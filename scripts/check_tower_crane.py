@@ -59,10 +59,13 @@ from config_lib import get_shared_config, get_expanded_optin
 from guidance_lib import read_sections, write_section, SECTION_CHECKER
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
+# consumers\ is private hub state, not shipped toolkit content - it lives at the outer root
+# (design\local_first_reframe.md's outer/inner split), one level above SHARED_ROOT (toolkit\).
+PROJECT_ROOT = SHARED_ROOT.parent
 HOOKS_DIR = SHARED_ROOT / 'hooks'
 TEMPLATES_DIR = SHARED_ROOT / 'templates'
 OPTINS_DIR = TEMPLATES_DIR / 'optins'
-CONSUMERS_DIR = SHARED_ROOT / 'consumers'
+CONSUMERS_DIR = PROJECT_ROOT / 'consumers'
 TESTS_DIR = SHARED_ROOT / 'tests'
 
 COUNTS = {'PASS': 0, 'WARN': 0, 'FAIL': 0}

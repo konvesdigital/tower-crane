@@ -42,8 +42,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
-CHANGE_REQUESTS_DIR = SHARED_ROOT / 'change_requests'
-STATE_PATH = SHARED_ROOT / '.claude' / 'automation_state.json'
+# change_requests\ and .claude\ are private/per-machine hub state, not shipped toolkit content -
+# both live at the outer root (design\local_first_reframe.md's outer/inner split), one level
+# above SHARED_ROOT (toolkit\).
+PROJECT_ROOT = SHARED_ROOT.parent
+CHANGE_REQUESTS_DIR = PROJECT_ROOT / 'change_requests'
+STATE_PATH = PROJECT_ROOT / '.claude' / 'automation_state.json'
 
 
 class Category:

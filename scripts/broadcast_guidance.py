@@ -39,7 +39,10 @@ from config_lib import get_shared_config
 from guidance_lib import read_sections, write_section, SECTION_BROADCAST, SECTION_CHECKER
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
-CONSUMERS_DIR = SHARED_ROOT / 'consumers'
+# consumers\ is private hub state, not shipped toolkit content - it lives at the outer root
+# (design\local_first_reframe.md's outer/inner split), one level above SHARED_ROOT (toolkit\).
+PROJECT_ROOT = SHARED_ROOT.parent
+CONSUMERS_DIR = PROJECT_ROOT / 'consumers'
 
 
 def parse_registry_minimal(path):

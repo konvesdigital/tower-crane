@@ -32,9 +32,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config_lib import get_shared_config, get_expanded_optin
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
+# consumers\ is private hub state, not shipped toolkit content - it lives at the outer root
+# (design\local_first_reframe.md's outer/inner split), one level above SHARED_ROOT (toolkit\).
+PROJECT_ROOT = SHARED_ROOT.parent
 TEMPLATES_DIR = SHARED_ROOT / 'templates'
 OPTINS_DIR = TEMPLATES_DIR / 'optins'
-CONSUMERS_DIR = SHARED_ROOT / 'consumers'
+CONSUMERS_DIR = PROJECT_ROOT / 'consumers'
 MENU_PATH = SHARED_ROOT / 'MENU.md'
 TMPL_PATH = TEMPLATES_DIR / 'consumer_CLAUDE.md.tmpl'
 

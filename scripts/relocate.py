@@ -35,8 +35,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config_lib import get_shared_config, get_expanded_optin
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
+# consumers\ is private hub state, not shipped toolkit content - it lives at the outer root
+# (design\local_first_reframe.md's outer/inner split), one level above SHARED_ROOT (toolkit\).
+PROJECT_ROOT = SHARED_ROOT.parent
 OPTINS_DIR = SHARED_ROOT / 'templates' / 'optins'
-CONSUMERS_DIR = SHARED_ROOT / 'consumers'
+CONSUMERS_DIR = PROJECT_ROOT / 'consumers'
 
 COUNTS = {'changed': 0, 'noop': 0, 'skipped': 0, 'warn': 0}
 
@@ -47,13 +50,14 @@ def write_utf8(path, content):
     path.write_text(content, encoding='utf-8', newline='\n')
 
 
-# Minimal registry reader - just the fields relocate needs (name, path, host, opted-in tools).
+# Minimal registry reader - just the fields relocate needs (name, path, host, opted-in tools,
+# imported template pieces).
 def read_registry_entry(path):
     raw = path.read_text(encoding='utf-8')
     m = re.search(r'```yaml\s*\r?\n(.*?)\r?\n```', raw, re.DOTALL)
     if not m:
         return None
-    obj = {'name': None, 'path': None, 'host': None, 'tools': []}
+    obj = {'name': None, 'path': None, 'host': None, 'tools': [], 'imports': []}
     section = None
     for line in re.split(r'\r?\n', m.group(1)):
         m1 = re.match(r'^name:\s*(.+?)\s*$', line)
@@ -77,7 +81,13 @@ def read_registry_entry(path):
         if re.match(r'^opted_in:\s*$', line):
             section = 'opted_in'
             continue
-        if re.match(r'^(imported|registered|owner):', line):
+        if re.match(r'^imported:\s*\[\s*\]\s*$', line):
+            section = None
+            continue
+        if re.match(r'^imported:\s*$', line):
+            section = 'imported'
+            continue
+        if re.match(r'^(registered|owner):', line):
             section = None
             continue
         if section == 'opted_in':
@@ -85,7 +95,40 @@ def read_registry_entry(path):
             if m1:
                 obj['tools'].append(m1.group(1))
                 continue
+        if section == 'imported':
+            m1 = re.match(r'^\s*-\s*piece:\s*(.+?)\s*$', line)
+            if m1:
+                obj['imports'].append(m1.group(1))
+                continue
     return obj
+
+
+# @import lines are baked into a consumer's CLAUDE.md at register/scaffold time from
+# config.local.json's import_base, same "already-baked, needs a relocate pass" situation as the
+# hook commands above - config_lib.py always recomputes import_base live, so this brings a
+# consumer's @import lines back in sync the same way the hook-command loop does for hooks/*.py.
+def fix_imports(consumer_path, imports, import_base, dry_run):
+    claude_path = Path(consumer_path) / 'CLAUDE.md'
+    if not claude_path.exists() or not imports:
+        return False
+    text = claude_path.read_text(encoding='utf-8')
+    lines = text.split('\n')
+    changed = False
+    for piece in imports:
+        pattern = re.compile(r'^@.*/' + re.escape(piece) + r'\.md\s*$')
+        expected = f"@{import_base}/{piece}.md"
+        for i, line in enumerate(lines):
+            if pattern.match(line) and line.rstrip('\r') != expected:
+                verb = 'would change' if dry_run else 'change'
+                print(f"  [{verb}] @import {piece}")
+                print(f"      from: {line.rstrip(chr(13))}")
+                print(f"      to:   {expected}")
+                lines[i] = expected
+                changed = True
+    if changed and not dry_run:
+        write_utf8(claude_path, '\n'.join(lines))
+        print(f"  wrote {claude_path}")
+    return changed
 
 
 def main():
@@ -134,9 +177,15 @@ def main():
             print(f"  [warn] path not found on disk: {c['path']}")
             COUNTS['warn'] += 1
             continue
+
+        imports_changed = fix_imports(c['path'], c['imports'], config['import_base'], args.dry_run)
+
         if not c['tools']:
-            print("  [no-op] no opted-in tools (prose-only consumer).")
-            COUNTS['noop'] += 1
+            if imports_changed:
+                COUNTS['changed'] += 1
+            else:
+                print("  [no-op] no opted-in tools (prose-only consumer).")
+                COUNTS['noop'] += 1
             continue
 
         settings_path = Path(c['path']) / '.claude' / 'settings.json'
@@ -194,6 +243,8 @@ def main():
             else:
                 write_utf8(settings_path, json.dumps(settings, indent=2))
                 print(f"  wrote {settings_path}")
+            COUNTS['changed'] += 1
+        elif imports_changed:
             COUNTS['changed'] += 1
         else:
             print("  [no-op] settings already current.")
