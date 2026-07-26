@@ -1,8 +1,8 @@
 <!--
 Shared protocol piece: continuity.md (OPTIONAL, default-on — decision 9).
-Home: ~\Documents\Claude\tower_crane\templates\continuity.md
+Home: ~\Documents\Claude\tower_crane\toolkit\templates\continuity.md
 Imported by a consumer's CLAUDE.md via:
-  @~/Documents/Claude/tower_crane/templates/continuity.md
+  @~/Documents/Claude/tower_crane/toolkit/templates/continuity.md
 Generalized from the tower_crane repo's own checkpoint/resume/archive conventions, stripped
 of tower_crane-specifics so it reads correctly in ANY consumer. The scaffolder imports this
 by default; a project opts out by dropping the import line (a clean, per-piece choice). Keep
@@ -100,21 +100,29 @@ single Decisions table. The procedures below read whatever is present.
 ### "resume"
 
 1. `git pull` (this project's own repo).
-2. **Ask whether to also sync the shared tower_crane hub** — a per-session yes/no question, not
-   a silent background pull: *"Also pull the shared tower_crane hub? (picks up new/fixed tools,
-   runs a local compliance check, and clears any pending guidance.)"* On **yes**:
-   - `git pull` inside the tower_crane hub clone — the same location this project's `@import`
-     lines resolve to (see the filing protocol, mandatory for every consumer, if you need the
-     exact path).
-   - Then, from inside that same clone, run `scripts\check_tower_crane.py --write-guidance`
-     (unfiltered, no `--consumer` flag — the hub's own per-machine `host:` scoping already
-     limits what that write touches to consumers registered on this machine). Pure Python, zero
-     AI cost, using whichever of `python3`/`python` this machine has.
-   On **no**: skip both — this project's guidance may lag until a future `resume` says yes, or
-   until the hub's own automation (if built) catches it on its own cadence.
+2. **Check the shared tower_crane hub for updates and compliance guidance** — both steps below are
+   read-only from this project's point of view (neither pulls or mutates the hub), so there's no
+   yes/no gate needed the way an actual pull would require:
+   - The hub is two nested git repos in one folder: an outer, private repo (nothing this project
+     imports lives there) and an inner `toolkit\` repo that actually holds the shared tools/
+     templates this project imports — the same location this project's `@import` lines resolve to
+     (see the filing protocol, mandatory for every consumer, if you need the exact path; `toolkit\`
+     is what's named there).
+   - From inside the hub's `toolkit\` folder, run `python scripts\update_toolkit.py --notify` (a
+     plain fetch + comparison against the hub's own last-reviewed baseline — never merges
+     anything). If it reports an update is available, mention it to the user, but do **not** `git
+     pull` `toolkit\` from this project's own session — reviewing and pulling it is the gated
+     `update` action, which only runs in a Claude Code session opened directly in the hub (the
+     diff-review procedure lives in the hub's own `CLAUDE.md`, not here). Pulling it from here
+     would bypass that trust-review gate.
+   - Then, from that same `toolkit\` folder, run `scripts\check_tower_crane.py --write-guidance`
+     (unfiltered, no `--consumer` flag — the hub's own per-machine `host:` scoping already limits
+     what that write touches to consumers registered on this machine). This runs against whatever
+     version of the checker is already present — no pull required. Pure Python, zero AI cost,
+     using whichever of `python3`/`python` this machine has.
 3. **Check for shared-tools compliance guidance** — see the compliance protocol: if
    `COMPLIANCE_GUIDANCE.md` exists in the project root, surface it now (this is also where
-   anything step 2's write-guidance just produced would show up).
+   anything step 2's `--write-guidance` run just produced would show up).
 4. Read `project_progress.md` — only the live-state sections your project uses: **Current
    Status** and/or **Current Focus**, **Next Up**, the **Decisions** (table, or the Locked/Open
    sections), the **active Phase** if the project is phased, and the **most recent Work Log

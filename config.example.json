@@ -18,7 +18,7 @@
     "automation.* (design\\sync_automation.md, Piece 3): the unattended ticket-processing agent.",
     "Off by default - flip 'enabled' to true only after running templates\\setup_automation.md's",
     "setup, which wires an hourly OS-scheduled task invoking scripts\\run_automation.py. 'mode'",
-    "has exactly one value for v1 ('propose_only') - reserved for a future narrower auto-apply",
+    "has exactly one value for v1 ('apply_direct') - reserved for a future narrower auto-apply",
     "tier, not implemented. 'target_remote' only needs a value if this machine's automation should",
     "watch a DIFFERENT hub than this clone's own git remote (rare) - leave empty to default to",
     "identity.git_remote above."
@@ -37,7 +37,7 @@
   },
   "automation": {
     "enabled": false,
-    "mode": "propose_only",
+    "mode": "apply_direct",
     "cadence_minutes": 60,
     "max_tickets_per_tick": 1,
     "max_attempts": 3,

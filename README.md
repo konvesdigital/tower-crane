@@ -101,12 +101,15 @@ you opted in by adding reference lines (a hook command in `.claude\settings.json
 lines in `CLAUDE.md`), and you can opt out any time by deleting them. Everything you get is
 **referenced, never copied**: your project holds a pointer to the shared file, not a duplicate.
 **If your project and this hub sit on the same machine, a fix reaches you the moment it's
-committed — no update to pull.** If the hub lives on a *different* machine (Federate, 2.4), the
-pointer only resolves to the current version once *your own machine's clone* of the hub is up to
-date — and nothing pulls that clone for you automatically today; your project's own `resume` only
-pulls your project's own repo. Run `git pull` yourself inside `~\Documents\Claude\tower_crane\`
-to pick up a fix (a `resume`-time prompt to do this is planned, not yet built — see
-`design\sync_automation.md`).
+committed** to the hub's `toolkit\` folder — no update to pull, since your `@import`/hook resolves
+straight to that file on disk. If the hub lives on a *different* machine (Federate, 2.4), the
+pointer only resolves to the current version once *your own machine's clone* of `toolkit\` is up
+to date. Your project's own `resume` (via `templates\continuity.md`) checks for this
+automatically — it runs `toolkit\scripts\update_toolkit.py --notify` (read-only, never a pull)
+and tells you if an update is waiting. Actually reviewing and pulling it is the separate, gated
+**`update`** action, which only runs in a Claude Code session opened directly in the hub (the
+diff-review procedure lives in the hub's own `CLAUDE.md`) — never from inside a consumer project,
+and never automatically, by design (`design\update_trust_review.md`).
 
 ### Getting set up
 Minimal version — full detail (and the hub-operator's-eye view) lives in
@@ -115,20 +118,20 @@ use this as a consumer:
 - **Someone already set this up for you** (they ran the scaffolder, or handed you a project whose
   `CLAUDE.md` already has `@import` lines) — you're done, nothing else to do.
 - **You're wiring your own existing project into someone else's hub yourself** — copy
-  `templates\register.md` from that hub into your project's root, open your project in Claude
-  Code, and say *"read register.md and follow it."* It swaps any pasted workflow prose for
-  `@import` lines and writes a registration request into the hub's `change_requests\` folder —
-  **you still need to `git add`/`commit`/`push` that file yourself** from inside the hub clone;
-  `register.md` doesn't do this for you yet. Once it's pushed, someone with hub access turns it
-  into a registry entry the next time they work in that repo. Nothing else from Track 2 is
-  required to do this part yourself.
+  `toolkit\templates\register.md` from that hub into your project's root, open your project in
+  Claude Code, and say *"read register.md and follow it."* It swaps any pasted workflow prose for
+  `@import` lines pointing into that hub's `toolkit\templates\`, and writes + commits + pushes a
+  registration request into the hub root's `change_requests\` folder (not inside `toolkit\`) —
+  that part's already handled by register.md's own steps. Once it's pushed, someone with hub
+  access turns it into a registry entry the next time they work in that repo. Nothing else from
+  Track 2 is required to do this part yourself.
 
 ### What else you'll see, day to day
 - **Filing a bug or improvement in a shared tool** — you don't fix it yourself. Drop a ticket in
-  this hub's `change_requests\` folder per `templates\filing.md` (already imported into your
-  `CLAUDE.md` if you're set up correctly), **then `git add`/`commit`/`push` it yourself** from
-  inside the hub clone — filing.md doesn't yet prompt for that push, and a ticket sitting
-  uncommitted on your own disk is invisible to the hub until you do.
+  the hub root's `change_requests\` folder (not inside `toolkit\`) per `toolkit\templates\
+  filing.md` (already imported into your `CLAUDE.md` if you're set up correctly), **then `git
+  add`/`commit`/`push` it yourself** from inside the hub root — a ticket sitting uncommitted on
+  your own disk is invisible to the hub until you do.
 - **Receiving guidance from the hub** — if this hub's checker finds your project has drifted, or
   the hub operator broadcasts a one-off notice, you'll find a `COMPLIANCE_GUIDANCE.md` file
   dropped in your project's root. Your own agent surfaces it at session start; see
@@ -146,56 +149,64 @@ You're running a Tower Crane hub — or about to start one, including if you jus
 from GitHub and want to set it up as your own.
 
 ### 2.1 Start a hub for the first time
-The repo carries no machine-specific paths — each clone/download provides its own via a
-gitignored config. This is the same first step whether it's your Nth machine on an existing hub
-or a hub you just downloaded and are running for the very first time:
+A hub is **two nested git repos in one folder**: an outer, private repo (your own continuity
+data — `project_progress.md`, `consumers\`, `change_requests\`) and an inner `toolkit\` repo (the
+shared tools/templates/`CLAUDE.md`, tracking the public `konvesdigital/tower-crane` repo). Neither
+carries machine-specific paths — each clone/download provides its own via a gitignored config
+inside `toolkit\`. Two cases reach this step:
 
-1. **Clone or unzip it wherever you want** — any path, any folder name — as long as it ends up
-   somewhere under your home directory. That's the one real constraint: consumers' `@import`
-   lines only resolve Claude Code's home-relative `~/...` form, so this repo needs to live under
-   `~` for that to work; there's no other "correct" location beyond that. `shared_root` /
-   `import_base` compute themselves from wherever you actually put it — nothing to type in.
-2. **Open it in Claude Code and say "read `templates\setup_machine.md` and follow it."** This is
-   the canonical, ask-don't-assume setup courier — it checks live for Python/git/`gh` rather than
-   assuming any of them, fills `config.local.json` for this machine, and runs `relocate.py` +
-   `check_tower_crane.py` to confirm a clean bill of health. **The only assumed prerequisite is
-   Claude Code itself**; without it, the same file is still just a plain checklist of CLI
-   commands a human can run and read the output of directly.
+1. **You just cloned or downloaded the public `konvesdigital/tower-crane` repo** — what you have
+   on disk right now *is* `toolkit\`, with no outer wrapper around it yet. **Open it in Claude
+   Code and say "read `templates\setup_machine.md` and follow it."** Its Step 0 detects this ("a
+   fresh public clone") and walks you through wrapping it in a new outer, private folder before
+   anything else.
+2. **You already have an outer folder** (your Nth machine on an existing hub, or one you just
+   bootstrapped per case 1) — any path, any folder name, as long as it ends up somewhere under
+   your home directory. That's the one real constraint: consumers' `@import` lines only resolve
+   Claude Code's home-relative `~/...` form, so the outer folder needs to live under `~` for that
+   to work. `shared_root` / `import_base` compute themselves from wherever `toolkit\` actually
+   ends up — nothing to type in. **Open the outer folder in Claude Code and say "read
+   `toolkit\templates\setup_machine.md` and follow it."** This is the canonical, ask-don't-assume
+   setup courier — it checks live for Python/git/`gh` rather than assuming any of them, fills
+   `toolkit\config.local.json` for this machine, and runs `relocate.py` + `check_tower_crane.py`
+   to confirm a clean bill of health. **The only assumed prerequisite is Claude Code itself**;
+   without it, the same file is still just a plain checklist of CLI commands a human can run and
+   read the output of directly.
 
-**If this folder ever moves or gets renamed later:** the next script you run notices on its own
+**If `toolkit\` ever moves or gets renamed later:** the next script you run notices on its own
 and prints a `[NOTICE]` explaining what changed. Nothing is broken — the location marker
 self-corrects automatically — but every already-onboarded consumer still has the OLD path baked
-into its hook command / `@import` lines. When you see that notice, run `scripts\relocate.py` to
-bring them back in sync.
+into its hook command / `@import` lines. When you see that notice, run
+`toolkit\scripts\relocate.py` to bring them back in sync.
 
 Maintainer tooling (`relocate.py`, `check_tower_crane.py`, the scaffolder, `seed_hub.py`,
-`publish_release.py`) is cross-platform Python. Run each with whichever Python 3 launcher
-`setup_machine.md` found on this machine (`python` on Windows, typically `python3` on
-macOS/Linux).
+`publish_release.py`) is cross-platform Python, living in `toolkit\scripts\`. Run each with
+whichever Python 3 launcher `setup_machine.md` found on this machine (`python` on Windows,
+typically `python3` on macOS/Linux).
 
 ### 2.2 Onboard a project as a consumer
 
 **Your own project (new or existing):**
 
-*A brand-new project* → run the scaffolder in this repo:
+*A brand-new project* → run the scaffolder, from inside `toolkit\`:
 ```
 scripts\new_consumer.py --target-path C:\Users\you\Documents\MyNewProject --project-name "My New Project"
 ```
 It creates *all* of the consumer's files in one shot — `.claude\settings.json` (opt-in hooks),
-`CLAUDE.md` (with `@import` lines), a skeleton `project_progress.md`, and a one-time
-`FIRST_RUN.md` checklist — plus the registry entry here. By default it opts into the
-`consistency_check` hook and imports the `filing` + `compliance` + `continuity` workflow pieces.
-Useful flags: `--no-continuity` (skip that piece), `--tools` with no values (no hooks), `--force`
-(overwrite). The new project's first session then runs `FIRST_RUN.md`: `git init`, **accept the
-one-time import dialog** (declining it disables `@import` permanently), and fill in the project
-overview.
+`CLAUDE.md` (with `@import` lines pointing into `toolkit\templates\`), a skeleton
+`project_progress.md`, and a one-time `FIRST_RUN.md` checklist — plus the registry entry here. By
+default it opts into the `consistency_check` hook and imports the `filing` + `compliance` +
+`continuity` workflow pieces. Useful flags: `--no-continuity` (skip that piece), `--tools` with no
+values (no hooks), `--force` (overwrite). The new project's first session then runs
+`FIRST_RUN.md`: `git init`, **accept the one-time import dialog** (declining it disables `@import`
+permanently), and fill in the project overview.
 
-*An existing, hand-built project* → copy `templates\register.md` into that project's root, open
-it in Claude Code, and say *"read register.md and follow it."* Its agent swaps any pasted
-workflow prose for `@import` lines and writes a registration request into `change_requests\` —
-**that project then needs to `git add`/`commit`/`push` the request itself** (register.md doesn't
-automate this push yet); only once it lands on this repo's GitHub remote does your next session
-here turn it into a registry entry. This is the migration path — it preserves everything
+*An existing, hand-built project* → copy `toolkit\templates\register.md` into that project's
+root, open it in Claude Code, and say *"read register.md and follow it."* Its agent swaps any
+pasted workflow prose for `@import` lines and writes + commits + pushes a registration request
+into the **hub root's** `change_requests\` folder (not inside `toolkit\`) — that's part of
+register.md's own steps. Only once it lands on the hub root's GitHub remote does your next
+session here turn it into a registry entry. This is the migration path — it preserves everything
 project-specific and only replaces shared, canonical prose.
 
 **Someone else's project:** mechanically identical to the above — you can run `new_consumer.py`
@@ -206,7 +217,7 @@ Track 1 is the complete set of hub mechanics they need; nothing else here is req
 
 ### 2.3 Run the hub day-to-day
 
-**Health check.** `scripts\check_tower_crane.py` is the platform's health check. It runs two
+**Health check.** `toolkit\scripts\check_tower_crane.py` is the platform's health check. It runs two
 passes: a **golden regression suite** (exercises each tool against known fixtures so a behavior
 regression is caught before it ships to consumers) and a **reference & drift scan** (confirms
 every consumer's wiring still resolves — hook paths exist, opt-in snippets still match, every
@@ -217,33 +228,36 @@ non-zero if anything fails.
 **The change-request round-trip.** A consumer that finds a bug or thinks of an improvement
 *files a request* rather than editing the shared file directly — this keeps each repo's git
 history honest (filing and fixing happen in separate repos and sessions).
-1. The consumer's agent drops a ticket into `change_requests\` (`Status: OPEN`) — **and the
-   consumer must commit and push it themselves** from inside the hub clone; nothing does this for
-   them yet (see `design\sync_automation.md`). An uncommitted ticket is invisible to the hub.
-2. The next time someone works in **this** repo and scans `change_requests\`, it gets picked up,
-   validated against *every* consumer (not just the filer), fixed, checked, and the commit SHA
-   recorded in the ticket. The ticket stays **OPEN**. If [2.8](#28-turn-on-unattended-ticket-processing-automation)'s
-   automation is turned on, this can also happen unattended — a fix arrives as a **PR** instead of
-   a direct commit, waiting on a human to review and merge it, rather than waiting on a human to
-   open a session here at all. Automation is off by default; without it, processing only happens
-   when a human is actually working in this repo.
-3. The consumer re-runs its own test and appends "verified PASS." Only then does this repo flip
+1. The consumer's agent drops a ticket into the **hub root's** `change_requests\` folder (not
+   inside `toolkit\`), `Status: OPEN`, and commits/pushes it — per `templates\filing.md`'s own
+   steps. An uncommitted ticket is invisible to the hub.
+2. The next time someone works in the hub and scans `change_requests\`, it gets picked up,
+   validated against *every* consumer (not just the filer), and fixed — committed locally to
+   `toolkit\`'s own `main` (the fix itself is never auto-pushed; that's exclusively
+   ["propose upstream"](#track-3--hub-architect)'s job) — with the commit SHA recorded in the
+   ticket via a separate commit pushed to the hub root's own remote. The ticket stays **OPEN**.
+   If [2.8](#28-turn-on-unattended-ticket-processing-automation)'s automation is turned on, this
+   can also happen unattended, fully automatically — no PR, no waiting on a human to review it,
+   since it's your own fix against your own toolkit and there's no second person in the loop.
+   Automation is off by default; without it, processing only happens when a human is actually
+   working in the hub.
+3. The consumer re-runs its own test and appends "verified PASS." Only then does the hub flip
    the ticket to **DONE**. *DONE means consumer-verified — not merely "fix applied."*
 
 The same machinery governs both executable tools **and** workflow prose. Not every change needs
 this ceremony, though — see [Track 3](#track-3--hub-architect) for when a change can propagate
 silently.
 
-**Push a fix down to one consumer.** When a consumer has drifted, this repo never reaches in and
-edits it. Instead, run the checker with `--write-guidance`: it drops a `COMPLIANCE_GUIDANCE.md`
-into that consumer's folder listing the exact deviations and fixes. The consumer's own agent
-surfaces that file at session start, summarizes it, asks the human, applies on confirmation, and
-deletes it.
+**Push a fix down to one consumer.** When a consumer has drifted, the hub never reaches in and
+edits it. Instead, from inside `toolkit\`, run the checker with `--write-guidance`: it drops a
+`COMPLIANCE_GUIDANCE.md` into that consumer's folder listing the exact deviations and fixes. The
+consumer's own agent surfaces that file at session start, summarizes it, asks the human, applies
+on confirmation, and deletes it.
 
-**Broadcast a notice to everyone at once.** `scripts\broadcast_guidance.py` pushes one
+**Broadcast a notice to everyone at once.** `toolkit\scripts\broadcast_guidance.py` pushes one
 hand-authored guidance file to the whole registry (or a single consumer via `--consumer`) through
 the same `COMPLIANCE_GUIDANCE.md` channel — for a one-off notice that isn't worth promoting into a
-permanent imported `templates\` piece.
+permanent imported `templates\` piece. Run from inside `toolkit\`:
 ```
 python scripts\broadcast_guidance.py --broadcast <notice.md>              # push to everyone
 python scripts\broadcast_guidance.py --broadcast <notice.md> --consumer geo_rank_tracker
@@ -253,7 +267,8 @@ python scripts\broadcast_guidance.py --status                             # who 
 `## Broadcast` section still present means pending/declined; gone means their agent applied it.
 
 **Turn this hub's own tools on for itself (dogfooding).** Tower Crane is not a registered
-consumer of itself by default. `scripts\self_hooks.py` closes that gap, per machine:
+consumer of itself by default. `toolkit\scripts\self_hooks.py` closes that gap, per machine (run
+from inside `toolkit\`):
 ```
 python scripts\self_hooks.py --list                       # what's available, what's on here
 python scripts\self_hooks.py --enable consistency_check    # turn one on
@@ -262,33 +277,28 @@ python scripts\self_hooks.py --disable consistency_check   # turn it back off
 State lives in `.claude\settings.local.json` (gitignored). Check what's on without running
 anything by opening `.claude\self_hooks_status.md`.
 
-### 2.4 Bring another machine or person onto this hub (Federate)
-Access control is **GitHub repo permissions — never a bespoke auth layer**. "Admin" just means
-*whoever holds merge/branch-protection rights* on this repo's GitHub remote; everyone else is a
-contributor who files tickets/PRs the same way any consumer project already does. Every clone —
-yours or theirs — is an equal peer; GitHub is the master copy, not any one machine.
+### 2.4 Bring another machine onto this hub (Federate)
+**This is for your own additional machines, not another person.** A 2026-07-25 design pass
+(`design\local_first_reframe.md`) retired "true multi-user, one shared hub" as a target use
+case — the write-access/trust boundary it implied has no real instance under normal use, and it's
+replaced by a simpler model: **each person runs their own private hub, and collaboration happens
+through the public `konvesdigital/tower-crane` repo's fork+PR channel** ([Track 3](#track-3--hub-architect)),
+never through shared write access to one person's outer (private) repo. If someone wants to build
+on your work, point them at [1. Track 1](#track-1--consumer--project-user) or
+[2.1](#21-start-a-hub-for-the-first-time) to stand up their **own** hub, not at write access to
+yours.
 
-1. **Grant them GitHub access** — collaborator or org team member. In practice, give **write**
-   access: filing a ticket currently means pushing a file to this repo yourself (see 2.3), so
-   read-only access isn't enough to actually participate today, even though filing conceptually
-   shouldn't require it. A true read-only filing path (fork+PR) isn't built.
-2. **They clone it wherever they want** (anywhere under their own home directory — see 2.1) and
-   run [2.1](#21-start-a-hub-for-the-first-time) on their own machine.
-3. **`gh auth login` + `git config user.*`** on their machine — ambient auth, never stored in a
+Federating your own machines together (same person, N machines, one hub — unaffected by the
+retirement above):
+1. **Clone the outer folder wherever you want** on the new machine (anywhere under your own home
+   directory — see 2.1), using your own git credentials against the outer repo's own (private)
+   remote.
+2. Run [2.1](#21-start-a-hub-for-the-first-time) case 2 on that machine — it walks through
+   `setup_machine.md` for the new clone.
+3. **`gh auth login` + `git config user.*`** on that machine — ambient auth, never stored in a
    tracked file.
-4. **The registry stays one shared union** — every consumer project from every person lives in
-   the same `consumers\` folder; `owner:` is attribution only, never a visibility boundary. If
-   you need to actually hide one person's projects, that's Replicate (2.5), not a registry
-   setting.
-5. **Round-trip log lines name the person**, not just the project, once there's more than one
-   contributor.
-6. **"Never edit a shared file directly" (`filing.md`) is a written convention, not a
-   GitHub-enforced rule** — anyone with write access can technically push straight to
-   `hooks\`/`scripts\`/`templates\`. Branch protection to actually block that is a one-time
-   GitHub repo setting you can add yourself; Tower Crane's own scripts don't configure it. This
-   matters more, not less, once [2.8](#28-turn-on-unattended-ticket-processing-automation)'s
-   automation is on — an unattended PR specifically needs a human's eyes before merge in a way a
-   same-session human-authored change never did.
+4. Everything under `consumers\`/`change_requests\`/`project_progress.md` syncs the same way any
+   git-backed continuity data does — ordinary `checkpoint`/`resume` on the outer repo.
 
 ### 2.5 Stand up a separate, independent hub (Replicate)
 To hand someone a **separate** hub — its own GitHub repo, its own empty registry, none of this
@@ -422,32 +432,44 @@ Replicate), `design\broadcast_guidance.md` (the broadcast primitive's scoping de
 ## Reference
 
 ### Where things live
+The hub is two nested git repos. Paths below are grouped by which one actually owns them.
+
+**Outer repo (private — your own continuity data, never shared publicly):**
+| Path | What it is |
+|---|---|
+| `consumers\` | The consumer registry — one file per opted-in project. |
+| `change_requests\` | The inbox — tickets from consumers and registration requests. |
+| `design\` | Rationale docs — see Track 3. |
+| `project_progress.md` | Cross-session working state for this hub. |
+| `CLAUDE.md` | A one-line pointer (`@import`) at `toolkit\CLAUDE.md` — kept here only so Claude Code auto-loads it. |
+| `.claude\settings.local.json`, `.claude\self_hooks_status.md` | This hub's own self-use state — gitignored, per-machine. |
+| `toolkit\` | The inner repo below — gitignored by this outer repo entirely. |
+
+**Inner `toolkit\` repo (shared, tracks the public `konvesdigital/tower-crane` repo):**
 | Path | What it is |
 |---|---|
 | `MENU.md` | Catalog of the shareable tools and their opt-in snippets. |
-| `consumers\` | The consumer registry — one file per opted-in project. |
 | `templates\` | Shared workflow prose (`filing`, `compliance`, `continuity`) + couriers (`register.md`, `bootstrap_hub.md`, `setup_machine.md`) + opt-in JSON under `optins\`. |
-| `change_requests\` | The inbox — tickets from consumers and registration requests. |
-| `scripts\` | Maintainer tooling — see 2.1-2.7 above for what each one does. |
+| `scripts\` | Maintainer tooling, including `update_toolkit.py` (the `update` action) — see 2.1-2.7 above for what each one does. |
 | `hooks\`, `agents\` | The executable tools themselves. |
-| `.claude\settings.local.json`, `.claude\self_hooks_status.md` | This repo's own self-use state — gitignored, per-machine. |
 | `CHANGELOG.md` | What's in each public release. |
 | `config.example.json` / `config.local.json` | Per-machine config. `.example` committed; `.local` gitignored. |
-| `design\` | Rationale docs — see Track 3. |
-| `project_progress.md` | Cross-session working state for this repo. |
-| `CLAUDE.md` | The Claude Code agent's per-session operating manual. Not human onboarding — that's this file. |
+| `CLAUDE.md` | The Claude Code agent's per-session operating manual — the canonical content. Not human onboarding — that's this file. |
+| `.last_reviewed_sha`, `.update_pending.json` | The `update` action's per-machine trust-review state — gitignored. |
 
 ### Quick-start cheat sheet
 | I want to... | Do this |
 |---|---|
-| Onboard a project | `scripts\new_consumer.py` (new) or `templates\register.md` (existing) — 2.2 |
-| Confirm the fleet is healthy | `scripts\check_tower_crane.py` — 2.3 |
+| Onboard a project | `toolkit\scripts\new_consumer.py` (new) or `toolkit\templates\register.md` (existing) — 2.2 |
+| Confirm the fleet is healthy | `toolkit\scripts\check_tower_crane.py` — 2.3 |
 | Push a drift fix to one consumer | checker with `--write-guidance` — 2.3 |
-| Push a notice to everyone | `scripts\broadcast_guidance.py --broadcast <file>` — 2.3 |
-| Turn on this hub's own tools | `scripts\self_hooks.py --enable <tool>` — 2.3 |
+| Push a notice to everyone | `scripts\broadcast_guidance.py --broadcast <file>` (from inside `toolkit\`) — 2.3 |
+| Turn on this hub's own tools | `scripts\self_hooks.py --enable <tool>` (from inside `toolkit\`) — 2.3 |
 | Set up on a new machine | 2.1 |
-| Add another machine/person (Federate) | 2.4 |
-| Generate an independent hub (Replicate) | `scripts\seed_hub.py --out <path>` — 2.5 |
-| Publish a release | `CHANGELOG.md` entry + `scripts\publish_release.py --version X.Y.Z` — 2.6 |
+| Add another of your own machines (Federate) | 2.4 |
+| Pull a reviewed toolkit update | `update` action, via `toolkit\scripts\update_toolkit.py` — see `CLAUDE.md`'s `"update"` procedure |
+| Propose a fix upstream | `"propose upstream"` — see `CLAUDE.md`'s procedure |
+| Generate an independent hub (Replicate) | `toolkit\scripts\seed_hub.py --out <path>` — 2.5 |
+| Publish a release | `CHANGELOG.md` entry + `toolkit\scripts\publish_release.py --version X.Y.Z` — 2.6 |
 | Flip the public repo public | `gh repo edit <owner>/<repo> --visibility public` — 2.6 |
 | Add a new shareable tool | 2.7 |

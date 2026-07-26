@@ -1,5 +1,5 @@
 <!--
-Home: ~\Documents\Claude\tower_crane\templates\register.md
+Home: ~\Documents\Claude\tower_crane\toolkit\templates\register.md
 This is the PORTABLE onboarding/migration file. Copy it into the ROOT of any existing project
 that should join the tower_crane platform, then open that project in Claude Code and say:
 "read register.md and follow it." It is deliberately self-contained: a project that hasn't
@@ -26,16 +26,20 @@ Ask the user where their tower_crane hub lives on this machine — **do not assu
 guess you may check whether `~\Documents\Claude\tower_crane\` exists and offer it as the likely
 answer, but confirm either way: there is no fixed conventional install location (tower_crane's own
 self-locating install design — the hub can live anywhere, under any folder name, as long as it's
-somewhere under the user's home directory). Verify `<hub>\templates\` exists at the confirmed path;
-if not, stop and ask again — every later step depends on it.
+somewhere under the user's home directory). The hub itself is two nested git repos in one folder —
+an outer, private **hub root**, and an inner `toolkit\` repo that actually holds the shared
+templates this project will import. Verify `<hub root>\toolkit\templates\` exists at the confirmed
+path (not `<hub root>\templates\` — that's the pre-split layout); if not, stop and ask again —
+every later step depends on it.
 
-Once confirmed, compute this machine's **import base**: take the hub's absolute path, express it
-relative to the user's home directory, forward-slash form, prefixed `~/` and suffixed `/templates`
-— e.g. a hub at `C:\Users\<user>\Documents\Claude\tower_crane` gives
-`~/Documents/Claude/tower_crane/templates`. (This mirrors the hub's own `config_lib.py`
+Once confirmed, compute this machine's **import base**: take the hub root's absolute path, express
+it relative to the user's home directory, forward-slash form, prefixed `~/` and suffixed
+`/toolkit/templates` — e.g. a hub root at `C:\Users\<user>\Documents\Claude\tower_crane` gives
+`~/Documents/Claude/tower_crane/toolkit/templates`. (This mirrors the hub's own `config_lib.py`
 `import_base` computation — same algorithm, done by hand here since this project has no copy of
-that script.) Call this value `<import_base>` — use it everywhere a path into the hub is needed
-below; never hardcode the example path above.
+that script.) Call this value `<import_base>` — use it everywhere a path into `toolkit\` is needed
+below; never hardcode the example path above. `change_requests\` (Step 5) lives directly under the
+**hub root**, not inside `toolkit\` — keep the two paths distinct.
 
 ## Step 1 — Inventory this project
 - Read this project's `CLAUDE.md` (if any). Identify **pasted shared-workflow prose** — checkpoint /
@@ -103,9 +107,10 @@ permanently for this project).
 ## Step 5 — File the registration request (the shared side creates the registry entry)
 You **cannot** edit tower_crane files directly — that's the platform's governance rule (consumers
 only *file*; the registry entry is authored in a tower_crane session). So drop a registration request
-into the shared change-request inbox, inside the hub clone located in Step 0. Create:
+into the shared change-request inbox, inside the hub root located in Step 0 — **not** inside
+`toolkit\`. Create:
 
-`<hub clone>\change_requests\<YYYY-MM-DD>_register_<slug>.md`
+`<hub root>\change_requests\<YYYY-MM-DD>_register_<slug>.md`
 
 where `<slug>` is this project's name lowercased with every run of non-alphanumeric characters turned
 into a single underscore (e.g. "My Cool Project" -> `my_cool_project`). Contents (the outer fence below
@@ -153,13 +158,14 @@ Rules for filling the block:
 - **`imported`** = one `{ piece, since }` per `@import` line you added in Step 2 (drop `continuity` if
   you skipped it). `since` = today.
 
-Once the ticket file is written and filled in, **from inside the hub clone**, `git add` it, commit
+Once the ticket file is written and filled in, **from inside the hub root** (not `toolkit\` —
+`change_requests\` belongs to the hub root's own repo, with its own remote), `git add` it, commit
 (e.g. `git commit -m "Register: <slug>"`), and `git push`. The registration only reaches the shared
-side once it's pushed to the hub's GitHub remote — this requires write access to the hub's repo, not
-just read.
+side once it's pushed to the hub root repo's GitHub remote — this requires write access to that
+repo, not just read.
 
 ## Step 6 — Finish
-- Confirm the registration request file was written into the hub clone's `change_requests\` folder
+- Confirm the registration request file was written into the hub root's `change_requests\` folder
   **and pushed** to its GitHub remote.
 - **Delete this `register.md`** from the project root (it's a one-time courier file).
 - Tell the user: the tower_crane agent will create the `consumers\<slug>.md` registry entry on its

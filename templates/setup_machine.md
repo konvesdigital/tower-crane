@@ -1,18 +1,21 @@
 <!--
-Home: templates\setup_machine.md  (part of the tower_crane pattern — floats on HEAD)
+Home: toolkit\templates\setup_machine.md  (part of the tower_crane pattern — floats on HEAD)
 This is the CANONICAL per-machine setup courier: fills config.local.json for THIS machine/clone by
 checking and asking, never assuming. Referenced (never copied/duplicated) from three places, so it
 stays the single source of truth:
   - README.md's "Setup (fresh clone / new machine)" section — Federate: joining or re-setting up a
     clone of an existing hub.
   - templates\bootstrap_hub.md Step 7 — Replicate: a freshly-bootstrapped independent hub's first
-    setup.
+    setup. (Note: bootstrap_hub.md itself still describes the pre-split single-repo layout and
+    hasn't been reconciled with the outer/inner split yet — its own fate is tied to the still-open
+    seed_hub.py/publish_release.py retirement decision, see project_progress.md Next Up.)
   - the generated SETUP.md that scripts\seed_hub.py writes into every distributed hub — Replicate
     recipient's first setup. (This file ships automatically — templates\ is a KEEP dir.)
 
-How it's used: open this repo/hub in Claude Code and say "read templates\setup_machine.md and
-follow it." **The only assumed prerequisite is Claude Code itself running this session** — Python,
-git, gh, and this machine's path conventions are all checked live, never assumed.
+How it's used: open the hub (the outer folder — see Step 0 below if you're not sure one exists yet)
+in Claude Code and say "read toolkit\templates\setup_machine.md and follow it." **The only assumed
+prerequisite is Claude Code itself running this session** — Python, git, gh, and this machine's path
+conventions are all checked live, never assumed.
 
 Without Claude Code: every step below is still just a CLI command and a question — substitute
 yourself for "the agent," run the same commands, answer the same questions.
@@ -31,10 +34,52 @@ something expected is missing, say so plainly and ask the user what to do.
 Work through this **with the user in the loop**: narrate each check as you run it, and show the
 final `config.local.json` for explicit confirmation before writing it (Step 7).
 
-## Step 0 — Confirm there's something to set up
-Verify `config.example.json` exists in this repo's root. If `config.local.json` already exists and
-looks filled in (no `<...>` placeholders left), tell the user and ask whether they want to redo it or
-stop here — don't overwrite a working config by default.
+## Step 0 — Detect what you're starting from
+The hub is two nested git repos in one folder: an outer, private repo (holds `project_progress.md`,
+`consumers\`, `change_requests\` — the user's own continuity data) and an inner `toolkit\` repo
+(holds `hooks\`, `scripts\`, `templates\`, `CLAUDE.md`, `config.example.json` — this file included).
+Two different starting points reach this file, and you need to tell them apart before doing
+anything else — ask the user directly if it isn't obvious; don't guess from folder names alone.
+
+**A. An existing hub, already set up.** You're running from inside `toolkit\`, and the outer folder
+one level up already has (or is meant to have) `project_progress.md`/`consumers\`/
+`change_requests\`. Verify `config.example.json` exists in **this** (`toolkit\`) folder's root. If
+`config.local.json` also exists here and looks filled in (no `<...>` placeholders left), tell the
+user and ask whether they want to redo it or stop here — don't overwrite a working config by
+default. Otherwise, skip straight to Step 1.
+
+**B. A fresh public clone — nothing wrapping it yet.** The user just cloned or downloaded
+`konvesdigital/tower-crane` directly, so what they're sitting in right now **is** the toolkit
+content itself (`hooks\`, `scripts\`, `templates\`, `CLAUDE.md`, `config.example.json` all present),
+but there's no outer folder around it — none of `project_progress.md`/`consumers\`/
+`change_requests\`/`design\` exist anywhere yet. Tower Crane needs that outer layer to actually work
+day to day (it's where the user's own project tracking and tickets live) — go to "Bootstrapping the
+outer hub" below before continuing to Step 1.
+
+### Bootstrapping the outer hub (only if B)
+1. Explain plainly what's about to happen: this folder needs to become a `toolkit\` subfolder one
+   level inside a new outer folder — the outer folder is the user's own **private** space (their
+   own GitHub repo, never the public one) holding `project_progress.md`, `consumers\`,
+   `change_requests\`, and a thin `CLAUDE.md` pointer importing `toolkit\CLAUDE.md`.
+2. Ask the user to confirm (or pick) the new outer folder's name and location — don't assume
+   `tower_crane`; ask.
+3. This session's own working directory sits inside the folder that needs to move, so **this step
+   can't be finished by Claude Code alone, mid-session** — give the user the exact commands to run
+   themselves (adapt for their OS/shell: e.g. on Windows, from the parent of the current folder,
+   `mkdir <outer-name>` then `move <current-folder-name> <outer-name>\toolkit`; the `mv` equivalent
+   on macOS/Linux), then ask them to close this session. `git remote -v` inside the moved folder
+   should still show `origin` pointing at `konvesdigital/tower-crane` afterward — nothing about the
+   toolkit clone itself changes, only its location.
+4. Tell the user: once moved, open Claude Code fresh inside the new outer folder and say "read
+   `toolkit\templates\setup_machine.md` and follow it" again — this time Step 0 detects scenario A,
+   and the rest of this file builds `config.local.json` as normal.
+5. If they want a private GitHub repo backing the new outer folder (recommended, for backup/
+   continuity — see `design\local_first_reframe.md` if curious why this matters), offer to help once
+   the new session starts: `gh repo create <name> --private`, `git init`, add the remote, a
+   `.gitignore` with `/toolkit/`, a thin `CLAUDE.md` pointer (`@~/<path-to-outer>/toolkit/CLAUDE.md`),
+   empty `consumers\`/`change_requests\`/`design\` folders, and a skeleton `project_progress.md`
+   (same shape `templates\register.md`'s Step 3 writes). One-time setup, only for a brand-new outer
+   hub.
 
 ## Step 1 — This machine's OS
 You already know this from your own environment context (the platform your session is running on) —
@@ -82,23 +127,28 @@ user if you can't run shell commands directly) and propose it as `host_id`. Conf
 rather than silently accepting it — they may want a different label.
 
 ## Step 6 — Identity
+`identity.git_remote` means the **outer** hub's own private remote (the one behind
+`project_progress.md`/`consumers\`/`change_requests\`) — not `toolkit\`'s own `origin`, which
+already points at the public `konvesdigital/tower-crane` repo and needs no separate recording here.
 Don't ask blind — check first, then confirm:
 - `git config user.name` / `git config user.email` — if already set, propose using those values.
-- `git remote get-url origin` — if set, propose that as `git_remote`. If this is a brand-new hub with
-  no remote yet, ask the user for the GitHub URL they intend to use (or tell them to create one first
-  if they haven't).
+- Run `git remote get-url origin` **from the outer folder** (one level up from `toolkit\`) — if set,
+  propose that as `git_remote`. If the outer folder has no remote yet (a brand-new hub), ask the
+  user for the GitHub URL they intend to use, or tell them to create one first if they haven't.
 Only ask outright for whatever the checks above don't already answer.
 
 ## Step 7 — Write config.local.json (confirm first)
-Show the user the complete proposed `config.local.json` built from Steps 2-6 and get an explicit
-go-ahead before writing it.
+`config.local.json` lives inside `toolkit\` (alongside `config.example.json`), not in the outer
+folder. Show the user the complete proposed `config.local.json` built from Steps 2-6 and get an
+explicit go-ahead before writing it.
 
 ## Step 8 — Regenerate and verify
-`scripts\relocate.py` and `scripts\check_tower_crane.py` are cross-platform Python — they run the
-same way on Windows, macOS, and Linux, using whichever launcher Step 2 found (`python3` or `python`).
+`toolkit\scripts\relocate.py` and `toolkit\scripts\check_tower_crane.py` are cross-platform Python —
+they run the same way on Windows, macOS, and Linux, using whichever launcher Step 2 found (`python3`
+or `python`).
 
-Run `scripts\relocate.py` (regenerates any registered consumers' hook commands for this machine),
-then `scripts\check_tower_crane.py` to confirm a clean bill of health.
+From inside `toolkit\`, run `scripts\relocate.py` (regenerates any registered consumers' hook
+commands for this machine), then `scripts\check_tower_crane.py` to confirm a clean bill of health.
 
 ## Step 9 — Finish
 Confirm to the user: `config.local.json` is filled and validated. This machine is ready to
