@@ -1,0 +1,46 @@
+{
+  "_comment": [
+    "Tower Crane per-machine config. COMMITTED template — copy to config.local.json (gitignored)",
+    "and fill with this machine's real values. See design\\portability.md and README.md.",
+    "All fields are non-secret setup pointers — NEVER put tokens or logins here (git/gh auth stays",
+    "in its ambient stores: `gh auth login`, `git config`). Keys beginning with _ are ignored by readers.",
+    "shared_root: leave this as an empty string. It fills itself in automatically the first time",
+    "any tower_crane script runs, computed from wherever this folder actually is — no path to pick,",
+    "no convention to follow, works from any location/name. It also self-corrects if the folder is",
+    "later moved or renamed (config_lib.py notices the mismatch and tells you to run relocate.py so",
+    "already-registered consumers catch up). The one requirement: this repo must live somewhere",
+    "under your home directory, since Claude Code's @import only resolves home-relative '~/...' paths.",
+    "python_launcher: the command that runs Python 3 on THIS machine. 'python' on Windows;",
+    "on macOS/Linux it is usually 'python3' (bare 'python' is often Python 2 or absent) - set it to",
+    "whatever `<launcher> --version` reports as Python 3.x here.",
+    "publish.* is only needed if you run scripts\\publish_release.py (cutting a Replicate release",
+    "to a separate public storefront repo). Leave the placeholders if you don't use it.",
+    "automation.* (design\\sync_automation.md, Piece 3): the unattended ticket-processing agent.",
+    "Off by default - flip 'enabled' to true only after running templates\\setup_automation.md's",
+    "setup, which wires an hourly OS-scheduled task invoking scripts\\run_automation.py. 'mode'",
+    "has exactly one value for v1 ('propose_only') - reserved for a future narrower auto-apply",
+    "tier, not implemented. 'target_remote' only needs a value if this machine's automation should",
+    "watch a DIFFERENT hub than this clone's own git remote (rare) - leave empty to default to",
+    "identity.git_remote above."
+  ],
+  "shared_root": "",
+  "python_launcher": "python",
+  "host_id": "<this machine's hostname, e.g. the value of %COMPUTERNAME%>",
+  "identity": {
+    "git_user_name": "<your name for `git config user.name`>",
+    "git_user_email": "<your email for `git config user.email`>",
+    "git_remote": "<the Tower Crane GitHub remote this clone points at, e.g. https://github.com/you/tower-crane>"
+  },
+  "publish": {
+    "public_repo_path": "<ABSOLUTE PATH to a persistent local clone of the public storefront repo, e.g. C:\\Users\\you\\Documents\\Claude\\tower_crane_public>",
+    "public_repo_remote": "<the public storefront repo's GitHub URL, e.g. https://github.com/you/tower-crane.git>"
+  },
+  "automation": {
+    "enabled": false,
+    "mode": "propose_only",
+    "cadence_minutes": 60,
+    "max_tickets_per_tick": 1,
+    "max_attempts": 3,
+    "target_remote": ""
+  }
+}

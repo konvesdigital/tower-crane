@@ -1,0 +1,15 @@
+# Portability: per-machine config (real values). Never committed — each clone fills its own
+# from config.example.json. This gitignored file IS the federation mechanism (design\portability.md).
+/config.local.json
+
+# Update trust review (design\update_trust_review.md): per-machine record of the last reviewed
+# public-repo commit. Never committed - it's a property of this specific clone, not the toolkit.
+/.last_reviewed_sha
+
+# OS / editor cruft
+Thumbs.db
+*.tmp
+
+# Python
+__pycache__/
+*.pyc

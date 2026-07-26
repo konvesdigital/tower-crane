@@ -1,0 +1,42 @@
+<!--
+Template: consumer_CLAUDE.md.tmpl
+Home: ~\Documents\Claude\tower_crane\templates\consumer_CLAUDE.md.tmpl
+Used by the scaffolder (scripts\new_consumer.py) to write a NEW consumer's CLAUDE.md.
+This is a TEMPLATE, not an imported float-on-HEAD file: the scaffolder materializes a
+copy into the new project once, doing token substitution below. Editing this template does
+NOT retroactively change existing consumers (unlike the @import protocol pieces, which do).
+
+Substitution tokens the scaffolder replaces:
+  {{PROJECT_NAME}}        - full title in Title Case (e.g. "Geo Rank Tracker")
+  {{DATE}}                - scaffold date, YYYY-MM-DD
+  {{SHARED_TOOLS_LIST}}   - bullet list of opted-in tools (or a "none yet" line)
+  {{PROTOCOL_IMPORTS}}    - @import lines for the selected protocol pieces
+The scaffolder strips this comment block from the materialized copy.
+-->
+
+# Project: {{PROJECT_NAME}}
+
+<!-- FIRST_RUN: replace this block with a real project overview — what this project is,
+     who it's for, and any constraints an agent must know. Delete this comment when done. -->
+_Project overview goes here (see `FIRST_RUN.md`)._
+
+## Tower Crane In Use
+
+This project opts into reusable Claude Code tooling from the tower_crane repo at
+`~\Documents\Claude\tower_crane\`. These are referenced (float-on-HEAD), not
+copied — an update ratified in tower_crane reaches this project the next time it runs. Do not
+edit the shared files; to report a bug or request an improvement, follow the filing protocol
+imported below.
+
+Opted-in tools (wired {{DATE}}):
+
+{{SHARED_TOOLS_LIST}}
+
+## Shared Workflow Protocol
+
+The following operating conventions are imported from tower_crane and float on HEAD — edits
+ratified there reach this project automatically. The first launch triggers a one-time
+import-approval dialog; accept it (see `FIRST_RUN.md`). To opt a piece out, remove its import
+line — a clean, per-piece choice (the shared checker will note the drift, but it is not blocked).
+
+{{PROTOCOL_IMPORTS}}
