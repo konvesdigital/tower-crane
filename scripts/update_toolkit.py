@@ -34,8 +34,12 @@ baseline (same bootstrap assumption as an SSH known_hosts first connection or a 
 install; nothing to review yet since nothing has been pulled through this gate before).
 
 Update is always the user's choice, never assumed or forced (Locked 2026-07-26) - this script never
-runs itself; nothing schedules --check automatically. See "Check for update" (separate, not-yet-built
-proactive notice) for the low-lift heads-up half of that story.
+runs itself; nothing schedules --check automatically.
+
+  --notify    The "check for update" proactive notice (design\\local_first_reframe.md): plain
+              fetch + comparison against last_reviewed_sha, no golden suite, no pending-file
+              write, never mutates state. Prints one line. Safe on any cadence (resume, cron) -
+              never triggers the full review gate; that stays --check, user-initiated only.
 """
 
 import argparse
@@ -212,6 +216,31 @@ def cmd_approve(cfg):
     print(f"Approved. Trusted baseline advanced to {pending['target'][:8]}. toolkit\\ is up to date.")
 
 
+def cmd_notify():
+    """The 'check for update' proactive notice (design\\local_first_reframe.md): a plain fetch +
+    comparison against last_reviewed_sha, no LLM, no golden suite, no pending-file write - never
+    mutates anything, safe to run on any cadence (resume, cron). Surfaces a single line; never
+    triggers the full review gate (that stays --check, user-initiated only)."""
+    fetch = _git(['fetch', 'origin'], check=False)
+    if fetch.returncode != 0:
+        print("[update check] couldn't fetch origin (offline?) - skipping.")
+        return
+
+    target = origin_main_sha()
+    base = read_last_reviewed()
+    if base is None or not _sha_exists(base):
+        print("[update check] no reviewed baseline yet - run `update` to establish one.")
+        return
+
+    if not _git(['diff', '--quiet', base, target], check=False).returncode:
+        print("[update check] toolkit\\ is up to date - nothing to review.")
+        return
+
+    count = _git(['rev-list', f'{base}..{target}', '--count']).stdout.strip()
+    print(f"[update check] a tower_crane update is available ({count} commit(s) since last "
+          "review) - run `update` to review and pull it in.")
+
+
 def cmd_reject():
     print("=== update_toolkit.py --reject ===")
     pending = load_pending()
@@ -233,7 +262,13 @@ def main():
                         help="Fetch and run the review gate (default if no flag given).")
     group.add_argument('--approve', action='store_true', help="Finalize a pending --check PASS.")
     group.add_argument('--reject', action='store_true', help="Discard a pending --check PASS.")
+    group.add_argument('--notify', action='store_true',
+                        help="Lightweight one-line heads-up, no golden suite, no state mutation.")
     args = parser.parse_args()
+
+    if args.notify:
+        cmd_notify()
+        return
 
     cfg = get_shared_config(SHARED_ROOT)
 

@@ -1,21 +1,35 @@
 #!/usr/bin/env python3
 """
-run_automation.py - Piece 3 of sync automation (design\\sync_automation.md): the wrapper an
-OS-level scheduled task (Task Scheduler / cron, see templates\\setup_automation.md) invokes
-hourly to keep the hub clone current, carry Piece 2b's compliance-guidance write, and propose a
-PR for at most one fix-worthy change_requests\\ ticket per tick.
+run_automation.py - Piece 3 of sync automation (design\\sync_automation.md, concrete outer/inner
+mechanics in design\\automation_repo_targeting.md): the wrapper an OS-level scheduled task (Task
+Scheduler / cron, see templates\\setup_automation.md) invokes hourly to carry Piece 2b's
+compliance-guidance write and apply at most one fix-worthy change_requests\\ ticket per tick.
 
 No-op (exit 0) unless config.local.json's automation.enabled is true - the scheduled task can
 exist unconditionally; the config flag is the real switch (same "available but off by default"
 posture as scripts\\self_hooks.py).
 
+Two separate repos, two separate git targets (design\\automation_repo_targeting.md, "Decision 1"):
+a ticket's tool fix physically lives in `toolkit\\` (SHARED_ROOT) and commits there, LOCAL ONLY -
+no push, ever (toolkit\\'s only remote is the public repo; pushing there unattended would bypass
+the "propose upstream" review gate). The ticket's own round-trip log line/bookkeeping commits AND
+pushes to the outer (private) repo (PROJECT_ROOT), same target `ticket_scan.py`'s bookkeeping uses.
+
+Never runs `toolkit\\`'s own update/merge gate (`scripts\\update_toolkit.py --check`/`--approve`) -
+only `--notify`, a plain surfacing check with no state mutation (design\\automation_repo_targeting.md,
+"Decision 2"; design\\update_trust_review.md's Fix-1-point-4). Unattended automation never advances
+`last_reviewed_sha` or adopts upstream content on its own.
+
 HARD ARCHITECTURAL RULE - judgment vs. mechanics split (locked in design\\sync_automation.md's
 Piece 3 planning): the headless `claude -p` invocation this script makes gets NO git/gh/Bash
-access. It edits the target shared-tool file(s) and nothing else. Every git/gh call - branch,
-commit, push, PR creation - and the check_tower_crane.py pass/fail gate live here, in
-deterministic Python. This makes "never push an unvalidated fix" and "the agent can't merge/push/
-branch on its own" true by construction, not by trusting a prompt instruction. A defensive diff
-check (PROTECTED_PATHS) still runs before anything is staged, in case the agent tries anyway.
+access. It edits the target shared-tool file(s) and nothing else. Every git call - the toolkit
+commit, the outer-repo bookkeeping commit+push - and the check_tower_crane.py pass/fail gate live
+here, in deterministic Python. This makes "never push an unvalidated fix" and "the agent can't
+commit/push on its own" true by construction, not by trusting a prompt instruction. A defensive
+before/after snapshot of the OUTER repo's own git status runs around the agent invocation, in case
+it tries to reach outside `toolkit\\` anyway (design\\automation_repo_targeting.md, "Decision 3" -
+supersedes the old SHARED_ROOT-relative PROTECTED_PATHS check, which post-split can no longer even
+see a write into a sibling repo).
 
 VERIFIED LIVE (2026-07-24, do not regress this): `scripts\\automation_settings.json` must list
 Bash (and WebFetch/WebSearch/Agent/NotebookEdit) under `permissions.deny`, not merely omit them
@@ -28,17 +42,15 @@ no Bash tool available, not "denied when attempted" - `permission_denials` staye
 was never offered the tool to try). Re-verify this empirically again if `automation_settings.json`
 or the `claude` CLI's permission handling ever changes.
 
-Never merges its own PR. Never flips a ticket's Status directly (only ticket_scan.py's
-mechanical, zero-judgment DONE-flip for an already-consumer-verified ticket does that).
+Never flips a ticket's Status directly (only ticket_scan.py's mechanical, zero-judgment DONE-flip
+for an already-consumer-verified ticket does that).
 """
 
 import argparse
 import json
-import os
 import re
 import subprocess
 import sys
-import tempfile
 from datetime import date
 from pathlib import Path
 
@@ -47,26 +59,25 @@ from config_lib import get_shared_config
 import ticket_scan
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
+# The outer (private) repo - change_requests\/project_progress.md live here, a sibling of the inner
+# toolkit\ repo SHARED_ROOT points at (design\local_first_reframe.md's outer/inner split).
+PROJECT_ROOT = SHARED_ROOT.parent
 CHECK_SCRIPT = SHARED_ROOT / 'scripts' / 'check_tower_crane.py'
+UPDATE_SCRIPT = SHARED_ROOT / 'scripts' / 'update_toolkit.py'
 AUTOMATION_SETTINGS = SHARED_ROOT / 'scripts' / 'automation_settings.json'
-PROTECTED_PATHS = ('change_requests', 'project_progress.md')
 CLAUDE_TIMEOUT_SECONDS = 20 * 60
 
 
-def write_utf8(path, content):
-    path.write_text(content, encoding='utf-8', newline='\n')
-
-
-# --- small git/gh helpers (no shared helper exists anywhere in this repo's scripts\ - matches the
+# --- small git helpers (no shared helper exists anywhere in this repo's scripts\ - matches the
 # existing ad hoc-per-script convention, e.g. publish_release.py) ---------------------------------
-def _git(args, check=True):
-    return subprocess.run(['git', '-C', str(SHARED_ROOT)] + args,
+def _git(args, cwd=SHARED_ROOT, check=True):
+    return subprocess.run(['git', '-C', str(cwd)] + args,
                            capture_output=True, text=True, check=check)
 
 
 def _changed_paths():
-    """Both modified-tracked and new-untracked files (git diff alone misses untracked new files
-    an agent may have created, e.g. a brand-new hook)."""
+    """Both modified-tracked and new-untracked files inside toolkit\\ (git diff alone misses
+    untracked new files an agent may have created, e.g. a brand-new hook)."""
     proc = _git(['status', '--porcelain'])
     paths = []
     for line in proc.stdout.splitlines():
@@ -81,30 +92,21 @@ def _changed_paths():
 
 
 def _discard_working_tree_changes():
-    # Discards only THIS script's own agent-invocation working-tree changes (never committed yet),
-    # not any pre-existing user work - main is always freshly pulled at the top of each tick.
+    # Discards only THIS script's own agent-invocation working-tree changes in toolkit\ (never
+    # committed yet), not any pre-existing user work - toolkit\ is never pulled mid-tick (Decision 2,
+    # design\automation_repo_targeting.md), so its checked-out content is exactly what the last
+    # human-approved baseline (or a prior tick's own local fix commits) left it as.
     _git(['checkout', '--', '.'], check=False)
     _git(['clean', '-fd'], check=False)
 
 
-def _parse_remote_owner(cfg):
-    remote = str((cfg.get('identity') or {}).get('git_remote') or '')
-    m = re.search(r'github\.com[:/]+([^/]+)/', remote)
-    return m.group(1) if m else 'maintainer'
-
-
-def _lookup_pr_number(branch):
-    proc = subprocess.run(
-        ['gh', 'pr', 'list', '--head', branch, '--json', 'number', '--limit', '1'],
-        cwd=str(SHARED_ROOT), capture_output=True, text=True,
-    )
-    if proc.returncode != 0:
-        return None
-    try:
-        rows = json.loads(proc.stdout)
-    except json.JSONDecodeError:
-        return None
-    return rows[0]['number'] if rows else None
+def _project_status_dirty():
+    """The outer (private) repo's own working-tree status - the cross-repo safety net
+    (design\\automation_repo_targeting.md, "Decision 3"). The agent's Read/Edit/Write tools aren't
+    path-sandboxed to toolkit\\, so a stray absolute-path write into change_requests\\/
+    project_progress.md would never show up in `_changed_paths()` (that only sees toolkit\\'s own
+    git status) - this is the only thing that can actually catch it."""
+    return bool(_git(['status', '--porcelain'], cwd=PROJECT_ROOT).stdout.strip())
 
 
 # --- headless Claude Code invocation --------------------------------------------------------------
@@ -157,36 +159,31 @@ def _extract_affects(result):
     return m.group(1).strip() if m else 'unspecified'
 
 
-def build_pr_body(ticket, checker_output):
-    truncated = checker_output if len(checker_output) < 4000 else checker_output[:4000] + '\n... (truncated)'
-    return f"""**Agent-authored - not reviewed by a human.** Do not merge without review.
-
-Proposed by Tower Crane's unattended sync-automation agent (Piece 3, `design\\sync_automation.md`)
-for ticket `change_requests\\{ticket.path.name}`.
-
-`scripts\\check_tower_crane.py` output at the time this PR was opened:
-
-```
-{truncated}
-```
-"""
-
-
 def process_one_ticket(ticket, cfg, state):
     print(f"Processing candidate ticket: {ticket.slug} (category: {ticket.category})")
+
+    if _project_status_dirty():
+        print("  [SKIP] outer repo already has uncommitted changes - something else is mid-edit "
+              "there; not attributing this tick's work to it.")
+        return
+
     result = invoke_claude(build_prompt(ticket))
     if result is None:
         ticket_scan.record_attempt(state, ticket.slug, 'agent_error')
         return
 
-    changed = _changed_paths()
-    protected_hit = [p for p in changed if p.startswith(PROTECTED_PATHS[0]) or p == PROTECTED_PATHS[1]]
-    if protected_hit:
-        print(f"  [ABORT] agent touched protected path(s) {protected_hit} - discarding.")
+    # Cross-repo safety net (design\automation_repo_targeting.md, "Decision 3"): the agent's tools
+    # aren't path-sandboxed to toolkit\, so check the OUTER repo's status too, not just toolkit\'s
+    # own `_changed_paths()`. Never auto-discard the outer repo if this trips - it might be real,
+    # unrelated human work-in-progress; leave it for the human to inspect at their next `resume`.
+    if _project_status_dirty():
+        print("  [ABORT] agent wrote into the outer repo - discarding toolkit\\'s changes only; "
+              "the outer repo's working tree needs manual inspection, left untouched.")
         _discard_working_tree_changes()
         ticket_scan.record_attempt(state, ticket.slug, 'protected_path_touched')
         return
 
+    changed = _changed_paths()
     if not changed:
         print("  [SKIP] agent made no changes.")
         ticket_scan.record_attempt(state, ticket.slug, 'agent_error')
@@ -199,63 +196,38 @@ def process_one_ticket(ticket, cfg, state):
         ticket_scan.record_attempt(state, ticket.slug, 'check_failed')
         return
 
-    branch = f"auto/{ticket.slug}"
+    # Local commit only, in toolkit\ - no push. Pushing to toolkit\'s own origin (the public repo)
+    # is exclusively "propose upstream"'s job, always user-initiated (Decision 1,
+    # design\automation_repo_targeting.md).
     try:
-        _git(['checkout', '-b', branch])
         _git(['add'] + changed)
         _git(['commit', '-m', f"Automated fix: {ticket.slug}"])
-        _git(['push', '-u', 'origin', branch])
-
-        pr_body = build_pr_body(ticket, check.stdout)
-        # mkstemp() returns an open fd as well as a path; that fd must be closed here or Windows
-        # refuses to unlink() the file later (a handle still open in this same process blocks its
-        # own delete) - same fix as publish_release.py's make_notes_file().
-        fd, tmp_path = tempfile.mkstemp(suffix='.md')
-        os.close(fd)
-        fd_path = Path(tmp_path)
-        write_utf8(fd_path, pr_body)
-        try:
-            subprocess.run(
-                ['gh', 'pr', 'create', '--title', f"Automated fix: {ticket.slug}",
-                 '--body-file', str(fd_path), '--head', branch, '--base', 'main'],
-                cwd=str(SHARED_ROOT), check=True,
-            )
-        finally:
-            fd_path.unlink(missing_ok=True)
-
-        pr_number = _lookup_pr_number(branch)
-        if pr_number is None:
-            raise RuntimeError("gh pr create succeeded but the PR number could not be looked up")
-    except Exception as e:
-        print(f"  [ERROR] branch/PR creation failed: {e}")
-        _git(['checkout', 'main'], check=False)
-        _git(['branch', '-D', branch], check=False)
-        ticket_scan.record_attempt(state, ticket.slug, 'push_or_pr_failed')
+    except subprocess.CalledProcessError as e:
+        print(f"  [ERROR] toolkit\\ commit failed: {e.stderr}")
+        _discard_working_tree_changes()
+        ticket_scan.record_attempt(state, ticket.slug, 'commit_failed')
         return
 
-    _git(['checkout', 'main'])
-    _git(['pull', '--ff-only'])
-
+    sha = _git(['rev-parse', 'HEAD']).stdout.strip()[:9]
     affects = _extract_affects(result)
-    remote_owner = _parse_remote_owner(cfg)
     today = date.today().isoformat()
     ticket_scan.append_log_line(
         ticket.path,
-        f"- {today} — automation: fix proposed (branch {branch}), PR #{pr_number} opened, "
-        f"affects: {affects}; awaiting {remote_owner} review.",
+        f"- {today} — automation: fix applied (commit {sha} in toolkit\\), affects: {affects}; "
+        f"awaiting {affects} verify.",
     )
-    _git(['add', str(ticket.path.relative_to(SHARED_ROOT))])
-    _git(['commit', '-m', f"Ticket bookkeeping: {ticket.slug} PR #{pr_number} opened"])
-    _git(['push', 'origin', 'main'])
+    _git(['add', str(ticket.path.relative_to(PROJECT_ROOT))], cwd=PROJECT_ROOT)
+    _git(['commit', '-m', f"Ticket bookkeeping: {ticket.slug} fix applied"], cwd=PROJECT_ROOT)
+    _git(['push', 'origin', 'main'], cwd=PROJECT_ROOT)
 
     ticket_scan.clear_attempts(state, ticket.slug)
-    print(f"  [OK] PR #{pr_number} opened for {ticket.slug}.")
+    print(f"  [OK] fix applied (toolkit\\ commit {sha}) for {ticket.slug}.")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Piece 3: hourly unattended ticket-processing tick.")
     parser.add_argument('--dry-run', action='store_true',
-                         help="Run the mechanical scan/bookkeeping only; never invoke claude or open a PR.")
+                         help="Run the mechanical scan/bookkeeping only; never invoke claude or apply a fix.")
     args = parser.parse_args()
 
     cfg = get_shared_config(SHARED_ROOT)
@@ -264,17 +236,26 @@ def main():
         print("automation.enabled is false in config.local.json - nothing to do.")
         return
 
-    mode = automation.get('mode', 'propose_only')
-    if mode != 'propose_only':
-        print(f"Unsupported automation.mode '{mode}' (only 'propose_only' exists in v1) - skipping.")
+    mode = automation.get('mode', 'apply_direct')
+    if mode != 'apply_direct':
+        print(f"Unsupported automation.mode '{mode}' (only 'apply_direct' exists in v1) - skipping.")
         return
 
     max_tickets = int(automation.get('max_tickets_per_tick', 1))
     max_attempts = int(automation.get('max_attempts', 3))
 
     print("=== run_automation.py ===")
-    _git(['checkout', 'main'])
-    _git(['pull', '--ff-only'])
+
+    # Outer repo: an ordinary, unconditional pull - safe, it's the user's own private repo (same
+    # posture as `resume`'s outer-repo pull). Picks up a ticket filed from another of the user's own
+    # machines under Federate #1.
+    _git(['pull', '--ff-only'], cwd=PROJECT_ROOT)
+
+    # toolkit\: never pulled/merged here - that's exclusively the gated `update` action's job.
+    # --notify is a plain, non-mutating surfacing check (Decision 2, design\automation_repo_targeting.md).
+    notify = subprocess.run([cfg['python_launcher'], str(UPDATE_SCRIPT), '--notify'],
+                            capture_output=True, text=True)
+    print(notify.stdout.strip())
 
     # Piece 2b cadence-carry: unconditional, zero AI cost.
     subprocess.run([cfg['python_launcher'], str(CHECK_SCRIPT), '--write-guidance'])

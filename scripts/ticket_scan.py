@@ -7,17 +7,20 @@ for a headless Claude Code invocation.
 Two responsibilities, both importable (no `claude` subprocess calls live here):
 
   scan() / parse_ticket() - categorize every OPEN ticket using the exact rule CLAUDE.md's
-    "Scanning at session start" already documents for a human session, plus two states this piece
-    introduces (a PR already open awaiting review; that PR closed without merging).
+    "Scanning at session start" already documents for a human session. No PR-outcome states exist
+    here (design\\automation_repo_targeting.md, design\\local_first_reframe.md's "Local ticket
+    processing" - local ticket fixes commit directly, no PR is ever opened for a ticket) - just
+    VERIFIED_PASS, on top of the ordinary human-session categories.
 
-  apply_mechanical_actions() - perform the categories that need no judgment at all: flip a
-    consumer-verified ticket to DONE, and react to a previously-opened automation PR's outcome
-    (merged -> append a "PR merged" round-trip line; closed unmerged -> append a "closed without
-    merging" line so the ticket becomes fix-worthy again next scan). Every write here touches only
-    change_requests\\<file>.md - `git add change_requests`, never `-A` - so the "auto-merge never
-    for hooks\\/scripts\\/templates\\/agents\\" boundary stays unambiguous even though this
-    ticket-inbox bookkeeping itself goes straight to main (Piece 1's already-locked precedent: a
-    filed ticket / its own metadata is inert until acted on, so it stays ungated).
+  apply_mechanical_actions() - perform the one category that needs no judgment at all: flip a
+    consumer-verified ticket to DONE. Every write here touches only change_requests\\<file>.md -
+    `git add change_requests`, never `-A` - so the "auto-merge never for
+    hooks\\/scripts\\/templates\\/agents\\" boundary stays unambiguous even though this ticket-inbox
+    bookkeeping itself goes straight to the outer (private) repo's main (Piece 1's already-locked
+    precedent: a filed ticket / its own metadata is inert until acted on, so it stays ungated). Runs
+    against PROJECT_ROOT, not SHARED_ROOT - change_requests\\ lives in the outer repo, a sibling of
+    the inner toolkit\\ repo this module's SHARED_ROOT points at (design\\local_first_reframe.md's
+    outer/inner split).
 
   Attempt-tracking (load_state/record_attempt/is_backed_off) is separate from categorization so a
     ticket whose fix keeps failing check_tower_crane.py backs off after max_attempts instead of
@@ -55,15 +58,13 @@ class Category:
     AWAITING_CONSUMER = 'awaiting_consumer'
     VERIFIED_PASS = 'verified_pass'
     STILL_FAILS = 'still_fails'
-    AWAITING_PR_REVIEW = 'awaiting_pr_review'   # last line: an automation "PR opened" line
-    PR_REJECTED = 'pr_rejected'                 # that PR was closed without merging
     UNKNOWN_STATE = 'unknown_state'              # non-empty log, none of the above - log, don't guess
     REGISTRATION = 'registration'                # Type: registration - excluded from all automation
 
 
 # Categories a candidate ticket must be in for run_automation.py to consider spending an AI
 # invocation on it.
-FIX_WORTHY = (Category.NO_ACTIVITY, Category.STILL_FAILS, Category.PR_REJECTED)
+FIX_WORTHY = (Category.NO_ACTIVITY, Category.STILL_FAILS)
 
 STATUS_RE = re.compile(r'^Status:\s*(OPEN|DONE)\s*$', re.MULTILINE)
 TYPE_REGISTRATION_RE = re.compile(r'^Type:\s*registration\s*$', re.MULTILINE | re.IGNORECASE)
@@ -72,22 +73,17 @@ NEXT_HEADING_RE = re.compile(r'^##\s', re.MULTILINE)
 
 RE_VERIFIED_PASS = re.compile(r'verified PASS', re.IGNORECASE)
 RE_STILL_FAILS = re.compile(r'still fails', re.IGNORECASE)
-RE_PR_CLOSED = re.compile(r'PR #(\d+) closed without merging', re.IGNORECASE)
-RE_PR_OPENED = re.compile(r'PR #(\d+) opened', re.IGNORECASE)
-RE_PR_MERGED = re.compile(r'PR #(\d+) merged', re.IGNORECASE)
 RE_AWAITING = re.compile(r'\bawaiting\b.+?\bverify\b', re.IGNORECASE)
-RE_AFFECTS = re.compile(r'affects:\s*([^;]+?)(?:[;.]|$)', re.IGNORECASE)
 
 
 @dataclass
 class Ticket:
     path: Path
-    slug: str               # path.stem - used verbatim as the auto/<slug> branch suffix
+    slug: str               # path.stem - used verbatim as the auto/<slug> branch suffix (fix commits)
     status: str              # 'OPEN' or 'DONE' (None if unparseable)
     is_registration: bool
     last_entry: str           # full text of the last '## Round-trip log' / '## Processing log' bullet
     category: str
-    pr_number: int = None
 
 
 def _log_entries(section_body):
@@ -123,22 +119,16 @@ def _last_log_entry(text):
 
 def _categorize(status, is_registration, last_entry):
     if is_registration:
-        return Category.REGISTRATION, None
+        return Category.REGISTRATION
     if not last_entry:
-        return Category.NO_ACTIVITY, None
+        return Category.NO_ACTIVITY
     if RE_VERIFIED_PASS.search(last_entry):
-        return Category.VERIFIED_PASS, None
+        return Category.VERIFIED_PASS
     if RE_STILL_FAILS.search(last_entry):
-        return Category.STILL_FAILS, None
-    m = RE_PR_CLOSED.search(last_entry)
-    if m:
-        return Category.PR_REJECTED, int(m.group(1))
-    m = RE_PR_OPENED.search(last_entry)
-    if m:
-        return Category.AWAITING_PR_REVIEW, int(m.group(1))
+        return Category.STILL_FAILS
     if RE_AWAITING.search(last_entry):
-        return Category.AWAITING_CONSUMER, None
-    return Category.UNKNOWN_STATE, None
+        return Category.AWAITING_CONSUMER
+    return Category.UNKNOWN_STATE
 
 
 def parse_ticket(path):
@@ -147,9 +137,9 @@ def parse_ticket(path):
     status = m.group(1) if m else None
     is_registration = bool(TYPE_REGISTRATION_RE.search(text))
     last_entry = _last_log_entry(text)
-    category, pr_number = _categorize(status, is_registration, last_entry)
+    category = _categorize(status, is_registration, last_entry)
     return Ticket(path=path, slug=path.stem, status=status, is_registration=is_registration,
-                  last_entry=last_entry, category=category, pr_number=pr_number)
+                  last_entry=last_entry, category=category)
 
 
 def scan(change_requests_dir=CHANGE_REQUESTS_DIR):
@@ -221,31 +211,22 @@ def needs_fix_candidates(tickets, state, max_attempts=3):
 
 
 # --- mechanical actions: no judgment required, safe to perform without an AI invocation -----------
-def _run_git(args, cwd=SHARED_ROOT):
+# change_requests\ lives in the outer (private) repo, PROJECT_ROOT - a sibling of the inner toolkit\
+# repo SHARED_ROOT points at (design\local_first_reframe.md's outer/inner split). Ticket bookkeeping
+# git operations must target PROJECT_ROOT, never SHARED_ROOT.
+def _run_git(args, cwd=PROJECT_ROOT):
     return subprocess.run(['git', '-C', str(cwd)] + args, capture_output=True, text=True, check=True)
 
 
-def _run_gh_pr_view(pr_number, cwd=SHARED_ROOT):
-    proc = subprocess.run(
-        ['gh', 'pr', 'view', str(pr_number), '--json', 'state,mergeCommit'],
-        cwd=str(cwd), capture_output=True, text=True,
-    )
-    if proc.returncode != 0:
-        return None
-    try:
-        return json.loads(proc.stdout)
-    except json.JSONDecodeError:
-        return None
-
-
 def apply_mechanical_actions(tickets, dry_run=False):
-    """Handle VERIFIED_PASS (flip DONE) and AWAITING_PR_REVIEW (check gh for merge/close outcome).
-    Mutates each affected Ticket's .category/.status in place so a status change (e.g. a PR that
-    just got rejected) is visible to needs_fix_candidates() in the SAME tick, not next hour's scan.
-    Returns a summary dict. One commit+push covering everything changed, not one per ticket."""
+    """Handle VERIFIED_PASS (flip DONE) - the only category needing mechanical action now that ticket
+    fixes never open a PR (design\\automation_repo_targeting.md). Mutates each affected Ticket's
+    .status in place so a status change is visible to needs_fix_candidates() in the SAME tick, not
+    next hour's scan. Returns a summary dict. One commit+push covering everything changed, not one
+    per ticket."""
     today = date.today().isoformat()
     touched_files = []
-    summary = {'done_flipped': [], 'pr_merged': [], 'pr_closed': [], 'errors': []}
+    summary = {'done_flipped': [], 'errors': []}
 
     for t in tickets:
         if t.category == Category.VERIFIED_PASS:
@@ -256,39 +237,8 @@ def apply_mechanical_actions(tickets, dry_run=False):
             touched_files.append(t.path)
             summary['done_flipped'].append(t.slug)
 
-        elif t.category == Category.AWAITING_PR_REVIEW and t.pr_number:
-            info = _run_gh_pr_view(t.pr_number)
-            if info is None:
-                summary['errors'].append(f"{t.slug}: could not read PR #{t.pr_number} state")
-                continue
-            state_ = info.get('state')
-            if state_ == 'MERGED':
-                affects_m = RE_AFFECTS.search(t.last_entry or '')
-                affects = affects_m.group(1).strip() if affects_m else 'unspecified'
-                sha = (info.get('mergeCommit') or {}).get('oid', 'unknown')[:9]
-                if not dry_run:
-                    append_log_line(
-                        t.path,
-                        f"- {today} — automation: PR #{t.pr_number} merged (commit `{sha}`), "
-                        f"affects: {affects}; awaiting {affects} verify.",
-                    )
-                t.category = Category.AWAITING_CONSUMER
-                touched_files.append(t.path)
-                summary['pr_merged'].append(t.slug)
-            elif state_ == 'CLOSED':
-                if not dry_run:
-                    append_log_line(
-                        t.path,
-                        f"- {today} — automation: PR #{t.pr_number} closed without merging; "
-                        "returning to shared side for re-fix.",
-                    )
-                t.category = Category.PR_REJECTED
-                touched_files.append(t.path)
-                summary['pr_closed'].append(t.slug)
-            # state_ == 'OPEN' -> still pending, nothing to do.
-
     if touched_files and not dry_run:
-        rel = [str(p.relative_to(SHARED_ROOT)) for p in touched_files]
+        rel = [str(p.relative_to(PROJECT_ROOT)) for p in touched_files]
         try:
             _run_git(['add'] + rel)
             _run_git(['commit', '-m', f"automation: ticket bookkeeping ({len(rel)} file(s))"])
@@ -301,13 +251,12 @@ def apply_mechanical_actions(tickets, dry_run=False):
 
 def _cli_report(tickets):
     for t in tickets:
-        pr = f" (PR #{t.pr_number})" if t.pr_number else ''
-        print(f"  [{t.category}]{pr} {t.path.name}")
+        print(f"  [{t.category}] {t.path.name}")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Mechanical, zero-AI scan/bookkeeping of change_requests\\*.md.")
-    parser.add_argument('--apply', action='store_true', help="Perform mechanical bookkeeping (DONE flips, PR merge/close bookkeeping). Without this flag, dry-run report only.")
+    parser.add_argument('--apply', action='store_true', help="Perform mechanical bookkeeping (DONE flips). Without this flag, dry-run report only.")
     parser.add_argument('--json', action='store_true', help="Emit the categorized report as JSON instead of text.")
     args = parser.parse_args()
 
@@ -324,7 +273,7 @@ def main():
 
     if args.json:
         print(json.dumps([
-            {'slug': t.slug, 'category': t.category, 'pr_number': t.pr_number} for t in tickets
+            {'slug': t.slug, 'category': t.category} for t in tickets
         ], indent=2))
     else:
         print("=== ticket_scan.py (dry-run report) ===")

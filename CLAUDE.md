@@ -232,10 +232,12 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
 2. Inner `toolkit\` repo — check only, never pull/merge (a reviewed merge is the `update` action
    below; auto-pulling here is exactly the un-gated path `design\update_trust_review.md`'s
    trust-review gate exists to prevent). If `toolkit\` exists and is a git repo:
-   `git -C toolkit fetch --quiet` then `git -C toolkit rev-list HEAD..@{upstream} --count`. If the
-   count is 0, say nothing. If it's greater than 0, note it in the status summary (e.g. "toolkit\
-   has N new commit(s) upstream — run `update` to review and pull them in"); if `toolkit\` doesn't
-   exist or has no upstream configured, skip this step silently.
+   `python scripts\update_toolkit.py --notify` (the "check for update" proactive notice,
+   `design\local_first_reframe.md`) from inside `toolkit\` — a plain fetch + comparison against
+   `last_reviewed_sha`, no golden suite, no state mutation. If it prints "up to date," say nothing
+   further. If it reports an update is available, note it in the status summary (e.g. "toolkit\ has
+   N commit(s) available — run `update` to review and pull them in"); if `toolkit\` doesn't exist,
+   skip this step silently.
 3. Read `project_progress.md`: Current Status, Next Up, Decisions table, most recent Work Log
    entry only.
 4. Scan `change_requests\` per "Scanning at session start" below — this is what surfaces a Piece 3
@@ -267,3 +269,35 @@ deterministic algorithm.
 5. Ask the user whether to approve. On yes: `python scripts\update_toolkit.py --approve`. On no:
    `python scripts\update_toolkit.py --reject`. Rejecting is a fully supported, indefinite steady
    state — "tools go stale but stay safe" — not a temporary holdout to re-nag about.
+
+**"propose upstream"** — sends a hand-built local fix or improvement in `toolkit\` back to the
+public repo (`konvesdigital/tower-crane`) as a fork + PR
+(`design\local_first_reframe.md`'s "Fork+PR contribution mechanics"). User-initiated only, never
+automatic. This is the **basic flow only** — plain fork/branch/commit/push/PR, no CODEOWNERS or
+compliance-bar authoring assistant yet (that's Fix 3, `design\update_trust_review.md`, not yet
+built). No Tower-Crane-specific script backs this — `toolkit\` is an ordinary git repo with an
+ordinary GitHub remote, so these are ordinary `git`/`gh` steps, run from inside `toolkit\`.
+1. Check whether a `fork` remote already exists: `git remote get-url fork`. If it errors (no such
+   remote), the user doesn't have one wired up yet — don't assume they lack a GitHub fork either,
+   just that this clone isn't pointed at it:
+   a. `gh repo fork konvesdigital/tower-crane --remote=false` — creates the user's GitHub fork if
+      they don't already have one; safe to run even if they do (idempotent, and `--remote=false`
+      keeps it from touching this clone's existing `origin`, which must keep pointing at the
+      public repo).
+   b. `gh api user -q .login` to get the user's GitHub username, then
+      `git remote add fork https://github.com/<username>/tower-crane.git`.
+2. Branch off current `main`: `git checkout -b <descriptive-branch-name>` (name it for the change,
+   e.g. `fix-relocate-symlink-check`).
+3. Commit the change with a plain-language message describing what changed and why — same bar as
+   any other commit in this project.
+4. Push the branch to the fork: `git push fork <branch-name>`.
+5. Draft a PR title and body in the user's own words describing the change and the reason for it.
+   Show it to the user and get explicit approval before opening anything — same
+   approval-before-consequential-action pattern as every other step in this project (this is the
+   step that actually reaches the shared public repo).
+6. On approval: `gh pr create --repo konvesdigital/tower-crane --head <username>:<branch-name>
+   --title "<title>" --body "<body>"`.
+7. Nothing further to do on this side — the public repo's own branch protection gates the merge,
+   reviewed by whoever administers `konvesdigital/tower-crane` (the author). This is an ordinary
+   GitHub PR review, not the internal `change_requests\` ticket/round-trip system — don't file a
+   ticket for it.
