@@ -229,14 +229,13 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
 
 **"resume"**
 1. Outer project repo: `git pull`.
-2. Inner `toolkit\` repo — check only, never pull/merge (a reviewed merge is the not-yet-built
-   `update` action; auto-pulling here is exactly the un-gated path
-   `design\update_trust_review.md`'s trust-review gate exists to prevent). If `toolkit\` exists and
-   is a git repo: `git -C toolkit fetch --quiet` then
-   `git -C toolkit rev-list HEAD..@{upstream} --count`. If the count is 0, say nothing. If it's
-   greater than 0, note it in the status summary (e.g. "toolkit\ has N new commit(s) upstream,
-   unreviewed — no automated update mechanism yet"); if `toolkit\` doesn't exist or has no
-   upstream configured, skip this step silently.
+2. Inner `toolkit\` repo — check only, never pull/merge (a reviewed merge is the `update` action
+   below; auto-pulling here is exactly the un-gated path `design\update_trust_review.md`'s
+   trust-review gate exists to prevent). If `toolkit\` exists and is a git repo:
+   `git -C toolkit fetch --quiet` then `git -C toolkit rev-list HEAD..@{upstream} --count`. If the
+   count is 0, say nothing. If it's greater than 0, note it in the status summary (e.g. "toolkit\
+   has N new commit(s) upstream — run `update` to review and pull them in"); if `toolkit\` doesn't
+   exist or has no upstream configured, skip this step silently.
 3. Read `project_progress.md`: Current Status, Next Up, Decisions table, most recent Work Log
    entry only.
 4. Scan `change_requests\` per "Scanning at session start" below — this is what surfaces a Piece 3
@@ -244,4 +243,27 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
    `logs\automation.log`, since automation is barred from touching `project_progress.md`.
 5. State status and next step in 1-3 lines, folding in anything the scan or the toolkit\ check
    surfaced (e.g. "PR #N awaiting your review", "ticket X awaiting consumer verify", or "toolkit\
-   has 2 unreviewed upstream commits"). Do not replay full history.
+   has 2 new commits upstream, run `update` to review"). Do not replay full history.
+
+**"update"** — pulls `toolkit\`'s `origin` remote under a diff-review trust gate
+(`design\update_trust_review.md` Fix 1, `design\local_first_reframe.md`'s "`update` action
+mechanics"). Never runs on its own — only when the user asks for it (e.g. after `resume` flags
+unreviewed upstream commits). Mechanical steps are scripted in `scripts\update_toolkit.py`; the
+diff-review-and-assessment step below is this procedure, since it's judgment work with no
+deterministic algorithm.
+1. Run `python scripts\update_toolkit.py` (equivalent to `--check`) from inside `toolkit\`.
+2. If it reports "Already up to date": nothing else to do, say so.
+3. If it reports `[BLOCKED]` (golden suite failed against the incoming content): stop — report the
+   failure to the user verbatim. This is a hard block, no override (Locked 2026-07-25). Offer to
+   help investigate or file a fork+PR fix upstream, but do not attempt `--approve`.
+4. If it prints `=== BEGIN DIFF ===` … `=== END DIFF ===` (golden suite passed, review pending):
+   read the literal diff text the script printed. Write your own plain-language assessment —
+   does this look like a benign engineering change, or does it contain anything destructive,
+   obfuscated, exfiltration-shaped, or inconsistent with the changed file's stated purpose? Show
+   the user **both the literal diff and your assessment together, always** — never the diff alone
+   (unreadable without help interpreting it), never your assessment alone (hides the ground truth
+   that makes the user's approval actually meaningful, per `design\update_trust_review.md`'s core
+   finding).
+5. Ask the user whether to approve. On yes: `python scripts\update_toolkit.py --approve`. On no:
+   `python scripts\update_toolkit.py --reject`. Rejecting is a fully supported, indefinite steady
+   state — "tools go stale but stay safe" — not a temporary holdout to re-nag about.

@@ -6,6 +6,10 @@
 # public-repo commit. Never committed - it's a property of this specific clone, not the toolkit.
 /.last_reviewed_sha
 
+# scripts\update_toolkit.py's pending-review marker between --check and --approve/--reject. Never
+# committed - transient per-machine state, not toolkit content.
+/.update_pending.json
+
 # OS / editor cruft
 Thumbs.db
 *.tmp
