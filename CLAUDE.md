@@ -197,10 +197,22 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
    - Prepend one dated Work Log entry (what changed, what's next). Newest entry on top.
    - Do NOT prune or move older entries automatically. Work Log stays complete until the user
      runs "archive" (below).
-2. Git: `git add -A && git commit -m "Checkpoint: <summary>" && git push`
-   - If no repo/remote is found: stop and ask the user whether to set one up now. This repo
-     should always have git — flag it rather than skip silently.
-3. Confirm to the user: saved and pushed.
+2. Git — the outer/inner split (`design\local_first_reframe.md`) means two independent repos live
+   in this folder; handle both:
+   a. Outer project repo (this repo root — `project_progress.md`, `consumers\`, `change_requests\`,
+      `config.local.json`): `git add -A && git commit -m "Checkpoint: <summary>" && git push`
+      - If no repo/remote is found: stop and ask the user whether to set one up now. This repo
+        should always have git — flag it rather than skip silently.
+   b. Inner `toolkit\` repo — only if `toolkit\` exists and `git -C toolkit status --porcelain`
+      shows changes: `git -C toolkit add -A && git -C toolkit commit -m "Checkpoint: <summary>" &&
+      git -C toolkit push`. This pushes to the user's own remote (their own private hub, or this
+      canonical repo if they're the operator) — always safe to push freely with no gate, since
+      `design\update_trust_review.md`'s trust-review gate only guards the *incoming* `update`
+      direction, never outgoing pushes of the user's own edits.
+      - If the push fails (e.g. no remote configured, no write access, diverged from upstream):
+        report it to the user; don't let it block or roll back the outer-repo checkpoint above.
+3. Confirm to the user: saved and pushed (note separately whether a `toolkit\` push happened,
+   was skipped as clean, or failed).
 4. **Suggest archiving when the file has grown** (resource conservation): `project_progress.md`
    is read into context each session, so a long Work Log is a recurring token cost for history
    no longer in active use. If it has grown past roughly **400 lines (~40 KB)**, or the Work Log
@@ -216,11 +228,20 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
 4. Remove those entries from `project_progress.md`. Confirm what was archived.
 
 **"resume"**
-1. `git pull`
-2. Read `project_progress.md`: Current Status, Next Up, Decisions table, most recent Work Log
+1. Outer project repo: `git pull`.
+2. Inner `toolkit\` repo — check only, never pull/merge (a reviewed merge is the not-yet-built
+   `update` action; auto-pulling here is exactly the un-gated path
+   `design\update_trust_review.md`'s trust-review gate exists to prevent). If `toolkit\` exists and
+   is a git repo: `git -C toolkit fetch --quiet` then
+   `git -C toolkit rev-list HEAD..@{upstream} --count`. If the count is 0, say nothing. If it's
+   greater than 0, note it in the status summary (e.g. "toolkit\ has N new commit(s) upstream,
+   unreviewed — no automated update mechanism yet"); if `toolkit\` doesn't exist or has no
+   upstream configured, skip this step silently.
+3. Read `project_progress.md`: Current Status, Next Up, Decisions table, most recent Work Log
    entry only.
-3. Scan `change_requests\` per "Scanning at session start" below — this is what surfaces a Piece 3
+4. Scan `change_requests\` per "Scanning at session start" below — this is what surfaces a Piece 3
    automation PR (`design\sync_automation.md`) you'd otherwise only see on GitHub or in
    `logs\automation.log`, since automation is barred from touching `project_progress.md`.
-4. State status and next step in 1-3 lines, folding in anything the scan surfaced (e.g. "PR #N
-   awaiting your review" or "ticket X awaiting consumer verify"). Do not replay full history.
+5. State status and next step in 1-3 lines, folding in anything the scan or the toolkit\ check
+   surfaced (e.g. "PR #N awaiting your review", "ticket X awaiting consumer verify", or "toolkit\
+   has 2 unreviewed upstream commits"). Do not replay full history.
