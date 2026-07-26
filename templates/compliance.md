@@ -28,9 +28,11 @@ unless *both* sections are gone.
 **At session start (and whenever you run `resume`):** check whether `COMPLIANCE_GUIDANCE.md`
 exists in the project root. If it does, for **each section present**:
 
-1. Read it and **summarize the deviations/notice and the exact changes it proposes** (import
-   lines to add, registry or opt-in-snippet fixes, hook wiring, missing starter files, a policy
-   heads-up, etc.) in plain language for the user.
+1. Read it and, for each proposed change, show the **literal proposed text verbatim** (the exact
+   import line, hook command, config block, etc., exactly as written in the guidance file)
+   **alongside** a plain-language explanation of what it does and why. Show both together, always —
+   never a paraphrase alone (hides what's actually being proposed) and never the raw text alone
+   (unreadable without the explanation for a non-engineer).
 2. **Ask the user whether to apply them.** Do not apply silently — this is a human-in-the-loop
    gate, and you have full context on this project that the shared side does not.
 3. On **yes**: apply the changes, confirm what you did, then **delete just that section**
