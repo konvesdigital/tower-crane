@@ -86,7 +86,9 @@ The habits that matter most, roughly in order of how often you'll reach for them
    instead of growing without bound.
 4. **"archive"** — user-initiated, any time the Work Log has grown long. Moves settled entries out
    to `project_progress_archive.md`, which is never read back into context unless something
-   specifically calls for old history.
+   specifically calls for old history. Worth doing once the log gets long: `project_progress.md` is
+   read into context every session, so a long Work Log is a recurring token cost — but the cost is
+   linear, not a cliff, so there's no wrong time to do it, just diminishing returns to waiting.
 5. **`README.md` vs `CLAUDE.md`** — `CLAUDE.md` is loaded every session, so it stays terse and
    purely operational; anything long-form a human might want to read once (rationale, onboarding,
    history) belongs in `README.md`, which Claude Code never auto-loads.
