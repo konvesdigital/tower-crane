@@ -13,7 +13,7 @@ Runs over a whole-repo diff between two refs (matches the Locked "diff scope for
 = the whole inner repo, no path filter" decision) - never scoped to one file, since the whole point
 is catching a script or directive file showing up somewhere unexpected.
 
-Four checks, three hard-fail, one soft-flag:
+Seven checks, five hard-fail, two soft-flag:
   1. Known AI-directive filename        HARD  - a new/renamed file matching a real, converged
                                                   AI-directive filename convention (CLAUDE.md,
                                                   .cursorrules, a second AGENTS.md, etc.) anywhere
@@ -41,6 +41,37 @@ Four checks, three hard-fail, one soft-flag:
                                                   legitimately quotes shell commands in prose) - see
                                                   capability-vs-content in check_agents_pr_gate.py
                                                   for the same reasoning.
+  6. Invisible/formatting Unicode       HARD  - added 2026-07-27 (security stress-test pass,
+                                                  design\\security_stress_test.md), the single most
+                                                  directly-relevant gap this project has: zero-width
+                                                  chars, bidi embedding/override/isolate controls,
+                                                  variation selectors, and Unicode tag characters can
+                                                  render as blank (or reordered) in a normal editor,
+                                                  diff view, or chat code block, while an LLM parsing
+                                                  the raw text still reads them - the exact mechanism
+                                                  behind the academic "Trojan Source" attack (Boucher
+                                                  & Anderson 2021, CVE-2021-42574) and its 2025
+                                                  application against AI-assistant rules files
+                                                  (Pillar Security's "Rules File Backdoor"). This repo
+                                                  IS an AGENTS.md-governed AI-directive system and the
+                                                  entire trust gate rests on "a human reads the diff
+                                                  verbatim" - an invisible character would defeat that
+                                                  specific guarantee silently. No legitimate reason
+                                                  for these codepoints anywhere in a text tooling repo.
+  7. Python capability creep            SOFT  - added 2026-07-27, same stress-test pass: new/changed
+                                                  .py code introducing a network call, dynamic-exec,
+                                                  or deserialization primitive not obviously covered
+                                                  by AGENTS.md's declared capability manifest ("never
+                                                  an arbitrary network request outside git/gh, never
+                                                  reading or emitting credentials"). consistency_check.py
+                                                  only checks correctness, never intent, and check 5
+                                                  above deliberately skips already-recognized code as
+                                                  "not disguised" - so a legitimate-looking new script
+                                                  doing something it has no business doing currently
+                                                  got zero scrutiny anywhere in this pipeline. Heuristic
+                                                  and deliberately narrow: subprocess/os.system are NOT
+                                                  flagged, since invoking git/gh via subprocess is this
+                                                  project's own normal, sanctioned pattern everywhere.
 
 Usage: python scripts\\check_file_surface.py --base-sha <sha> --head-sha <sha>
 Run from anywhere; always resolves paths against this toolkit\\ repo, not the caller's cwd.
@@ -84,6 +115,32 @@ WORKFLOW_DIR_PREFIX = '.github/workflows/'  # legitimately embeds shell in `run:
 DISGUISED_CODE_TOKENS = [
     'eval(', 'exec(', 'base64', '| sh', '| bash', 'invoke-expression', 'iex(',
     'os.system(', 'subprocess.', 'curl ', 'wget ',
+]
+
+# Invisible/formatting Unicode codepoints - the "Trojan Source" set (Boucher & Anderson 2021,
+# CVE-2021-42574/CVE-2021-42694) plus the additional invisible/steganography ranges used by the
+# 2025 "Rules File Backdoor" attacks against AI-assistant instruction files. Each range renders as
+# blank, zero-width, or silently reorders surrounding text in a normal editor/diff/chat view, while
+# still being fully legible to an LLM tokenizing the raw bytes. No legitimate use in this repo.
+INVISIBLE_UNICODE_RANGES = [
+    (0x200B, 0x200F),   # zero-width space/non-joiner/joiner, LTR mark, RTL mark
+    (0x202A, 0x202E),   # bidi embedding/override controls (LRE/RLE/PDF/LRO/RLO)
+    (0x2060, 0x2064),   # word joiner, invisible math operators
+    (0x2066, 0x2069),   # bidi isolate controls (LRI/RLI/FSI/PDI) - Trojan Source's primary vector
+    (0xFEFF, 0xFEFF),   # zero-width no-break space / byte-order mark
+    (0xFE00, 0xFE0F),   # variation selectors
+    (0xE0100, 0xE01EF), # variation selectors supplement
+    (0xE0000, 0xE007F), # Unicode tag characters (used for text steganography/smuggling)
+]
+
+# Deliberately narrow: subprocess/os.system are NOT here (this project's scripts invoke git/gh via
+# subprocess constantly - that's the sanctioned pattern, not a capability creep). This targets
+# capabilities AGENTS.md's own manifest explicitly disclaims: network access and credential
+# handling, plus dynamic-exec/deserialization primitives a static correctness checker can't catch.
+CAPABILITY_CREEP_TOKENS = [
+    'requests.', 'urllib.request', 'urllib3', 'http.client', 'socket.', 'ftplib', 'smtplib',
+    'paramiko', 'telnetlib', 'eval(', 'exec(', '__import__(', 'marshal.loads(', 'pickle.loads(',
+    'base64.b64decode(',
 ]
 
 
@@ -230,6 +287,72 @@ def check_disguised_code(shared_root, files, base_sha, head_sha):
         print(f"  {norm} matched {token!r}: {line}")
 
 
+def _is_invisible_char(ch):
+    cp = ord(ch)
+    return any(lo <= cp <= hi for lo, hi in INVISIBLE_UNICODE_RANGES)
+
+
+def check_invisible_unicode(shared_root, files, base_sha, head_sha):
+    """Hard-fail on any invisible/formatting Unicode codepoint added anywhere in the diff - see
+    check 6 in the module docstring for the full rationale. Scans every file, not just code: the
+    attack this defends against specifically targets prose/instruction files (AGENTS.md itself,
+    templates\\, README.md), not scripts."""
+    hits = []
+    for status, path in files:
+        norm = path.replace('\\', '/')
+        proc = git(shared_root, ['diff', f'{base_sha}..{head_sha}', '--', path])
+        for line in proc.stdout.splitlines():
+            if not line.startswith('+') or line.startswith('+++'):
+                continue
+            for ch in line[1:]:
+                if _is_invisible_char(ch):
+                    hits.append((norm, f'U+{ord(ch):04X}'))
+    if not hits:
+        report('PASS', "no invisible/formatting Unicode codepoints found in added content.")
+        return
+    seen = set()
+    for norm, cp in hits:
+        key = (norm, cp)
+        if key in seen:
+            continue
+        seen.add(key)
+        report('FAIL', f"'{norm}' adds an invisible/formatting Unicode character ({cp}) - no "
+                       "legitimate reason for this in a text-based tooling repo. This is the exact "
+                       "technique behind Unicode 'Trojan Source' attacks and the AI-rules-file "
+                       "'hidden instruction' attack class: text invisible (or reordered) to a human "
+                       "reviewer, fully legible to an LLM parsing the raw bytes.")
+
+
+def check_python_capability_creep(shared_root, files, base_sha, head_sha):
+    """Soft nudge - see check 7 in the module docstring for the full rationale. Only scans .py
+    files already recognized as code under the allowed dirs; unrecognized-location .py files are
+    already a hard-fail via check_language_and_location above."""
+    hits = []
+    for status, path in files:
+        norm = path.replace('\\', '/')
+        ext = PurePosixPath(norm).suffix.lower()
+        if ext != PY_EXT or not norm.startswith(ALLOWED_PY_DIR_PREFIXES):
+            continue
+        proc = git(shared_root, ['diff', f'{base_sha}..{head_sha}', '--', path])
+        for line in proc.stdout.splitlines():
+            if not line.startswith('+') or line.startswith('+++'):
+                continue
+            content = line[1:]
+            lower = content.lower()
+            for token in CAPABILITY_CREEP_TOKENS:
+                if token in lower:
+                    hits.append((norm, token, content.strip()))
+    if not hits:
+        report('PASS', "no new capability-creep token (network call, dynamic-exec, "
+                       "deserialization) found in changed Python code.")
+        return
+    report('WARN', "changed Python code adds token(s) suggesting a capability outside AGENTS.md's "
+                   "declared manifest (git/gh + local filesystem only) - reviewer should confirm "
+                   "this is intended, not a smuggled capability:")
+    for norm, token, line in hits[:10]:
+        print(f"  {norm} matched {token!r}: {line}")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="File-surface classifier: language, location, and disguise checks over a "
@@ -253,6 +376,8 @@ def main():
     check_language_and_location(shared_root, files, args.head_sha)
     check_binary_files(shared_root, args.base_sha, args.head_sha)
     check_disguised_code(shared_root, files, args.base_sha, args.head_sha)
+    check_invisible_unicode(shared_root, files, args.base_sha, args.head_sha)
+    check_python_capability_creep(shared_root, files, args.base_sha, args.head_sha)
 
     print()
     print(f"=== Summary: {COUNTS['PASS']} passed, {COUNTS['WARN']} warning(s), {COUNTS['FAIL']} failure(s) ===")

@@ -11,6 +11,13 @@
 # Security note: the PR body is untrusted, attacker-controlled text. It is passed to the script
 # via `env:`, never interpolated directly into a `run:` shell block - interpolating
 # `${{ github.event.pull_request.body }}` inline is a known GitHub Actions script-injection vector.
+#
+# Third-party Actions below are pinned to a full commit SHA, not a mutable version tag (added
+# 2026-07-27, security stress-test pass, design\security_stress_test.md). This is the exact defense
+# that would have stopped the tj-actions/changed-files compromise (CVE-2025-30066, March 2025): a
+# compromised maintainer credential rewrote that Action's `@v46`/`@v45` tags to point at a malicious
+# commit, and every consumer pinning by tag silently pulled it with zero diff in their own repo.
+# SHA-pinning means the Action's own upstream history moving doesn't move what runs here.
 
 name: AGENTS.md Fix 3 gate
 
@@ -28,13 +35,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PR head
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.x'
 

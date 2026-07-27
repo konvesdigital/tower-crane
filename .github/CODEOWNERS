@@ -8,6 +8,14 @@
 # PR could silently edit a check to always pass, or remove this file's own restriction, defeating
 # Phase 3 entirely. Found live 2026-07-27 while building the file-surface classifier below.
 /.github/ @konvesdigital
-/scripts/check_agents_pr_gate.py @konvesdigital
-/scripts/check_standing_constraints.py @konvesdigital
-/scripts/check_file_surface.py @konvesdigital
+
+# Widened 2026-07-27 (security stress-test pass, design\security_stress_test.md): the scope above
+# only protected AGENTS.md and .github\ itself - every OTHER shared script (config_lib.py,
+# relocate.py, run_automation.py, publish_release.py, seed_hub.py, etc.) and every template had no
+# mandatory-reviewer requirement at all once branch protection eventually goes live, even though
+# every consumer project runs all of them unmodified (float-on-HEAD). Covers the whole shared-tool
+# surface now, superseding the narrower per-script lines this originally had.
+/hooks/ @konvesdigital
+/scripts/ @konvesdigital
+/templates/ @konvesdigital
+/agents/ @konvesdigital

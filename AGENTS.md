@@ -11,7 +11,7 @@ capabilities:
   - gh (GitHub CLI) - ticket/PR mechanics only, per the "propose upstream" procedure and Fix 3
   - local filesystem read/write within this hub's own folders (outer repo + toolkit\)
   - never an arbitrary network request outside git/gh, never reading or emitting credentials
-max_lines: 400
+max_lines: 420
 human_review_required: true
 ---
 
@@ -45,12 +45,14 @@ not import into, any consumer project's own `CLAUDE.md`.
   in an imported file. This covers: the golden suite (`check_tower_crane.py`, Locked 2026-07-25); a
   `consistency_check.py` static-analysis FAIL on any new or changed script in the incoming content
   (`update_toolkit.py`'s pre-merge sweep); a `check_file_surface.py` FAIL (a non-Python script, a
-  script outside its expected home, a second AI-directive file, or a binary file anywhere in the
-  incoming diff); or a post-merge Pass B (cross-consumer drift) failure, which additionally requires
-  automatically rolling back the merge (fast-forward makes this a clean revert) rather than leaving
-  the broken state landed. Added 2026-07-27 after a live discussion found the original golden-suite-
-  only wording left a script-only, Python-only, careless-mistake-only gap against a genuinely
-  adversarial change.
+  script outside its expected home, a second AI-directive file, a binary file, or an invisible/
+  formatting Unicode character anywhere in the incoming diff — the "Trojan Source"/"Rules File
+  Backdoor" class, added 2026-07-27, `design\security_stress_test.md`); an `origin` remote-identity
+  mismatch (`origin`'s URL no longer matching the expected canonical upstream, same doc); or a post-merge
+  Pass B (cross-consumer drift) failure, which additionally requires automatically rolling back the
+  merge (fast-forward makes this a clean revert) rather than leaving the broken state landed. Added
+  2026-07-27 after a live discussion found the original golden-suite-only wording left a
+  script-only, Python-only, careless-mistake-only gap against a genuinely adversarial change.
 - An agent MUST NOT edit any file inside `hooks\`, `scripts\`, `templates\`, or `agents\` in
   response to a consumer project's request without that request first existing as a ticket in
   `change_requests\` (see "Change Requests" below).
@@ -312,26 +314,34 @@ diff-review-and-assessment step below is this procedure, since it's judgment wor
 deterministic algorithm.
 1. Run `python scripts\update_toolkit.py` (equivalent to `--check`) from inside `toolkit\`.
 2. If it reports "Already up to date": nothing else to do, say so.
-3. If it reports `[BLOCKED]` (a mechanical gate failed against the incoming content — the golden
+3. If it reports `[ABORT]` for a remote-identity mismatch (`origin`'s URL no longer matches the
+   expected upstream — possibly repointed by tampering, a bad paste, or a typosquatted fork): stop,
+   report it verbatim, get explicit confirmation before anything else. Never assume it's benign.
+4. If it reports `[BLOCKED]` (a mechanical gate failed against the incoming content — the golden
    suite, the `consistency_check.py` sweep, or `check_file_surface.py`): stop — report the failure
    to the user verbatim. This is a hard block, no override (Locked 2026-07-25, extended 2026-07-27).
    Offer to help investigate or file a fork+PR fix upstream, but do not attempt `--approve`.
-4. If it prints `=== BEGIN DIFF ===` … `=== END DIFF ===` (all pre-merge gates passed, review
-   pending): read the literal diff text the script printed. Write your own plain-language
-   assessment — does this look like a benign engineering change, or does it contain anything
-   destructive, obfuscated, exfiltration-shaped, or inconsistent with the changed file's stated
-   purpose? Show the user **both the literal diff and your assessment together, always** — never
-   the diff alone (unreadable without help interpreting it), never your assessment alone (hides the
-   ground truth that makes the user's approval actually meaningful, per
-   `design\update_trust_review.md`'s core finding). **"Show" means quoting the diff verbatim in
-   your own chat-visible text response** (a fenced code block for anything non-trivial) — running
-   the script and letting its printed output stand in for this is not sufficient, since tool call
-   results are not guaranteed visible to the user.
-5. Ask the user whether to approve. On yes: `python scripts\update_toolkit.py --approve` — this
-   also runs a post-merge check (full `check_tower_crane.py` against the live consumer registry)
-   and automatically rolls back if it fails, before `last_reviewed_sha` ever advances. On no:
-   `python scripts\update_toolkit.py --reject`. Rejecting is a fully supported, indefinite steady
-   state — "tools go stale but stay safe" — not a temporary holdout to re-nag about.
+5. If it prints `=== PENDING COMMITS ===` then `=== BEGIN DIFF ===` … `=== END DIFF ===` (gates
+   passed against the whole pending range; review pending): present the pending-commit list first,
+   as a short line-item index (added 2026-07-27, `design\security_stress_test.md`'s diff-size
+   mitigation — a large batch doesn't have to be read in one sitting). Ask how many leading (oldest)
+   items the user wants to decide on now; for those, read that commit's diff section and write your
+   own plain-language assessment — benign, or destructive/obfuscated/exfiltration-shaped/
+   inconsistent with the file's stated purpose? Show **both the literal diff and your assessment
+   together, always** — never the diff alone (unreadable without help), never the assessment alone
+   (hides the ground truth that makes approval meaningful, per `design\update_trust_review.md`'s
+   core finding). **"Show" means quoting the diff verbatim in your own chat-visible response**
+   (fenced code block for anything non-trivial) — tool output alone isn't sufficient, since it's not
+   guaranteed visible to the user.
+6. Ask whether to approve what was just reviewed. Covering everything shown:
+   `python scripts\update_toolkit.py --approve` — also runs a post-merge check (full
+   `check_tower_crane.py` against the live consumer registry), auto-rolling back on failure before
+   `last_reviewed_sha` advances. Covering only the leading items reviewed this round (added
+   2026-07-27): `python scripts\update_toolkit.py --approve --through <n>` (`<n>` = the last
+   approved item's 1-based index from the printed list) — the rest stay queued; a later `update`
+   surfaces just the remainder. On no: `python scripts\update_toolkit.py --reject` — a fully
+   supported, indefinite steady state ("tools go stale but stay safe"), not a holdout to re-nag
+   about.
 
 **"propose upstream"** — sends a hand-built local fix or improvement in `toolkit\` back to the
 public repo (`konvesdigital/tower-crane`) as a fork + PR

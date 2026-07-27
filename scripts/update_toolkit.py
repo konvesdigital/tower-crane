@@ -28,7 +28,8 @@ check and the mechanical merge:
                 2026-07-25 for the golden suite, extended 2026-07-27 to the other two gates - no
                 override). PASS prints the literal diff text and leaves a pending-review marker for
                 --approve/--reject.
-  --approve   Only valid after a --check left a pending PASS. Re-fetches to confirm origin/main
+  --approve [--through <n-or-sha>]
+              Only valid after a --check left a pending PASS. Re-fetches to confirm origin/main
               hasn't moved since the diff was shown, merges (fast-forward), then runs a FOURTH
               gate: the full check_tower_crane.py (both passes, including Pass B's cross-consumer
               drift scan) against the now-live merged content and the real consumers\\ registry -
@@ -37,6 +38,18 @@ check and the mechanical merge:
               automatically rolls the merge back (fast-forward makes this a clean `git reset
               --hard`) rather than leaving a broken state landed. Only on a clean pass does
               last_reviewed_sha actually advance.
+                Without --through: approves every pending commit shown by --check (all the way to
+              origin/main). With --through <n-or-sha>: partial approval, added 2026-07-27 (security
+              stress-test pass, design\\security_stress_test.md) - fast-forwards only to the given
+              commit (a 1-based index into the pending-commit list --check printed, or one of those
+              commits' own SHAs), leaving the remaining, newer pending commits queued. Lets a large
+              batch of upstream commits be reviewed a few at a time across multiple `update` calls
+              instead of forcing one all-or-nothing read of a potentially large diff in one sitting
+              (a real residual risk this project's own diff-size gate only partially covers - see
+              the design doc). The mechanical gates below still always run against the FULL pending
+              range regardless of --through, so nothing merges - partial or otherwise - until
+              everything currently fetched has passed every gate; --through only controls how much
+              of what already passed gets merged and trusted in this round.
   --reject    Clears the pending marker. Nothing was ever merged during --check (the golden suite
               ran against a worktree, not this clone), so rejecting is just "forget the pending
               review" - the old trusted baseline was never actually left.
@@ -54,6 +67,13 @@ runs itself; nothing schedules --check automatically.
               fetch + comparison against last_reviewed_sha, no golden suite, no pending-file
               write, never mutates state. Prints one line. Safe on any cadence (resume, cron) -
               never triggers the full review gate; that stays --check, user-initiated only.
+
+Remote-identity check (added 2026-07-27, security stress-test pass, design\\security_stress_test.md):
+every subcommand that talks to `origin` first confirms `git remote get-url origin` still matches
+the expected canonical URL recorded in config.local.json (`publish.public_repo_remote`). Nothing
+before this defended against `origin` silently being repointed (local tampering, a bad clone-URL
+paste, a typosquatted fork) - the diff-review gate would have faithfully reviewed and let a user
+approve content from an entirely different repo with no structural signal anything was wrong.
 """
 
 import argparse
@@ -73,6 +93,47 @@ LAST_REVIEWED_PATH = SHARED_ROOT / '.last_reviewed_sha'
 PENDING_PATH = SHARED_ROOT / '.update_pending.json'
 CONFIG_PATH = SHARED_ROOT / 'config.local.json'
 EMPTY_TREE_SHA = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'  # git's canonical empty-tree object
+
+
+def _normalize_remote_url(url):
+    """Loose-compare git remote URLs: strip a trailing '.git', trailing slash, and case-fold the
+    host - 'https://github.com/x/y.git' and 'https://github.com/x/y' are the same remote."""
+    u = url.strip().rstrip('/')
+    if u.lower().endswith('.git'):
+        u = u[:-4]
+    return u.lower()
+
+
+def _origin_remote_mismatch(cfg):
+    """Returns None if `origin` matches config.local.json's publish.public_repo_remote (or
+    nothing's configured to check against), else (expected, actual) strings describing the
+    mismatch."""
+    expected = cfg.get('publish', {}).get('public_repo_remote')
+    if not expected:
+        return None
+    actual = _git(['remote', 'get-url', 'origin'], check=False)
+    if actual.returncode != 0:
+        return (expected, '(no origin remote configured)')
+    if _normalize_remote_url(actual.stdout) != _normalize_remote_url(expected):
+        return (expected, actual.stdout.strip())
+    return None
+
+
+def check_origin_remote(cfg):
+    """Hard-abort version of the remote-identity check, used by --check/--approve: prevents a
+    silently repointed origin (local tampering, a bad clone-URL paste, a typosquatted fork) from
+    having its content diff-reviewed and approved as if it were the real upstream, with no signal
+    anything was wrong."""
+    mismatch = _origin_remote_mismatch(cfg)
+    if mismatch is None:
+        return
+    expected, actual = mismatch
+    print(f"[ABORT] 'origin' does not match the expected upstream. Configured (trusted): "
+          f"{expected!r}. Actual, this clone: {actual!r}. This could mean origin was silently "
+          "repointed (local tampering, a bad clone-URL paste, a typosquatted fork) - refusing to "
+          "review or merge anything until this is confirmed deliberate. If you intentionally "
+          "changed upstream, update config.local.json's publish.public_repo_remote to match.")
+    sys.exit(1)
 
 
 def write_utf8(path, content):
@@ -125,6 +186,37 @@ def clear_pending():
 
 def origin_main_sha():
     return _git(['rev-parse', 'origin/main']).stdout.strip()
+
+
+def list_pending_commits(base, target):
+    """Oldest-first list of commit SHAs strictly between base (exclusive) and target (inclusive).
+    The natural atomic unit for partial review/approval: a fast-forward merge can only ever land a
+    contiguous prefix of this list, never an arbitrary subset, so commits (not files) are what
+    --approve --through addresses."""
+    proc = _git(['log', '--reverse', '--format=%H', f'{base}..{target}'])
+    return [sha for sha in proc.stdout.splitlines() if sha.strip()]
+
+
+def commit_subject_and_files(sha):
+    subject = _git(['log', '-1', '--format=%s', sha]).stdout.strip()
+    files = [f for f in _git(['diff-tree', '--no-commit-id', '--name-only', '-r', sha]).stdout.splitlines() if f.strip()]
+    return subject, files
+
+
+def resolve_through(value, commits):
+    """value is either a 1-based index into `commits` (oldest-first, matching what --check prints)
+    or a SHA/unambiguous-prefix of one of those commits. Returns the resolved full SHA, or None if
+    value doesn't identify any commit in the pending list."""
+    if value.isdigit():
+        idx = int(value)
+        if 1 <= idx <= len(commits):
+            return commits[idx - 1]
+        return None
+    proc = _git(['rev-parse', '--verify', value], check=False)
+    if proc.returncode != 0:
+        return None
+    resolved = proc.stdout.strip()
+    return resolved if resolved in commits else None
 
 
 def create_review_worktree(target_sha):
@@ -230,6 +322,7 @@ def run_post_merge_check(cfg):
 
 def cmd_check(cfg):
     print("=== update_toolkit.py --check ===")
+    check_origin_remote(cfg)
     if _is_dirty():
         print("[ABORT] toolkit\\ working tree has uncommitted changes - commit or stash them first.")
         sys.exit(1)
@@ -280,24 +373,48 @@ def cmd_check(cfg):
         clear_pending()
         sys.exit(1)
 
-    diff_text = _git(['diff', base, target]).stdout
     save_pending({'base': base, 'target': target})
     print("[PASS] All mechanical gates passed against the incoming content.")
     print()
-    print("=== BEGIN DIFF (last_reviewed_sha..origin/main, literal, unabridged) ===")
-    print(diff_text)
+
+    commits = list_pending_commits(base, target)
+    print(f"=== PENDING COMMITS ({len(commits)}, oldest first) ===")
+    for i, sha in enumerate(commits, 1):
+        subject, files = commit_subject_and_files(sha)
+        print(f"  [{i}] {sha[:8]}  {subject}")
+        for f in files:
+            print(f"        {f}")
+    print("=== END PENDING COMMITS ===")
+    print()
+
+    print("=== BEGIN DIFF (one section per pending commit, literal, unabridged) ===")
+    for i, sha in enumerate(commits, 1):
+        subject, _files = commit_subject_and_files(sha)
+        show = _git(['show', sha]).stdout
+        print(f"--- COMMIT [{i}/{len(commits)}] {sha[:8]}: {subject} ---")
+        print(show)
+        print(f"--- END COMMIT [{i}] ---")
     print("=== END DIFF ===")
     print()
-    print("Quote the diff above VERBATIM in your own chat-visible response (fenced code block), "
-          "together with your own plain-language assessment - never the diff alone, never a "
-          "verdict alone, and never relying on this tool output alone to convey it, since tool "
-          "call results are not guaranteed visible to the user. Then:")
-    print("  python scripts\\update_toolkit.py --approve   (on the user's yes)")
-    print("  python scripts\\update_toolkit.py --reject    (on the user's no)")
+    print("Present the pending-commit list above to the user FIRST, as a short line-item index. "
+          "Ask how many of the leading (oldest) items they want to review right now - a large batch "
+          "doesn't have to be read in one sitting (design\\security_stress_test.md). For whichever "
+          "commits they choose to decide on this round, quote that commit's own diff section above "
+          "VERBATIM in your own chat-visible response (fenced code block), together with your own "
+          "plain-language assessment - never the diff alone, never a verdict alone, and never "
+          "relying on this tool output alone to convey it, since tool call results are not "
+          "guaranteed visible to the user. Then:")
+    print("  python scripts\\update_toolkit.py --approve                    (approve ALL pending commits)")
+    print("  python scripts\\update_toolkit.py --approve --through <n>      (approve only through "
+          "item <n> in the list above - the rest stay queued; running `update` again later reviews "
+          "just the remainder)")
+    print("  python scripts\\update_toolkit.py --reject                     (discard this round; "
+          "nothing was merged)")
 
 
-def cmd_approve(cfg):
+def cmd_approve(cfg, through=None):
     print("=== update_toolkit.py --approve ===")
+    check_origin_remote(cfg)
     if _is_dirty():
         print("[ABORT] toolkit\\ working tree has uncommitted changes - commit or stash them first.")
         sys.exit(1)
@@ -315,8 +432,18 @@ def cmd_approve(cfg):
               "new state before approving.")
         sys.exit(1)
 
+    commits = list_pending_commits(pending['base'], pending['target'])
+    if through is None:
+        merge_target = pending['target']
+    else:
+        merge_target = resolve_through(through, commits)
+        if merge_target is None:
+            print(f"[ABORT] '{through}' isn't one of the pending commits the last --check showed "
+                  f"(expected a 1-based index from 1..{len(commits)}, or one of their SHAs).")
+            sys.exit(1)
+
     pre_merge_sha = _git(['rev-parse', 'HEAD']).stdout.strip()
-    _git(['merge', '--ff-only', pending['target']])
+    _git(['merge', '--ff-only', merge_target])
 
     print("Merged. Running the post-merge gate: full check_tower_crane.py (both passes) against "
           "the now-live content and the real consumers\\ registry...")
@@ -332,16 +459,32 @@ def cmd_approve(cfg):
         clear_pending()
         sys.exit(1)
 
-    write_last_reviewed(pending['target'])
+    write_last_reviewed(merge_target)
     clear_pending()
-    print(f"Approved. Trusted baseline advanced to {pending['target'][:8]}. toolkit\\ is up to date.")
+    remaining = len(list_pending_commits(merge_target, pending['target']))
+    if remaining:
+        approved_count = len(commits) - remaining
+        print(f"Approved through {merge_target[:8]} ({approved_count}/{len(commits)} pending "
+              f"commits merged). {remaining} commit(s) remain queued - run `update` again to "
+              "review the rest.")
+    else:
+        print(f"Approved. Trusted baseline advanced to {merge_target[:8]}. toolkit\\ is up to date.")
 
 
-def cmd_notify():
+def cmd_notify(cfg):
     """The 'check for update' proactive notice (design\\local_first_reframe.md): a plain fetch +
     comparison against last_reviewed_sha, no LLM, no golden suite, no pending-file write - never
     mutates anything, safe to run on any cadence (resume, cron). Surfaces a single line; never
-    triggers the full review gate (that stays --check, user-initiated only)."""
+    triggers the full review gate (that stays --check, user-initiated only). The remote-identity
+    check here is a WARN, not an abort - --notify's whole point is a safe, side-effect-free
+    heads-up, so it still reports a mismatched origin without blocking `resume`."""
+    mismatch = _origin_remote_mismatch(cfg)
+    if mismatch is not None:
+        expected, actual = mismatch
+        print(f"[update check] [WARN] 'origin' does not match the expected upstream (configured: "
+              f"{expected!r}, actual: {actual!r}) - run `update` for the full check, which will "
+              "abort until this is resolved.")
+
     fetch = _git(['fetch', 'origin'], check=False)
     if fetch.returncode != 0:
         print("[update check] couldn't fetch origin (offline?) - skipping.")
@@ -385,16 +528,20 @@ def main():
     group.add_argument('--reject', action='store_true', help="Discard a pending --check PASS.")
     group.add_argument('--notify', action='store_true',
                         help="Lightweight one-line heads-up, no golden suite, no state mutation.")
+    parser.add_argument('--through', default=None,
+                         help="With --approve: partial approval, only through this pending commit "
+                              "(1-based index from the last --check's list, or one of those "
+                              "commits' own SHAs). Ignored by every other flag.")
     args = parser.parse_args()
-
-    if args.notify:
-        cmd_notify()
-        return
 
     cfg = get_shared_config(SHARED_ROOT)
 
+    if args.notify:
+        cmd_notify(cfg)
+        return
+
     if args.approve:
-        cmd_approve(cfg)
+        cmd_approve(cfg, through=args.through)
     elif args.reject:
         cmd_reject()
     else:
