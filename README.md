@@ -151,7 +151,7 @@ from GitHub and want to set it up as your own.
 ### 2.1 Start a hub for the first time
 A hub is **two nested git repos in one folder**: an outer, private repo (your own continuity
 data — `project_progress.md`, `consumers\`, `change_requests\`) and an inner `toolkit\` repo (the
-shared tools/templates/`CLAUDE.md`, tracking the public `konvesdigital/tower-crane` repo). Neither
+shared tools/templates/`AGENTS.md`, tracking the public `konvesdigital/tower-crane` repo). Neither
 carries machine-specific paths — each clone/download provides its own via a gitignored config
 inside `toolkit\`. Two cases reach this step:
 
@@ -339,7 +339,7 @@ that. When you're ready: `gh repo edit <owner>/<repo> --visibility public`. No c
 way.
 
 ### 2.7 Add a new shareable tool to the catalog
-Full mechanical steps live in `CLAUDE.md` ("Adding a new tool") since that's what your agent
+Full mechanical steps live in `toolkit\AGENTS.md` ("Adding a new tool") since that's what your agent
 follows — but in short: build and test the tool in whichever project prompted the need, strip
 anything project-specific (no hardcoded paths or project names — it must work unmodified from any
 future project), drop it in the matching folder (`hooks\`, `agents\`, or `scripts\`), and add a
@@ -394,7 +394,7 @@ calling agent's context when the hook exits **code 2** on **stderr** — any oth
 "non-blocking," shown to the human only. `hooks\consistency_check.py` originally exited 1 to
 stdout only: every FAIL was logging correctly but never reaching the agent that needed to see it
 — found 2026-07-23 via this repo's own dogfooding. This is now the standing contract for any
-automatic Claude Code hook in this repo (`CLAUDE.md` "Adding a new tool" step 2a). It doesn't
+automatic Claude Code hook in this repo (`toolkit\AGENTS.md` "Adding a new tool" step 2a). It doesn't
 apply to a manually-invoked maintainer script like `check_tower_crane.py` — its output is already
 fully visible to whoever runs it.
 
@@ -410,13 +410,13 @@ owners.
 ### What actually ships — private vs. public content
 | Category | Files | Effect of editing here |
 |---|---|---|
-| **KEEP** (git-tracked, copied verbatim + scrubbed) | `hooks\`, `agents\`, `scripts\`, `tests\`, `templates\`, `CLAUDE.md`, `config.example.json`, `.gitignore`, `CHANGELOG.md` | Ships in the next generate/release — once committed. |
+| **KEEP** (git-tracked, copied verbatim + scrubbed) | `hooks\`, `agents\`, `scripts\`, `tests\`, `templates\`, `AGENTS.md`, `config.example.json`, `.gitignore`, `CHANGELOG.md` | Ships in the next generate/release — once committed. |
 | **Derived** | `MENU.md` | Catalog rows/opt-in snippets ship through; "In use by" cells are blanked. |
 | **Regenerated** (hardcoded inside `scripts\seed_hub.py`'s own script body) | `README.md`, `project_progress.md`, `SETUP.md` | No effect — this repo's own copy is never read. To change what a *new* hub's public README says, edit the `readme` string inside `scripts\seed_hub.py`. |
 | **Excluded** | `design\`, `consumers\`, `change_requests\`, `project_progress_archive.md` | Never ships. |
 
 This file (`README.md`) and `project_progress.md` are safe places for private, internal notes —
-they structurally cannot leak into a public release. `CLAUDE.md`, by contrast, *is* a KEEP file,
+they structurally cannot leak into a public release. `AGENTS.md`, by contrast, *is* a KEEP file,
 so keep it to generic process rules only.
 
 > **Never hand-edit files inside the local `tower_crane_public` clone.** `publish_release.py`
@@ -441,7 +441,7 @@ The hub is two nested git repos. Paths below are grouped by which one actually o
 | `change_requests\` | The inbox — tickets from consumers and registration requests. |
 | `design\` | Rationale docs — see Track 3. |
 | `project_progress.md` | Cross-session working state for this hub. |
-| `CLAUDE.md` | A one-line pointer (`@import`) at `toolkit\CLAUDE.md` — kept here only so Claude Code auto-loads it. |
+| `CLAUDE.md` | A one-line pointer (`@import`) at `toolkit\AGENTS.md` — kept here only so Claude Code auto-loads it, and where personal/unshared customization belongs. |
 | `.claude\settings.local.json`, `.claude\self_hooks_status.md` | This hub's own self-use state — gitignored, per-machine. |
 | `toolkit\` | The inner repo below — gitignored by this outer repo entirely. |
 
@@ -454,7 +454,7 @@ The hub is two nested git repos. Paths below are grouped by which one actually o
 | `hooks\`, `agents\` | The executable tools themselves. |
 | `CHANGELOG.md` | What's in each public release. |
 | `config.example.json` / `config.local.json` | Per-machine config. `.example` committed; `.local` gitignored. |
-| `CLAUDE.md` | The Claude Code agent's per-session operating manual — the canonical content. Not human onboarding — that's this file. |
+| `AGENTS.md` | The canonical hub-operating instructions — imported whole by the outer `CLAUDE.md`. Not human onboarding — that's this file. Carries the standard AI-directive preamble (`design\update_trust_review.md`'s Fix 3) since it's the file a crowd-sourced PR would ever touch. |
 | `.last_reviewed_sha`, `.update_pending.json` | The `update` action's per-machine trust-review state — gitignored. |
 
 ### Quick-start cheat sheet
@@ -467,8 +467,8 @@ The hub is two nested git repos. Paths below are grouped by which one actually o
 | Turn on this hub's own tools | `scripts\self_hooks.py --enable <tool>` (from inside `toolkit\`) — 2.3 |
 | Set up on a new machine | 2.1 |
 | Add another of your own machines (Federate) | 2.4 |
-| Pull a reviewed toolkit update | `update` action, via `toolkit\scripts\update_toolkit.py` — see `CLAUDE.md`'s `"update"` procedure |
-| Propose a fix upstream | `"propose upstream"` — see `CLAUDE.md`'s procedure |
+| Pull a reviewed toolkit update | `update` action, via `toolkit\scripts\update_toolkit.py` — see `toolkit\AGENTS.md`'s `"update"` procedure |
+| Propose a fix upstream | `"propose upstream"` — see `toolkit\AGENTS.md`'s procedure |
 | Generate an independent hub (Replicate) | `toolkit\scripts\seed_hub.py --out <path>` — 2.5 |
 | Publish a release | `CHANGELOG.md` entry + `toolkit\scripts\publish_release.py --version X.Y.Z` — 2.6 |
 | Flip the public repo public | `gh repo edit <owner>/<repo> --visibility public` — 2.6 |

@@ -9,7 +9,7 @@ Mechanical-gate-then-agent split (Locked 2026-07-26, mirrors run_automation.py's
 this script owns every deterministic step - fetch, diff-against-last-reviewed decision, golden
 suite, and the post-approval merge. The diff-review-and-assessment step itself (reading the
 literal diff, writing a plain-language read of what it does) is NOT here - it stays a Claude Code
-procedure (toolkit\\CLAUDE.md's "update" section, alongside checkpoint/resume), since it is
+procedure (toolkit\\AGENTS.md's "update" section, alongside checkpoint/resume), since it is
 judgment work with no deterministic algorithm.
 
 Two-call protocol, because the review gate needs a human/Claude in the loop between the mechanical

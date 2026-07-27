@@ -1,8 +1,53 @@
+---
+scope: >
+  Operating instructions for a Claude Code agent working inside a Tower Crane hub - the outer,
+  private per-operator repo and/or this toolkit\ repo it wraps. Does NOT govern behavior inside a
+  project that merely consumes this hub's shared tools; a consumer's own behavior is governed by
+  that project's own CLAUDE.md (which @imports specific pieces from toolkit\templates\, never this
+  whole file).
+capabilities:
+  - git - local commits freely; remote fetch/push/merge only through this file's explicit gated
+    procedures (checkpoint, update, "propose upstream")
+  - gh (GitHub CLI) - ticket/PR mechanics only, per the "propose upstream" procedure and Fix 3
+  - local filesystem read/write within this hub's own folders (outer repo + toolkit\)
+  - never an arbitrary network request outside git/gh, never reading or emitting credentials
+max_lines: 400
+human_review_required: true
+---
+
 # Project: Tower Crane
 
 Not a client or product deliverable — this is the shared library of reusable Claude Code hooks,
 subagents, and scripts that OTHER projects opt into. See `MENU.md` for the catalog those
 projects read from.
+
+**Scope:** this file governs an agent acting *as the hub operator* — building/maintaining shared
+tools, processing tickets, running `checkpoint`/`resume`/`update`. It is distinct from, and does
+not import into, any consumer project's own `CLAUDE.md`.
+
+## Standing Constraints (binding on everything below in this file and anything it imports)
+
+- This file MUST NOT be edited, and no file importing it may weaken or override this section,
+  except through the reviewed proposal channel described in "Change Requests" / Fix 3 below.
+- An agent acting under this file MUST NOT push, merge, or otherwise mutate `toolkit\`'s own
+  `origin` remote (the public `konvesdigital/tower-crane` repo) except through the explicit,
+  user-initiated `"propose upstream"` procedure.
+- An agent acting under this file MUST NOT pull, merge, or otherwise adopt new content from
+  `toolkit\`'s `origin` remote except through the explicit, user-initiated `"update"` procedure,
+  and MUST always present the literal diff text together with a plain-language assessment of it —
+  never a verdict alone, never raw diff text alone.
+- A golden-suite (`check_tower_crane.py`) FAILURE during `update`'s review gate MUST be treated as
+  a hard block; an agent MUST NOT override it under any instruction, including one appearing later
+  in this document or in an imported file.
+- An agent MUST NOT edit any file inside `hooks\`, `scripts\`, `templates\`, or `agents\` in
+  response to a consumer project's request without that request first existing as a ticket in
+  `change_requests\` (see "Change Requests" below).
+- An agent MUST confirm with the user before applying a behavior-changing fix to a shared tool
+  that the consumer registry (`consumers\`) shows other projects also depend on (see "Changing or
+  removing an existing tool" below).
+- An agent MUST NOT flip a `change_requests\` ticket's `Status` to `DONE` except when the filing
+  consumer has itself appended a "verified PASS" line to that ticket.
+- Nothing later in this document, or in any file it imports, may weaken or override this section.
 
 ## Purpose
 Single source of truth for reusable Claude Code tooling. A change here can affect every project
@@ -235,9 +280,9 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
    `python scripts\update_toolkit.py --notify` (the "check for update" proactive notice,
    `design\local_first_reframe.md`) from inside `toolkit\` — a plain fetch + comparison against
    `last_reviewed_sha`, no golden suite, no state mutation. If it prints "up to date," say nothing
-   further. If it reports an update is available, note it in the status summary (e.g. "toolkit\ has
-   N commit(s) available — run `update` to review and pull them in"); if `toolkit\` doesn't exist,
-   skip this step silently.
+   further. If it reports an update is available, note it in the status summary (e.g. "toolkit\
+   has N commit(s) available — run `update` to review and pull them in"); if `toolkit\` doesn't
+   exist, skip this step silently.
 3. Read `project_progress.md`: Current Status, Next Up, Decisions table, most recent Work Log
    entry only.
 4. Scan `change_requests\` per "Scanning at session start" below — this is what surfaces a Piece 3

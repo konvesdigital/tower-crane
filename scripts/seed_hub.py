@@ -44,7 +44,7 @@ SHARED_ROOT = Path(__file__).resolve().parent.parent
 # folder is NOT here, so it is excluded by default - that is the allowlist's point.
 KEEP_DIRS = ['hooks', 'agents', 'scripts', 'tests', 'templates']
 # KEEP root files: copied verbatim.
-KEEP_ROOT_FILES = ['CLAUDE.md', 'config.example.json', '.gitignore', 'CHANGELOG.md']
+KEEP_ROOT_FILES = ['AGENTS.md', 'config.example.json', '.gitignore', 'CHANGELOG.md']
 # REGENERATE root files: written fresh below (never copied from the source - they carry instance
 # narrative). Listed here only so the summary can report them as "regenerated, not copied".
 REGEN_ROOT_FILES = ['README.md', 'MENU.md', 'project_progress.md']
