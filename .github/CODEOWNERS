@@ -3,3 +3,11 @@
 # requiring this review before merge (branch protection itself needs the repo to be public, or a
 # paid GitHub plan, to take effect on GitHub's Free tier - see project_progress.md Next Up).
 /AGENTS.md @konvesdigital
+
+# The gate infrastructure itself needs at least the same protection as what it guards - otherwise a
+# PR could silently edit a check to always pass, or remove this file's own restriction, defeating
+# Phase 3 entirely. Found live 2026-07-27 while building the file-surface classifier below.
+/.github/ @konvesdigital
+/scripts/check_agents_pr_gate.py @konvesdigital
+/scripts/check_standing_constraints.py @konvesdigital
+/scripts/check_file_surface.py @konvesdigital

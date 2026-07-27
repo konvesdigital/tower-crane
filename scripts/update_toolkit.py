@@ -16,13 +16,27 @@ Two-call protocol, because the review gate needs a human/Claude in the loop betw
 check and the mechanical merge:
   --check     (default) fetch + diff last_reviewed_sha vs origin/main.
                 Empty diff -> fast-forwards silently, advances last_reviewed_sha, done.
-                Non-empty diff -> runs the golden suite against the fetched content in a throwaway
-                git worktree (never touches this clone's real working tree). FAIL hard-blocks
-                (Locked 2026-07-25, no override) - nothing merges. PASS prints the literal diff
-                text and leaves a pending-review marker for --approve/--reject.
+                Non-empty diff -> runs three mechanical gates against the fetched content, all in a
+                throwaway git worktree or via direct ref comparison (never touches this clone's
+                real working tree): check_tower_crane.py's golden suite (Pass A only - Pass B needs
+                the live consumers\\ registry, see below); a consistency_check.py static-analysis
+                sweep over every .py file in hooks\\/scripts\\/agents\\ (closes the gap the golden
+                suite leaves for a brand-new script with no tests\\<tool>\\ fixtures yet); and
+                check_file_surface.py's file-surface classifier (assumes an adversary, not just
+                carelessness - catches a non-Python script, a script outside its expected home, a
+                second AI-directive file, or a binary blob). Any FAIL hard-blocks (Locked
+                2026-07-25 for the golden suite, extended 2026-07-27 to the other two gates - no
+                override). PASS prints the literal diff text and leaves a pending-review marker for
+                --approve/--reject.
   --approve   Only valid after a --check left a pending PASS. Re-fetches to confirm origin/main
-              hasn't moved since the diff was shown, merges (fast-forward), advances
-              last_reviewed_sha to the new HEAD.
+              hasn't moved since the diff was shown, merges (fast-forward), then runs a FOURTH
+              gate: the full check_tower_crane.py (both passes, including Pass B's cross-consumer
+              drift scan) against the now-live merged content and the real consumers\\ registry -
+              something only possible post-merge, since Pass B needs consumers\\ (outer repo) and a
+              real toolkit\\ location, neither reachable from the pre-merge worktree. A FAIL here
+              automatically rolls the merge back (fast-forward makes this a clean `git reset
+              --hard`) rather than leaving a broken state landed. Only on a clean pass does
+              last_reviewed_sha actually advance.
   --reject    Clears the pending marker. Nothing was ever merged during --check (the golden suite
               ran against a worktree, not this clone), so rejecting is just "forget the pending
               review" - the old trusted baseline was never actually left.
@@ -113,28 +127,105 @@ def origin_main_sha():
     return _git(['rev-parse', 'origin/main']).stdout.strip()
 
 
-def run_golden_suite_against(target_sha, cfg):
-    """Checks out target_sha into a throwaway worktree and runs ITS OWN check_tower_crane.py
-    golden suite only (--skip-reference: consumers\\/config.local.json live outside the inner
-    repo's tree post-split, so pass B has nothing valid to scan from an ephemeral worktree
-    location). Returns (passed: bool, output: str)."""
+def create_review_worktree(target_sha):
     worktree_dir = Path(tempfile.gettempdir()) / f"tower_crane_update_review_{os.getpid()}"
     if worktree_dir.exists():
         shutil.rmtree(worktree_dir, ignore_errors=True)
-
     _git(['worktree', 'add', '--detach', str(worktree_dir), target_sha])
+    return worktree_dir
+
+
+def remove_review_worktree(worktree_dir):
+    _git(['worktree', 'remove', '--force', str(worktree_dir)], check=False)
+    _git(['worktree', 'prune'], check=False)
+
+
+def run_golden_suite_against(worktree_dir, cfg):
+    """Runs check_tower_crane.py's golden suite only (--skip-reference: consumers\\/
+    config.local.json live outside the inner repo's tree post-split, so pass B has nothing valid to
+    scan from an ephemeral worktree location - that gap is covered separately, post-merge, by
+    run_post_merge_check()). Returns (passed: bool, output: str)."""
+    # get_shared_config needs a config.local.json to exist; reuse this clone's own (per-machine
+    # values are valid regardless of the temporary path - shared_root self-corrects harmlessly).
+    shutil.copy2(CONFIG_PATH, worktree_dir / 'config.local.json')
+    proc = subprocess.run(
+        [cfg['python_launcher'], str(worktree_dir / 'scripts' / 'check_tower_crane.py'), '--skip-reference'],
+        capture_output=True, text=True,
+    )
+    return proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def run_consistency_sweep(worktree_dir, cfg):
+    """Runs hooks\\consistency_check.py (static analysis - undefined names, arity mismatches,
+    string-key drift) against every .py file under hooks\\/scripts\\/agents\\ in the incoming
+    worktree. Closes the gap the golden suite leaves: Pass A only exercises tools that already have
+    tests\\<tool>\\ fixtures, so a brand-new script gets zero automatic scrutiny otherwise. Returns
+    (passed: bool, output: str)."""
+    hook_script = worktree_dir / 'hooks' / 'consistency_check.py'
+    if not hook_script.exists():
+        return True, "--- consistency_check.py sweep ---\n  (no hooks\\consistency_check.py in incoming content - skipping)"
+
+    targets = []
+    for sub in ('hooks', 'scripts', 'agents'):
+        d = worktree_dir / sub
+        if d.is_dir():
+            targets.extend(sorted(d.glob('*.py')))
+
+    # sandbox project dir, same convention as check_tower_crane.py's own invoke_golden_suite() -
+    # the hook needs CLAUDE_PROJECT_DIR and writes logs there; without it, it silently skips.
+    sandbox = Path(tempfile.gettempdir()) / f"update_toolkit_consistency_sandbox_{os.getpid()}"
+    sandbox.mkdir(parents=True, exist_ok=True)
+    saved_proj_dir = os.environ.get('CLAUDE_PROJECT_DIR')
+    os.environ['CLAUDE_PROJECT_DIR'] = str(sandbox)
+
+    lines = ["--- consistency_check.py sweep (every script in the incoming content) ---"]
+    ok = True
     try:
-        # get_shared_config needs a config.local.json to exist; reuse this clone's own (per-machine
-        # values are valid regardless of the temporary path - shared_root self-corrects harmlessly).
-        shutil.copy2(CONFIG_PATH, worktree_dir / 'config.local.json')
-        proc = subprocess.run(
-            [cfg['python_launcher'], str(worktree_dir / 'scripts' / 'check_tower_crane.py'), '--skip-reference'],
-            capture_output=True, text=True,
-        )
-        return proc.returncode == 0, proc.stdout + proc.stderr
+        for f in targets:
+            proc = subprocess.run(
+                [cfg['python_launcher'], str(hook_script), str(f)],
+                capture_output=True, text=True,
+            )
+            rel = f.relative_to(worktree_dir)
+            if proc.returncode == 2:
+                ok = False
+                lines.append(f"  [FAIL] {rel}")
+                for line in (proc.stdout + proc.stderr).splitlines():
+                    lines.append(f"    {line}")
+            else:
+                lines.append(f"  [PASS] {rel}")
     finally:
-        _git(['worktree', 'remove', '--force', str(worktree_dir)], check=False)
-        _git(['worktree', 'prune'], check=False)
+        if saved_proj_dir is None:
+            os.environ.pop('CLAUDE_PROJECT_DIR', None)
+        else:
+            os.environ['CLAUDE_PROJECT_DIR'] = saved_proj_dir
+        shutil.rmtree(sandbox, ignore_errors=True)
+
+    return ok, '\n'.join(lines)
+
+
+def run_file_surface_check(base_sha, target_sha, cfg):
+    """Runs check_file_surface.py directly against this clone's own git history (base_sha and
+    target_sha are both already fetched/reachable here - no worktree checkout needed, since the
+    script reads blobs via `git show`/`git diff`, never the working tree). Returns (passed, output)."""
+    script = SHARED_ROOT / 'scripts' / 'check_file_surface.py'
+    proc = subprocess.run(
+        [cfg['python_launcher'], str(script), '--base-sha', base_sha, '--head-sha', target_sha],
+        capture_output=True, text=True,
+    )
+    return proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def run_post_merge_check(cfg):
+    """Runs the FULL check_tower_crane.py (both passes) against the now-live merged toolkit\\ and
+    the real consumers\\ registry - only possible post-merge, since Pass B needs the outer repo's
+    consumers\\ folder and a real (not ephemeral-worktree) toolkit\\ location. Returns (passed,
+    output)."""
+    proc = subprocess.run(
+        [cfg['python_launcher'], str(SHARED_ROOT / 'scripts' / 'check_tower_crane.py')],
+        capture_output=True, text=True, cwd=str(SHARED_ROOT),
+    )
+    return proc.returncode == 0, proc.stdout + proc.stderr
 
 
 def cmd_check(cfg):
@@ -167,26 +258,40 @@ def cmd_check(cfg):
         return
 
     print(f"Non-empty diff: last-reviewed {base[:8]} .. origin/main {target[:8]}. Running the "
-          "golden-suite gate before any review is shown.")
-    passed, suite_output = run_golden_suite_against(target, cfg)
-    print(suite_output)
-    if not passed:
-        print("[BLOCKED] Golden suite FAILED against the incoming content - update refused, no "
-              "override (Locked 2026-07-25). The old trusted baseline is untouched. Investigate, "
-              "or file a fork+PR fix upstream.")
+          "mechanical gates before any review is shown.")
+
+    worktree_dir = create_review_worktree(target)
+    try:
+        golden_ok, golden_output = run_golden_suite_against(worktree_dir, cfg)
+        print(golden_output)
+        consistency_ok, consistency_output = run_consistency_sweep(worktree_dir, cfg)
+        print(consistency_output)
+    finally:
+        remove_review_worktree(worktree_dir)
+
+    surface_ok, surface_output = run_file_surface_check(base, target, cfg)
+    print(surface_output)
+
+    if not (golden_ok and consistency_ok and surface_ok):
+        print("[BLOCKED] One or more mechanical gates FAILED against the incoming content - update "
+              "refused, no override (Locked 2026-07-25, extended 2026-07-27 to the consistency "
+              "sweep and file-surface classifier). The old trusted baseline is untouched. "
+              "Investigate, or file a fork+PR fix upstream.")
         clear_pending()
         sys.exit(1)
 
     diff_text = _git(['diff', base, target]).stdout
     save_pending({'base': base, 'target': target})
-    print("[PASS] Golden suite passed against the incoming content.")
+    print("[PASS] All mechanical gates passed against the incoming content.")
     print()
     print("=== BEGIN DIFF (last_reviewed_sha..origin/main, literal, unabridged) ===")
     print(diff_text)
     print("=== END DIFF ===")
     print()
-    print("Review the diff above with the user, alongside a plain-language assessment of what it "
-          "does and why - never the diff alone, never a verdict alone. Then:")
+    print("Quote the diff above VERBATIM in your own chat-visible response (fenced code block), "
+          "together with your own plain-language assessment - never the diff alone, never a "
+          "verdict alone, and never relying on this tool output alone to convey it, since tool "
+          "call results are not guaranteed visible to the user. Then:")
     print("  python scripts\\update_toolkit.py --approve   (on the user's yes)")
     print("  python scripts\\update_toolkit.py --reject    (on the user's no)")
 
@@ -210,7 +315,23 @@ def cmd_approve(cfg):
               "new state before approving.")
         sys.exit(1)
 
+    pre_merge_sha = _git(['rev-parse', 'HEAD']).stdout.strip()
     _git(['merge', '--ff-only', pending['target']])
+
+    print("Merged. Running the post-merge gate: full check_tower_crane.py (both passes) against "
+          "the now-live content and the real consumers\\ registry...")
+    post_ok, post_output = run_post_merge_check(cfg)
+    print(post_output)
+    if not post_ok:
+        _git(['reset', '--hard', pre_merge_sha])
+        print("[ROLLED BACK] Post-merge check_tower_crane.py found a FAILURE - most likely "
+              "cross-consumer breakage that only the real, live consumers\\ registry could reveal "
+              "(the pre-merge gate can't see it from an ephemeral worktree). The merge has been "
+              "reverted; the old trusted baseline is untouched. Hard block, no override (Locked "
+              "2026-07-27, same discipline as the pre-merge golden-suite gate).")
+        clear_pending()
+        sys.exit(1)
+
     write_last_reviewed(pending['target'])
     clear_pending()
     print(f"Approved. Trusted baseline advanced to {pending['target'][:8]}. toolkit\\ is up to date.")

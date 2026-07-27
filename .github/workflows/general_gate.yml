@@ -1,0 +1,54 @@
+# General PR gate - runs on EVERY PR, not just ones touching AGENTS.md (see agents_md_gate.yml for
+# that narrower, AGENTS.md-content-specific gate). Built 2026-07-27 after a live discussion found
+# that the AGENTS.md-specific checks alone don't defend against a deliberate adversary adding a
+# second AI-directive file elsewhere, a script in a language none of the Python-specific checkers
+# read, or a script hidden somewhere unexpected - design\update_trust_review.md's own threat model
+# is a malicious/compromised actor, not just carelessness, so this gate assumes that.
+#
+# Two checks:
+#   - check_file_surface.py: known-AI-directive-filename, language/location, and binary-file checks
+#     (hard), plus a disguised-code content heuristic (soft).
+#   - check_scripts_gate.py: consistency_check.py static analysis over every changed script under
+#     hooks\/scripts\/agents\.
+#
+# Same branch-protection caveat as agents_md_gate.yml: not wired as a *required* status check yet -
+# GitHub Free tier doesn't support branch protection on a private repo, and this repo is still
+# private. Runs and reports either way.
+
+name: General PR gate
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  general-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: File-surface classifier
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python scripts/check_file_surface.py --base-sha "$BASE_SHA" --head-sha "$HEAD_SHA"
+
+      - name: Changed-script consistency sweep
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python scripts/check_scripts_gate.py --base-sha "$BASE_SHA" --head-sha "$HEAD_SHA"
