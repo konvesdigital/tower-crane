@@ -337,9 +337,10 @@ mechanical checks are still not built, so `AGENTS.md`'s own branch protection do
    e.g. `fix-relocate-symlink-check`).
 2a. **If this change touches `AGENTS.md`** — authoring-assistant behavior, before committing.
    Nothing forces this step to run — running it is just how a submission actually clears review
-   (today, the operator's manual read; once built, Phase 3's mechanical checks), so skipping it
-   doesn't bypass anything, it just risks the PR coming back for rework. Say this plainly if asked
-   to skip it.
+   (the operator's manual read, plus Phase 3's mechanical CI gate,
+   `scripts\check_agents_pr_gate.py`, once branch protection is live), so skipping it doesn't
+   bypass anything, it just risks the PR coming back for rework. Say this plainly if asked to skip
+   it.
    a. **Silently auto-fix the frontmatter** (`scope`/`capabilities`/`human_review_required`) to
       match the new content — re-derive the capability list from what the new prose actually
       references (e.g. new content mentioning a network call would need `capabilities` updated and
@@ -353,19 +354,24 @@ mechanical checks are still not built, so `AGENTS.md`'s own branch protection do
       user can proceed once they've confirmed, this is simply the one place burden is allowed to go
       up because the edit is supposed to be a deliberate act.
    c. Ask the contributor two plain questions — "what changed, in your words?" and "why?" — and
-      separately write your own independent read of what the diff actually does. Keep both as two
-      clearly labeled, side-by-side statements (never blended into one voice) for step 5's PR body.
+      separately write your own independent read of what the diff actually does. Render both into
+      the PR body under two literal headings, `### Contributor statement` and `### Independent
+      read` (never blended into one voice) — Phase 3's mechanical gate greps for these two exact
+      headings whenever a PR touches `AGENTS.md`, so the literal text matters, not just the intent.
 3. Commit the change with a plain-language message describing what changed and why — same bar as
    any other commit in this project.
 4. Push the branch to the fork: `git push fork <branch-name>`.
 5. Draft a PR title and body in the user's own words describing the change and the reason for it —
-   or, when 2a applied, the two-statement structure from 2a-c (contributor's own rationale +
-   Claude's independent read, both shown, neither alone). Show it to the user and get explicit
-   approval before opening anything — same approval-before-consequential-action pattern as every
-   other step in this project (this is the step that actually reaches the shared public repo).
+   or, when 2a applied, the `### Contributor statement` / `### Independent read` structure from
+   2a-c (both shown, neither alone). Show it to the user and get explicit approval before opening
+   anything — same approval-before-consequential-action pattern as every other step in this
+   project (this is the step that actually reaches the shared public repo).
 6. On approval: `gh pr create --repo konvesdigital/tower-crane --head <username>:<branch-name>
    --title "<title>" --body "<body>"`.
-7. Nothing further to do on this side — the public repo's own branch protection gates the merge,
-   reviewed by whoever administers `konvesdigital/tower-crane` (the author). This is an ordinary
-   GitHub PR review, not the internal `change_requests\` ticket/round-trip system — don't file a
-   ticket for it.
+7. Nothing further to do on this side — a PR touching `AGENTS.md` runs the "AGENTS.md Fix 3 gate"
+   GitHub Actions check (`scripts\check_agents_pr_gate.py`) and is scoped to the operator via
+   `.github\CODEOWNERS`, reviewed by whoever administers `konvesdigital/tower-crane` (the author).
+   Branch protection isn't wired as *required* yet — GitHub's Free tier doesn't support it on a
+   private repo — so today this is still an ordinary manual GitHub PR review with an informational
+   check attached, not yet a hard merge gate. This is an ordinary GitHub PR review either way, not
+   the internal `change_requests\` ticket/round-trip system — don't file a ticket for it.

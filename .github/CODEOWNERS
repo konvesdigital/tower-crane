@@ -1,0 +1,5 @@
+# Fix 3 Checkpoint 2 (design\update_trust_review.md) - require operator review specifically on
+# the canonical AI-directive file, not the whole repo. Paired with branch protection on `main`
+# requiring this review before merge (branch protection itself needs the repo to be public, or a
+# paid GitHub plan, to take effect on GitHub's Free tier - see project_progress.md Next Up).
+/AGENTS.md @konvesdigital
