@@ -1,3 +1,4 @@
+test
 ---
 scope: >
   Operating instructions for a Claude Code agent working inside a Tower Crane hub - the outer,
