@@ -318,10 +318,12 @@ deterministic algorithm.
 **"propose upstream"** — sends a hand-built local fix or improvement in `toolkit\` back to the
 public repo (`konvesdigital/tower-crane`) as a fork + PR
 (`design\local_first_reframe.md`'s "Fork+PR contribution mechanics"). User-initiated only, never
-automatic. This is the **basic flow only** — plain fork/branch/commit/push/PR, no CODEOWNERS or
-compliance-bar authoring assistant yet (that's Fix 3, `design\update_trust_review.md`, not yet
-built). No Tower-Crane-specific script backs this — `toolkit\` is an ordinary git repo with an
-ordinary GitHub remote, so these are ordinary `git`/`gh` steps, run from inside `toolkit\`.
+automatic. Plain fork/branch/commit/push/PR for most files — ordinary `git`/`gh` steps, run from
+inside `toolkit\` (`toolkit\` is an ordinary git repo with an ordinary GitHub remote, no
+Tower-Crane-specific script backs the basic flow). **When the change touches `AGENTS.md`
+specifically**, step 2a below adds Fix 3 Checkpoint 1's authoring-assistant behavior
+(`design\update_trust_review.md`, Phase 2 — built 2026-07-27); Phase 3's merge-time CODEOWNERS +
+mechanical checks are still not built, so `AGENTS.md`'s own branch protection doesn't exist yet.
 1. Check whether a `fork` remote already exists: `git remote get-url fork`. If it errors (no such
    remote), the user doesn't have one wired up yet — don't assume they lack a GitHub fork either,
    just that this clone isn't pointed at it:
@@ -333,13 +335,34 @@ ordinary GitHub remote, so these are ordinary `git`/`gh` steps, run from inside 
       `git remote add fork https://github.com/<username>/tower-crane.git`.
 2. Branch off current `main`: `git checkout -b <descriptive-branch-name>` (name it for the change,
    e.g. `fix-relocate-symlink-check`).
+2a. **If this change touches `AGENTS.md`** — authoring-assistant behavior, before committing.
+   Nothing forces this step to run — running it is just how a submission actually clears review
+   (today, the operator's manual read; once built, Phase 3's mechanical checks), so skipping it
+   doesn't bypass anything, it just risks the PR coming back for rework. Say this plainly if asked
+   to skip it.
+   a. **Silently auto-fix the frontmatter** (`scope`/`capabilities`/`human_review_required`) to
+      match the new content — re-derive the capability list from what the new prose actually
+      references (e.g. new content mentioning a network call would need `capabilities` updated and
+      flagged, since the existing manifest declares none). Never touch the Standing Constraints
+      wording itself while doing this — that section is governed by (b) below, not autofixed.
+   b. Run `python scripts\check_standing_constraints.py` (compares the `## Standing Constraints`
+      section verbatim against `main`). If it prints `[UNCHANGED]`, stay silent and continue. If it
+      prints `[CHANGED]`, this is a standing-constraint edit — surface the printed before/after text
+      to the user plainly as a warning and get their explicit confirmation this is deliberate before
+      continuing. This is an **overridable warning, not a hard block** (Locked 2026-07-26) — the
+      user can proceed once they've confirmed, this is simply the one place burden is allowed to go
+      up because the edit is supposed to be a deliberate act.
+   c. Ask the contributor two plain questions — "what changed, in your words?" and "why?" — and
+      separately write your own independent read of what the diff actually does. Keep both as two
+      clearly labeled, side-by-side statements (never blended into one voice) for step 5's PR body.
 3. Commit the change with a plain-language message describing what changed and why — same bar as
    any other commit in this project.
 4. Push the branch to the fork: `git push fork <branch-name>`.
-5. Draft a PR title and body in the user's own words describing the change and the reason for it.
-   Show it to the user and get explicit approval before opening anything — same
-   approval-before-consequential-action pattern as every other step in this project (this is the
-   step that actually reaches the shared public repo).
+5. Draft a PR title and body in the user's own words describing the change and the reason for it —
+   or, when 2a applied, the two-statement structure from 2a-c (contributor's own rationale +
+   Claude's independent read, both shown, neither alone). Show it to the user and get explicit
+   approval before opening anything — same approval-before-consequential-action pattern as every
+   other step in this project (this is the step that actually reaches the shared public repo).
 6. On approval: `gh pr create --repo konvesdigital/tower-crane --head <username>:<branch-name>
    --title "<title>" --body "<body>"`.
 7. Nothing further to do on this side — the public repo's own branch protection gates the merge,
