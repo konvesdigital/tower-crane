@@ -18,7 +18,16 @@ update_toolkit.py's [PASS]/[BLOCKED]/=== BEGIN DIFF ===:
   [UNCHANGED]  Standing Constraints section is byte-identical to the base ref's version.
   [CHANGED]    it differs - printed alongside the literal before/after text.
 
-Usage: python scripts\\check_standing_constraints.py [--base main] [--file AGENTS.md]
+A second caller, `checkpoint`'s new soft disclosure guardrail (design\\update_trust_review.md's
+"Refinement 2026-07-27"), reuses this same exact-text detector before committing a `toolkit\\`
+change - but compared against the previous *pushed* state, not a merge-base with `main` (checkpoint
+commits straight to `main`, no PR branch). Pass `--head worktree` for this mode: `--base` is then
+read literally (no merge-base computation) and the "after" text comes from the file currently on
+disk, uncommitted changes included, instead of a committed ref.
+
+Usage:
+  python scripts\\check_standing_constraints.py [--base main] [--file AGENTS.md]
+  python scripts\\check_standing_constraints.py --base HEAD --head worktree   (checkpoint's pre-commit form)
 Run from anywhere; always resolves paths against this toolkit\\ repo, not the caller's cwd.
 """
 
@@ -64,30 +73,53 @@ def read_file_at(ref, rel_path):
     return proc.stdout
 
 
+def read_worktree_file(rel_path):
+    # Deliberately no explicit encoding: must decode with the same platform-default codec
+    # subprocess(text=True) uses for git show's output below, or byte-identical files compare
+    # unequal on a non-UTF8-default console (verified live on Windows/cp1252 - forcing utf-8 here
+    # while git show implicitly uses cp1252 turned em-dashes into false [CHANGED] positives).
+    path = SHARED_ROOT / rel_path
+    if not path.exists():
+        return None
+    return path.read_text()
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Exact-match check: does a proposed change touch AGENTS.md's Standing "
                      "Constraints section? (Fix 3 Checkpoint 1's mechanical gate.)"
     )
     parser.add_argument('--base', default='main',
-                         help="Ref to compare HEAD against (default: main).")
+                         help="Ref to compare against (default: main). With --head worktree, this "
+                              "ref is read literally - no merge-base computation.")
+    parser.add_argument('--head', default='HEAD',
+                         help="Ref to read the 'after' text from (default: HEAD), or the literal "
+                              "string 'worktree' to read the current on-disk file instead - used by "
+                              "checkpoint's pre-commit disclosure guardrail to see uncommitted "
+                              "changes.")
     parser.add_argument('--file', default='AGENTS.md',
                          help="Path, relative to toolkit\\, of the file to check (default: AGENTS.md).")
     args = parser.parse_args()
 
-    merge_base = _git(['merge-base', 'HEAD', args.base], check=False)
-    if merge_base.returncode != 0:
-        print(f"[ERROR] couldn't find a merge-base between HEAD and '{args.base}' - is '{args.base}' "
-              "a valid ref in this clone?")
-        sys.exit(1)
-    base_sha = merge_base.stdout.strip()
-
-    base_text = read_file_at(base_sha, args.file)
-    head_text = read_file_at('HEAD', args.file)
+    if args.head == 'worktree':
+        base_sha = args.base
+        head_text = read_worktree_file(args.file)
+        head_label = 'working tree'
+    else:
+        merge_base = _git(['merge-base', 'HEAD', args.base], check=False)
+        if merge_base.returncode != 0:
+            print(f"[ERROR] couldn't find a merge-base between HEAD and '{args.base}' - is "
+                  f"'{args.base}' a valid ref in this clone?")
+            sys.exit(1)
+        base_sha = merge_base.stdout.strip()
+        head_text = read_file_at(args.head, args.file)
+        head_label = args.head
 
     if head_text is None:
-        print(f"[ERROR] '{args.file}' not found at HEAD.")
+        print(f"[ERROR] '{args.file}' not found at {head_label}.")
         sys.exit(1)
+
+    base_text = read_file_at(base_sha, args.file)
     if base_text is None:
         print(f"[UNCHANGED] '{args.file}' doesn't exist at the base ref ({base_sha[:8]}) - nothing "
               "to compare; treating as no prior Standing Constraints to have changed.")
@@ -105,13 +137,14 @@ def main():
     print()
     print(f"=== BEFORE ({args.base}) ===")
     print(base_section if base_section is not None else "(section absent)")
-    print(f"=== AFTER (HEAD) ===")
+    print(f"=== AFTER ({head_label}) ===")
     print(head_section if head_section is not None else "(section absent)")
     print("=== END ===")
     print()
     print("This is an overridable warning, not a hard block (Locked 2026-07-26) - surface it to the "
-          "user plainly and get explicit confirmation this edit is deliberate before continuing with "
-          "'propose upstream'.")
+          "user plainly. If called from 'propose upstream': get explicit confirmation this edit is "
+          "deliberate before continuing. If called from checkpoint's pre-commit disclosure guardrail: "
+          "this is a notice only, nothing to confirm - the push cannot be blocked, only disclosed.")
     sys.exit(0)
 
 

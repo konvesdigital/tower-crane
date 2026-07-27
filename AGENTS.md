@@ -263,11 +263,21 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
       - If no repo/remote is found: stop and ask the user whether to set one up now. This repo
         should always have git — flag it rather than skip silently.
    b. Inner `toolkit\` repo — only if `toolkit\` exists and `git -C toolkit status --porcelain`
-      shows changes: `git -C toolkit add -A && git -C toolkit commit -m "Checkpoint: <summary>" &&
-      git -C toolkit push`. This pushes to the user's own remote (their own private hub, or this
-      canonical repo if they're the operator) — always safe to push freely with no gate, since
-      `design\update_trust_review.md`'s trust-review gate only guards the *incoming* `update`
-      direction, never outgoing pushes of the user's own edits.
+      shows changes:
+      - **Soft disclosure guardrail, before committing** (`design\update_trust_review.md`'s
+        "Refinement 2026-07-27"): if the pending changes touch `AGENTS.md`, run
+        `python scripts\check_standing_constraints.py --base HEAD --head worktree` from inside
+        `toolkit\`. `[UNCHANGED]`: say nothing, proceed silently — this is the common case and
+        asking every time would just be noise. `[CHANGED]`: this is disclosure-only, not a block
+        — nothing can or should stop the operator's own push — surface the printed before/after
+        text to the user as an explicit, unmissable notice before committing, so this class of
+        change is never made without the operator knowing they made it. Never skip this check
+        silently when `AGENTS.md` is among the changed files.
+      - `git -C toolkit add -A && git -C toolkit commit -m "Checkpoint: <summary>" &&
+        git -C toolkit push`. This pushes to the user's own remote (their own private hub, or this
+        canonical repo if they're the operator) — always safe to push freely with no gate, since
+        `design\update_trust_review.md`'s trust-review gate only guards the *incoming* `update`
+        direction, never outgoing pushes of the user's own edits.
       - If the push fails (e.g. no remote configured, no write access, diverged from upstream):
         report it to the user; don't let it block or roll back the outer-repo checkpoint above.
 3. Confirm to the user: saved and pushed (note separately whether a `toolkit\` push happened,

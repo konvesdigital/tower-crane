@@ -14,8 +14,16 @@ build - same convention as check_tower_crane.py) per the Decisions table in
 design\\update_trust_review.md:
   1. Filename invariant           HARD  - AGENTS.md must still exist, at that path, at head.
   2. Frontmatter schema           HARD  - the 4 required keys, correct shape, all present.
-  3. Standing Constraints match   SOFT  - reuses check_standing_constraints.py's exact-text compare;
-                                           an overridable warning (Locked 2026-07-26), not a block.
+  3. Standing Constraints match   HARD  - reuses check_standing_constraints.py's exact-text compare;
+                                           unconditional, no exceptions (Locked 2026-07-27 - corrects
+                                           a build drift: the doc's original design always specified
+                                           hard-fail here, the 2026-07-27 build had incorrectly given
+                                           it Checkpoint 1's overridable-warning treatment instead).
+                                           No exception logic exists anywhere in this check - it
+                                           can't distinguish a weakening edit from a legitimate
+                                           tightening, so a blanket fail is the only version of "hard"
+                                           that means anything. The amendment path is external to this
+                                           script entirely: GitHub's own admin-override-merge action.
   4. Capability-vs-content        SOFT  - heuristic keyword scan; a heuristic can't safely hard-fail.
   5. Diff-size gate               SOFT  - Locked threshold (2026-07-26): >60 changed lines of
                                            AGENTS.md, or the file growing past its own declared
@@ -150,15 +158,17 @@ def check_frontmatter_schema(head_text):
     return int(max_lines_value)
 
 
-# --- check 3: standing constraints exact-match (soft) --------------------------------------------
+# --- check 3: standing constraints exact-match (hard) ---------------------------------------------
 def check_standing_constraints(base_text, head_text):
     base_section = extract_section(base_text) if base_text is not None else None
     head_section = extract_section(head_text)
     if base_section == head_section:
         report('PASS', "Standing Constraints section unchanged from base.")
         return
-    report('WARN', "Standing Constraints section DIFFERS from base - overridable, per Locked "
-                   "2026-07-26 decision, but the CODEOWNERS reviewer should read this deliberately:")
+    report('FAIL', "Standing Constraints section DIFFERS from base - unconditional hard-fail "
+                   "(Locked 2026-07-27), no exceptions. The only legitimate way for this PR to merge "
+                   "is the repo owner's own admin-override-merge on GitHub - a distinct, logged "
+                   "action, never something this script grants:")
     print("  --- BEFORE (base) ---")
     print(f"  {base_section!r}" if base_section is not None else "  (section absent)")
     print("  --- AFTER (head) ---")
