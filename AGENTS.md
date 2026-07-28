@@ -104,11 +104,11 @@ in the registry (`consumers\<slug>.md`) and floats on this repo's HEAD.
 1. **New project from scratch** — run the scaffolder here:
    `scripts\new_consumer.py --target-path <abs path> --project-name "<Full Title>"`. It writes ALL of
    the consumer's files (`.claude\settings.json` with opt-in hooks, `CLAUDE.md` with `@import`
-   lines, skeleton `project_progress.md`, `FIRST_RUN.md`) plus the registry entry and the MENU
-   "In use by" append. Defaults: opts into `consistency_check` and imports `filing` + `compliance`
-   + `continuity`. Flags: `-Tools @()` for no hooks, `-NoContinuity` to skip that piece, `-Force`
-   to overwrite. This agent does NOT run git — the new project's first session does that via its
-   `FIRST_RUN.md` (git init, accept the one-time import-approval dialog, fill the overview).
+   lines, skeleton `project_progress.md`, `FIRST_RUN.md`) plus the registry entry. Defaults: opts
+   into `consistency_check` and imports `filing` + `compliance` + `continuity`. Flags: `-Tools @()`
+   for no hooks, `-NoContinuity` to skip that piece, `-Force` to overwrite. This agent does NOT run
+   git — the new project's first session does that via its `FIRST_RUN.md` (git init, accept the one-
+   time import-approval dialog, fill the overview).
 2. **Existing (hand-copied) project** — the human copies `templates\register.md` into that project's
    root and tells its agent to follow it. That agent swaps its pasted workflow prose for `@import`
    lines and files a `register` ticket here — which you action per "Registration tickets" below
@@ -192,8 +192,10 @@ request instead). Action it immediately:
    confirm `templates\optins\<tool>.json` exists; for each `imported` piece, confirm the project's
    `CLAUDE.md` actually imports it (the block should reflect what register.md wired). If something is
    off, note it in the ticket and reconcile rather than blindly copying.
-3. Create `consumers\<slug>.md` from the block (same format as `consumers\geo_rank_tracker.md`) and
-   append the project to MENU "In use by" for each opted-in tool.
+3. Create `consumers\<slug>.md` from the block (same format as `consumers\geo_rank_tracker.md`).
+   Never record a project/client name anywhere in `toolkit\` itself (including `MENU.md`) — that
+   repo tracks the public `konvesdigital/tower-crane` repo, and `consumers\` exists in the outer,
+   private repo specifically so this kind of detail never reaches it.
 4. Run `scripts\check_tower_crane.py --consumer <slug>` to confirm the new entry validates clean.
 5. Flip `Status` to **DONE** (registration has no consumer-verify round-trip — the registry entry
    existing *is* the completion; the checker validates it from here on). Log it in `project_progress.md`,
@@ -202,9 +204,10 @@ request instead). Action it immediately:
 ### Applying a fix (this agent's turn)
 1. Read the symptom/repro, root cause, and Proposed fix (a suggestion, not a mandate).
 2. **Mandatory pre-apply validation:** enumerate *every* consumer in the registry (`consumers\`,
-   the source of truth — not MENU's demoted "In use by" glance) and reason about impact on each —
-   not just the filer, who can't see the others. Consumers float on this repo's HEAD (no version
-   pinning), so a fix reaches all of them the moment they next run.
+   the source of truth — `MENU.md` never carries consumer-identifying detail, since it's tracked
+   in the public `toolkit\` repo) and reason about impact on each — not just the filer, who can't
+   see the others. Consumers float on this repo's HEAD (no version pinning), so a fix reaches all
+   of them the moment they next run.
 3. Apply the fix (or a better one). Then run **`scripts\check_tower_crane.py`** — the executable
    teeth for step 2: its golden suite (`tests\<tool>\`) catches a behavior regression, and its
    reference scan confirms no consumer's wiring/imports broke. Also run the ticket's Suggested test

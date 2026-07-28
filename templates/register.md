@@ -124,7 +124,8 @@ Type: registration
 # Register: <Full Project Name in Title Case>
 
 Requesting registration on the tower_crane platform. Create `consumers\<slug>.md` from the block
-below and append this project to MENU "In use by" for each opted-in tool.
+below. Never record this project's name anywhere inside `toolkit\` itself (including `MENU.md`) —
+that repo tracks the public `konvesdigital/tower-crane` repo.
 
 ```yaml
 name: <Full Project Name in Title Case>

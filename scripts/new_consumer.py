@@ -9,16 +9,20 @@ session (consumer_platform design, decision 10):
   <target>/project_progress.md      - continuity skeleton (only when continuity is on)
   <target>/FIRST_RUN.md             - one-time checklist the new project runs then deletes
   consumers/<slug>.md               - registry entry (this repo)
-  MENU.md                           - appends the project to each opted-in tool's "In use by"
+
+consumers/<slug>.md is the ONLY place a project name is recorded - it lives in the outer, private
+hub repo (design\\local_first_reframe.md's outer/inner split), never in toolkit\\ itself, which
+tracks the public konvesdigital/tower-crane repo. MENU.md's "In use by" column was removed
+2026-07-28 after it was found writing real consumer/client names into that public-repo-tracked
+file - see project_progress.md.
 
 This script does NOT run git - git init + first commit is a FIRST_RUN.md step in the new project.
 
 OS-reach Tier 2 port of new_consumer.ps1 (design\\portability.md, "OS-reach Tier 2: full
 cross-platform design"). Logic is a direct translation - see that doc's Build order for the
 parity-check approach used to verify ports in this series. Generated files (settings.json,
-CLAUDE.md, project_progress.md, FIRST_RUN.md, registry entry, MENU.md) now use LF line endings
-universally (the locked line-endings decision, bundled into this port) - MENU.md was previously
-CRLF-joined.
+CLAUDE.md, project_progress.md, FIRST_RUN.md, registry entry) now use LF line endings universally
+(the locked line-endings decision, bundled into this port).
 """
 
 import argparse
@@ -38,7 +42,6 @@ PROJECT_ROOT = SHARED_ROOT.parent
 TEMPLATES_DIR = SHARED_ROOT / 'templates'
 OPTINS_DIR = TEMPLATES_DIR / 'optins'
 CONSUMERS_DIR = PROJECT_ROOT / 'consumers'
-MENU_PATH = SHARED_ROOT / 'MENU.md'
 TMPL_PATH = TEMPLATES_DIR / 'consumer_CLAUDE.md.tmpl'
 
 # short human blurb per known tool for the "Tower Crane In Use" list (falls back to the name)
@@ -247,36 +250,10 @@ Notes: scaffolded by `scripts/new_consumer.py` on {scaffold_date}. Registry form
     write_utf8(registry_path, registry)
     print(f"  wrote  {registry_path}")
 
-    # --- 6b. MENU.md "In use by" -----------------------------------------------------------------
-    if tools and MENU_PATH.exists():
-        menu_lines = MENU_PATH.read_text(encoding='utf-8').splitlines()
-        changed = False
-        for i, line in enumerate(menu_lines):
-            # a hooks-table data row for one of the opted-in tools: | <tool> | file | ... | in use by |
-            for t in tools:
-                if re.match(rf'^\|\s*{re.escape(t)}\s*\|', line):
-                    cells = line.split('|')
-                    last = len(cells) - 1  # trailing empty cell after the final pipe
-                    useby = cells[last - 1].strip()
-                    names = []
-                    if useby and useby != '*(none yet)*':
-                        names = [n.strip() for n in useby.split(',') if n.strip()]
-                    if project_name not in names:
-                        names.append(project_name)
-                        cells[last - 1] = ' ' + ', '.join(names) + ' '
-                        menu_lines[i] = '|'.join(cells)
-                        changed = True
-                    break
-        if changed:
-            write_utf8(MENU_PATH, '\n'.join(menu_lines) + '\n')
-            print(f"  wrote  {MENU_PATH} (In use by)")
-        else:
-            print(f"  skip   MENU.md already lists {project_name}")
-
     # --- 7. next steps -------------------------------------------------------------------------
     print()
     print("Done. Next steps:")
-    print(f"  1. In tower_crane: review + commit the new consumers/{slug}.md and MENU.md.")
+    print(f"  1. In tower_crane: review + commit the new consumers/{slug}.md.")
     print(f"  2. Open {target_path} in a fresh Claude Code session and complete FIRST_RUN.md")
     print("     (git init, accept the import-approval dialog, fill the CLAUDE.md overview).")
 

@@ -8,17 +8,18 @@ automatically - a project opts in by adding a reference to the relevant item in 
 When adding a new item to this menu: drop the file in the matching subfolder, add a row below,
 and write the CLAUDE.md snippet a project needs to opt in.
 
-**Source of truth for who has opted into what is the consumer registry (`consumers\<name>.md`),
-not this menu.** The "In use by" column here is a human glance; `ls consumers\` is the index the
-scaffolder writes and the checker reads. Opt-in JSON snippets are canonical in
+**Who has opted into what lives in your own hub's private `consumers\<name>.md` registry, never
+here.** This file tracks the public `konvesdigital/tower-crane` repo, so it can never carry a
+project or client name — check your own hub's `consumers\` folder (`ls consumers\`, the index the
+scaffolder writes and the checker reads) instead. Opt-in JSON snippets are canonical in
 `templates\optins\<tool>.json` — MENU references them, and the scaffolder merges them into a new
 consumer's `settings.json`. Don't duplicate a snippet's JSON here; point at its file.
 
 ## Hooks
 
-| Name | File | What it does | Trigger | In use by |
-|---|---|---|---|---|
-| consistency_check | `hooks\consistency_check.py` | AST-based static analysis on a `.py` file: undefined names, function call arg-count mismatches, inconsistent string-key/column spellings. No AI, no tokens - pure static analysis. | PostToolUse, after any `.py` write/edit | Geo Rank Tracker |
+| Name | File | What it does | Trigger |
+|---|---|---|---|
+| consistency_check | `hooks\consistency_check.py` | AST-based static analysis on a `.py` file: undefined names, function call arg-count mismatches, inconsistent string-key/column spellings. No AI, no tokens - pure static analysis. | PostToolUse, after any `.py` write/edit |
 
 ### consistency_check - opt-in snippet
 Canonical snippet: **`templates\optins\consistency_check.json`**. Merge it into the project's
