@@ -28,7 +28,7 @@ Two responsibilities, both importable (no `claude` subprocess calls live here):
     fix-worthy ticket first).
 
 No golden-suite fixtures - matches the established convention for scripts\\*.py maintainer tooling
-(relocate.py, publish_release.py, broadcast_guidance.py, self_hooks.py all have none either;
+(relocate.py, broadcast_guidance.py, self_hooks.py all have none either;
 check_tower_crane.py's golden discovery is hardcoded to hooks\\<tool>.py, not scripts\\). Verified
 via manual/live testing against real ticket files instead - see project_progress.md.
 """

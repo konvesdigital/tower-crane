@@ -13,8 +13,11 @@
     "python_launcher: the command that runs Python 3 on THIS machine. 'python' on Windows;",
     "on macOS/Linux it is usually 'python3' (bare 'python' is often Python 2 or absent) - set it to",
     "whatever `<launcher> --version` reports as Python 3.x here.",
-    "publish.* is only needed if you run scripts\\publish_release.py (cutting a Replicate release",
-    "to a separate public storefront repo). Leave the placeholders if you don't use it.",
+    "publish.public_repo_remote: the expected canonical URL of toolkit\\'s own `origin` (the public",
+    "konvesdigital/tower-crane repo). update_toolkit.py's remote-identity check compares this against",
+    "the live `git remote get-url origin` before every update, to catch a silently repointed origin",
+    "(design\\security_stress_test.md). Optional - leave the placeholder if you don't want this check;",
+    "an empty value just skips it, it never fails closed.",
     "automation.* (design\\sync_automation.md, Piece 3): the unattended ticket-processing agent.",
     "Off by default - flip 'enabled' to true only after running templates\\setup_automation.md's",
     "setup, which wires an hourly OS-scheduled task invoking scripts\\run_automation.py. 'mode'",
@@ -32,8 +35,7 @@
     "git_remote": "<the Tower Crane GitHub remote this clone points at, e.g. https://github.com/you/tower-crane>"
   },
   "publish": {
-    "public_repo_path": "<ABSOLUTE PATH to a persistent local clone of the public storefront repo, e.g. C:\\Users\\you\\Documents\\Claude\\tower_crane_public>",
-    "public_repo_remote": "<the public storefront repo's GitHub URL, e.g. https://github.com/you/tower-crane.git>"
+    "public_repo_remote": "<the public konvesdigital/tower-crane URL, e.g. https://github.com/konvesdigital/tower-crane.git>"
   },
   "automation": {
     "enabled": false,

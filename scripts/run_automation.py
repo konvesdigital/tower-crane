@@ -69,7 +69,7 @@ CLAUDE_TIMEOUT_SECONDS = 20 * 60
 
 
 # --- small git helpers (no shared helper exists anywhere in this repo's scripts\ - matches the
-# existing ad hoc-per-script convention, e.g. publish_release.py) ---------------------------------
+# existing ad hoc-per-script convention, e.g. relocate.py) ---------------------------------
 def _git(args, cwd=SHARED_ROOT, check=True):
     return subprocess.run(['git', '-C', str(cwd)] + args,
                            capture_output=True, text=True, check=check)

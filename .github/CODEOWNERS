@@ -1,7 +1,7 @@
 # Fix 3 Checkpoint 2 (design\update_trust_review.md) - require operator review specifically on
 # the canonical AI-directive file, not the whole repo. Paired with branch protection on `main`
-# requiring this review before merge (branch protection itself needs the repo to be public, or a
-# paid GitHub plan, to take effect on GitHub's Free tier - see project_progress.md Next Up).
+# requiring this review before merge - live since the 2026-07-27 public flip (classic branch
+# protection needs a public repo, or a paid plan, to take effect on GitHub's Free tier).
 /AGENTS.md @konvesdigital
 
 # The gate infrastructure itself needs at least the same protection as what it guards - otherwise a
@@ -11,10 +11,9 @@
 
 # Widened 2026-07-27 (security stress-test pass, design\security_stress_test.md): the scope above
 # only protected AGENTS.md and .github\ itself - every OTHER shared script (config_lib.py,
-# relocate.py, run_automation.py, publish_release.py, seed_hub.py, etc.) and every template had no
-# mandatory-reviewer requirement at all once branch protection eventually goes live, even though
-# every consumer project runs all of them unmodified (float-on-HEAD). Covers the whole shared-tool
-# surface now, superseding the narrower per-script lines this originally had.
+# relocate.py, run_automation.py, etc.) and every template had no mandatory-reviewer requirement,
+# even though every consumer project runs all of them unmodified (float-on-HEAD). Covers the whole
+# shared-tool surface now, superseding the narrower per-script lines this originally had.
 /hooks/ @konvesdigital
 /scripts/ @konvesdigital
 /templates/ @konvesdigital

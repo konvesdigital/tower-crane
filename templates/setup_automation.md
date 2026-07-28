@@ -2,7 +2,7 @@
 Home: templates\setup_automation.md  (part of the tower_crane pattern — floats on HEAD)
 This is the hub-operator-only runbook for turning on Piece 3 (design\sync_automation.md): the
 unattended ticket-processing agent. Read directly, never `@import`ed by any consumer project —
-same category as templates\setup_machine.md / bootstrap_hub.md.
+same category as templates\setup_machine.md.
 
 How it's used: open this hub in Claude Code and say "read templates\setup_automation.md and
 follow it." **The only assumed prerequisite is Claude Code itself** — the headless `claude` CLI's

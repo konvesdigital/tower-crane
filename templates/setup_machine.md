@@ -1,16 +1,15 @@
 <!--
 Home: toolkit\templates\setup_machine.md  (part of the tower_crane pattern — floats on HEAD)
 This is the CANONICAL per-machine setup courier: fills config.local.json for THIS machine/clone by
-checking and asking, never assuming. Referenced (never copied/duplicated) from three places, so it
-stays the single source of truth:
+checking and asking, never assuming. Referenced (never copied/duplicated) from:
   - README.md's "Setup (fresh clone / new machine)" section — Federate: joining or re-setting up a
     clone of an existing hub.
-  - templates\bootstrap_hub.md Step 7 — Replicate: a freshly-bootstrapped independent hub's first
-    setup. (Note: bootstrap_hub.md itself still describes the pre-split single-repo layout and
-    hasn't been reconciled with the outer/inner split yet — its own fate is tied to the still-open
-    seed_hub.py/publish_release.py retirement decision, see project_progress.md Next Up.)
-  - the generated SETUP.md that scripts\seed_hub.py writes into every distributed hub — Replicate
-    recipient's first setup. (This file ships automatically — templates\ is a KEEP dir.)
+  - This file's own Step 0 scenario B ("Bootstrapping the outer hub") — Replicate: standing up a
+    brand-new independent hub from a fresh public clone of `toolkit\`. Retired 2026-07-27:
+    `scripts\seed_hub.py`, `scripts\publish_release.py`, and the strip-in-place courier
+    `templates\bootstrap_hub.md` (all three of which predated the outer/inner split) are gone —
+    getting a hub of your own is now just an ordinary `git clone` of the public repo plus this
+    scenario, nothing generated or stripped.
 
 How it's used: open the hub (the outer folder — see Step 0 below if you're not sure one exists yet)
 in Claude Code and say "read toolkit\templates\setup_machine.md and follow it." **The only assumed
