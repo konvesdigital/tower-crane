@@ -1,477 +1,312 @@
 # Tower Crane
 
 A shared library of reusable Claude Code **tools** (hooks, subagents, scripts) *and* shared
-**workflow conventions** that other projects opt into. It is not a product or a client
-deliverable — it is the single source of truth those projects point at.
-
-## Why this exists
-
-**The real driver is token economy, not tidiness.** Every Claude Code session pays for whatever's
-loaded into context, and `CLAUDE.md` is loaded on *every single session* — so a `CLAUDE.md` that
-accumulates history, workflow instructions, and completed-work recaps burns real tokens on every
-future session, forever, whether or not that content is still relevant. `README.md`, by contrast,
-is human-facing documentation Claude Code never auto-loads — so it's the right place for anything
-long-form a human might read once, while `CLAUDE.md` stays terse and purely operational.
-
-That split is the seed of everything else here:
-- **`project_progress.md`'s checkpoint/resume/archive discipline** keeps the same problem from
-  recurring one level down: Current Status and Next Up describe only the present, not a growing
-  "done" list; completed work lives exactly once, in a dated Work Log entry; and when that log
-  grows long, "archive" moves settled entries out to `project_progress_archive.md`, which is
-  never read back into context unless something specifically calls for old history. Every one of
-  these rules exists so a session reads only what it needs to resume work, not the full history
-  of everything that's ever happened.
-- **The checkpoint process itself** (update the doc, commit, push) is what makes this reliably
-  repeatable instead of ad hoc — and, as a side effect, means the project is never more than one
-  checkpoint away from being safely in git instead of sitting unsaved on a local disk.
-- **Referenced-not-copied sharing (float-on-HEAD)** is the same economy applied across *projects*
-  instead of within one: hand-copying a good convention or hook into every project's `CLAUDE.md`
-  would both re-bloat each project's context and drift the moment one copy gets fixed and the
-  others don't. Referencing it once, here, keeps every consuming project's own `CLAUDE.md` as
-  short as if it had never needed the convention at all.
-
-**The governing idea** that makes referencing work in practice: *an improvement discovered in one
-project, once ratified here, benefits every project.* Fix a shared hook or refine a shared
-workflow rule once, and every consuming project picks it up the next time it runs — no
-copy-paste, no drift.
-
-Time saved and history preserved — nothing lost to an unmanaged folder, everything backed up in
-git at each checkpoint — are real benefits, but they're downstream of the token-economy design,
-not the reason for it.
-
-**What happens without this.** A person can start Claude Code in any folder with zero setup — but
-left alone, that folder's `CLAUDE.md` tends to grow without bound as instructions and history
-pile up in the one file read every session, nothing gets pushed to git until someone remembers
-to, and there's no discipline for what belongs in context versus what a human can read on their
-own later. This workflow is what fixes that, and it works the same way whether you're starting a
-project from scratch with it already in place, or retrofitting it onto a project that's already
-in that ballooning state (`templates\register.md` — see Track 1's "Getting set up," or Track 2
-§2.2 if you're the one doing it for someone else).
+**workflow conventions**, built so one person running several Claude Code projects can keep them
+organized without re-inventing the same conventions in every one. It is not a product or a client
+deliverable — it's infrastructure you run for yourself.
 
 ---
 
-## Which of these is you?
+## What it is
 
-1. **You're working in a project that already uses Tower Crane, or is about to.**
-   → [Track 1 — Consumer / Project User](#track-1--consumer--project-user)
-2. **You're running a Tower Crane hub, or want to start one** (including: you just downloaded
-   this from GitHub).
-   → [Track 2 — Hub Operator](#track-2--hub-operator)
-3. **You're changing how Tower Crane itself works, not just using it.**
-   → [Track 3 — Hub Architect](#track-3--hub-architect)
+Tower Crane is a local hub for running Claude Code across several of your own projects — one shared
+set of tools and conventions, with each project pointing at it instead of carrying its own copy.
 
-Most first-time readers are #2.
+- **Shared tools** — Claude Code hooks, scripts, and (eventually) subagents. See `MENU.md`.
+- **Shared workflow conventions** — how a session saves progress, how a fix reaches every project
+  that uses it. See `templates\`.
+
+**Structurally, it's two nested git repos in one folder:**
+
+| | Holds |
+|---|---|
+| **Outer repo** | Your own working state — which projects you run, open tickets, notes. Private. |
+| **`toolkit\`** (this repo) | The tools and conventions themselves. Public, at `konvesdigital/tower-crane`. |
 
 ---
 
-## Track 1 — Consumer / Project User
+## Why you need it
 
-Your project's `CLAUDE.md` has `@import` lines pointing at this repo, or someone just handed you
-this repo and said your project should use it. (Nobody's wired this up for you yet? See "Getting
-set up" below — it's minimal.)
+Two things, mainly: **it keeps Claude Code cheap to run**, and **it saves you from rebuilding the
+same conventions in every project.**
 
-### How this changes day-to-day use of Claude Code
-The habits that matter most, roughly in order of how often you'll reach for them:
+- **Token economy.** `checkpoint`/`resume` keep each project's `CLAUDE.md` and progress notes lean,
+  so only the current state loads every session — not a growing history. The tools you install add
+  to this too: a hook like `consistency_check.py` checks your code the moment you save it, as plain
+  local Python, at **zero LLM tokens** — instead of asking Claude to re-review it.
+- **Time.** Fix a hook or refine a convention once, here, and every project that's opted in picks it
+  up automatically — no copy-pasting the same fix into five `CLAUDE.md` files, and no risk of one
+  copy drifting from the rest.
 
-1. **"checkpoint"** — say it any time you want to save progress. Your agent updates
-   `project_progress.md` (refreshes Current Status / Next Up, moves resolved Decisions, prepends
-   one dated Work Log entry), then commits and pushes. Nothing sits unsaved on local disk for
-   long.
-2. **"resume"** — say it at the start of a session. Your agent pulls latest and reads only
-   Current Status, Next Up, and the most recent Work Log entry — not the whole project history —
-   then tells you where things stand in a couple of lines.
-3. **`project_progress.md`** — the one file that carries state between sessions. Current Status
-   and Next Up describe only the present; anything finished lives exactly once, in its dated Work
-   Log entry, never restated at the top. That's what keeps the file cheap to read every session
-   instead of growing without bound.
-4. **"archive"** — user-initiated, any time the Work Log has grown long. Moves settled entries out
-   to `project_progress_archive.md`, which is never read back into context unless something
-   specifically calls for old history. Worth doing once the log gets long: `project_progress.md` is
-   read into context every session, so a long Work Log is a recurring token cost — but the cost is
-   linear, not a cliff, so there's no wrong time to do it, just diminishing returns to waiting.
-5. **`README.md` vs `CLAUDE.md`** — `CLAUDE.md` is loaded every session, so it stays terse and
-   purely operational; anything long-form a human might want to read once (rationale, onboarding,
-   history) belongs in `README.md`, which Claude Code never auto-loads.
+The longer version: Claude Code loads a project's `CLAUDE.md` on every single session. Left alone,
+that file tends to grow without bound — accumulated instructions, a running history of everything
+that ever happened — burning tokens every session whether or not any of it still matters, while
+nothing forces work into git along the way. Tower Crane's conventions put a firm line between what a
+session actually needs loaded and what's just history worth reading once, and make sure work reaches
+git as a habit, not something to remember.
 
-This is the actual substance of what Tower Crane gives a project — the token-economy discipline
-covered above ("Why this exists"), ready to use instead of reinvented (or skipped) per project.
+You don't need to be a software engineer to use this — Claude Code drives almost every mechanical
+step (git commands, file creation, GitHub operations); you mostly describe intent and approve what
+it's about to do.
+
+---
+
+## How to get it
+
+Two steps, both of which Claude Code walks you through — you never need to type raw git commands
+yourself:
+
+1. **Clone or download `konvesdigital/tower-crane`.** What you get is `toolkit\` itself, with no
+   private wrapper around it yet.
+2. **Open it in Claude Code and say:** *"read `templates\setup_machine.md` and follow it."* It
+   detects a fresh public clone and wraps it in a new, private outer folder — the "hub" described
+   above — checking live for Python/git/`gh` rather than assuming any of them are installed.
+   **Claude Code itself is the only assumed prerequisite.**
+
+Handing Claude Code a freshly downloaded repo and asking it to read and follow instructions inside
+it is a reasonable thing to be cautious about — see [**Why you can trust it**](#why-you-can-trust-it)
+below for exactly what `setup_machine.md` (and every other file like it) can and can't do, and what
+review exists before anything from outside your own machine ever reaches you.
+
+If you're setting up a second machine for a hub you already run, or you already have an outer folder
+from a previous setup, the same instruction detects that case instead and skips straight to
+configuring this machine. The only real constraint is that the folder lives somewhere under your
+home directory (`~`) — everything else is computed live from wherever it ends up, never typed in by
+hand.
+
+---
+
+## How to use it
+
+Once it's installed, the usual lifecycle is: **connect your projects, let the day-to-day conventions
+run themselves inside each one, and turn on automation so the upkeep doesn't need you to open the
+hub folder at all.**
+
+1. **Connect a project** — it becomes a *consumer*, referencing the hub's tools/conventions instead
+   of duplicating them.
+2. **Work in the project as usual** — say `"checkpoint"` to save progress, `"resume"` to pick back
+   up.
+3. **Turn on automation** (recommended) so tickets and health checks keep running without you.
+
+The rest of this section covers each of those in more detail, plus — at the end — what it looks like
+to work on Tower Crane itself.
+
+### Connecting a project
+
+A project you point at the hub becomes a **consumer** — it references the shared tools and
+conventions instead of copying them. Nothing here runs automatically *to* a project until you do
+this, and you can disconnect any time by removing the reference lines.
+
+- *Brand-new project* → from inside `toolkit\`:
+  ```
+  scripts\new_consumer.py --target-path C:\Users\you\Documents\MyNewProject --project-name "My New Project"
+  ```
+  Creates every file the project needs in one shot — `.claude\settings.json`, `CLAUDE.md` with
+  `@import` lines, a skeleton `project_progress.md`, and a `FIRST_RUN.md` checklist — plus a
+  registry entry here.
+- *Existing, hand-built project* → copy `toolkit\templates\register.md` into its root, open it in
+  Claude Code, and say *"read register.md and follow it."* It swaps any pasted workflow prose for
+  `@import` lines and files a registration request into the hub's ticket inbox — the migration path,
+  preserving everything project-specific and only replacing shared, canonical prose.
+
+### The habits that matter, inside a connected project
+
+Roughly in order of how often you'll reach for them:
+
+1. **"checkpoint"** — say it any time you want to save progress. Updates `project_progress.md`
+   (Current Status/Next Up, a new dated Work Log entry), then commits and pushes.
+2. **"resume"** — say it at the start of a session. Pulls latest, reads only Current Status, Next
+   Up, and the most recent Work Log entry, and tells you where things stand in a couple of lines.
+3. **`project_progress.md`** — the one file that carries state between sessions. Current Status and
+   Next Up describe only the present; anything finished lives exactly once, in its Work Log entry.
+4. **"archive"** — any time the Work Log has grown long. Moves settled entries out to
+   `project_progress_archive.md`, never read back into context unless something calls for old
+   history.
+5. **Filing a bug or improvement in a shared tool** — drop a ticket in the hub's
+   `change_requests\` folder per `templates\filing.md`, then commit/push it yourself. From there
+   it's automatic: the ticket gets picked up (next time you're in the hub, or by unattended
+   automation if it's on), the fix gets applied, and `scripts\check_tower_crane.py` runs the
+   fleet's regression + drift suite to confirm the fix didn't break any of your other connected
+   projects — all before the ticket is ever flagged ready for you to confirm it actually fixed what
+   you filed.
+6. **Receiving guidance** — if a project has drifted, or you've broadcast a notice, you'll find a
+   `COMPLIANCE_GUIDANCE.md` in that project's root. The project's own agent shows you the literal
+   proposed change alongside a plain-language summary and asks before applying it.
+
 Full mechanics: `templates\continuity.md`.
 
-### What opting in means
-A project that opts in is a **consumer**. Nothing here runs automatically *to* your project —
-you opted in by adding reference lines (a hook command in `.claude\settings.json`, `@import`
-lines in `CLAUDE.md`), and you can opt out any time by deleting them. Everything you get is
-**referenced, never copied**: your project holds a pointer to the shared file, not a duplicate.
-**If your project and this hub sit on the same machine, a fix reaches you the moment it's
-committed** to the hub's `toolkit\` folder — no update to pull, since your `@import`/hook resolves
-straight to that file on disk. If the hub lives on a *different* machine (Federate, 2.4), the
-pointer only resolves to the current version once *your own machine's clone* of `toolkit\` is up
-to date. Your project's own `resume` (via `templates\continuity.md`) checks for this
-automatically — it runs `toolkit\scripts\update_toolkit.py --notify` (read-only, never a pull)
-and tells you if an update is waiting. Actually reviewing and pulling it is the separate, gated
-**`update`** action, which only runs in a Claude Code session opened directly in the hub (the
-diff-review procedure lives in the hub's own `CLAUDE.md`) — never from inside a consumer project,
-and never automatically, by design (`design\update_trust_review.md`).
+### Keeping your projects healthy
 
-### Getting set up
-Minimal version — full detail (and the hub-operator's-eye view) lives in
-[Track 2](#track-2--hub-operator) if you ever need it, but you shouldn't have to read it just to
-use this as a consumer:
-- **Someone already set this up for you** (they ran the scaffolder, or handed you a project whose
-  `CLAUDE.md` already has `@import` lines) — you're done, nothing else to do.
-- **You're wiring your own existing project into someone else's hub yourself** — copy
-  `toolkit\templates\register.md` from that hub into your project's root, open your project in
-  Claude Code, and say *"read register.md and follow it."* It swaps any pasted workflow prose for
-  `@import` lines pointing into that hub's `toolkit\templates\`, and writes + commits + pushes a
-  registration request into the hub root's `change_requests\` folder (not inside `toolkit\`) —
-  that part's already handled by register.md's own steps. Once it's pushed, someone with hub
-  access turns it into a registry entry the next time they work in that repo. Nothing else from
-  Track 2 is required to do this part yourself.
+A few commands keep every connected project honest without visiting each one individually.
 
-### What else you'll see, day to day
-- **Filing a bug or improvement in a shared tool** — you don't fix it yourself. Drop a ticket in
-  the hub root's `change_requests\` folder (not inside `toolkit\`) per `toolkit\templates\
-  filing.md` (already imported into your `CLAUDE.md` if you're set up correctly), **then `git
-  add`/`commit`/`push` it yourself** from inside the hub root — a ticket sitting uncommitted on
-  your own disk is invisible to the hub until you do.
-- **Receiving guidance from the hub** — if this hub's checker finds your project has drifted, or
-  the hub operator broadcasts a one-off notice, you'll find a `COMPLIANCE_GUIDANCE.md` file
-  dropped in your project's root. Your own agent surfaces it at session start; see
-  `templates\compliance.md` for what to do with it. It never edits your files directly — you (or
-  your agent, with your OK) apply the change.
+- **Health check.** `scripts\check_tower_crane.py` — the golden regression suite (does each tool
+  still behave correctly?) and drift scan (does every project's wiring still resolve?) that runs
+  automatically every time a shared-tool ticket gets applied, not something you have to remember to
+  invoke. You can also run it by hand any time you want to confirm the fleet is healthy without
+  waiting for a ticket.
+- **Push a fix or a notice.** `check_tower_crane.py --write-guidance` targets one drifted project;
+  `scripts\broadcast_guidance.py --broadcast <file>` sends a one-off, hand-authored notice to all of
+  them.
+- **Turn on unattended automation.** An hourly, unattended tick that processes open tickets and
+  refreshes compliance guidance without you opening an interactive session here. It never touches
+  the public repo unattended and never adopts anything unreviewed on its own — it only surfaces
+  what it couldn't safely resolve at your next session. Off by default: *"read
+  `templates\setup_automation.md` and follow it."*
+- **Turn on the hub's own tools, on itself.** Tower Crane isn't a consumer of itself by default —
+  `scripts\self_hooks.py --list`/`--enable <tool>`/`--disable <tool>` closes that gap, per machine.
 
-That's the whole of what you need from this side. Everything else in this README is about
-*running* the hub, not using it from inside a consumer project.
+### Working within Tower Crane itself
+
+Occasionally you'll want to change the shared tools themselves. That happens two genuinely different
+ways, worth keeping distinct: changes that stay entirely on your own machine, and changes that touch
+the public repo — the one place content you didn't personally write can enter. See
+[**Why you can trust it**](#why-you-can-trust-it) below for exactly what review happens on the public
+side.
+
+Two kinds of things are shared, reaching a project two different ways:
+
+| Shared thing | Example | How a project gets it |
+|---|---|---|
+| **Tools** (executable) | `hooks\consistency_check.py` | Its `.claude\settings.json` points at the shared file by a per-machine command. |
+| **Workflow** (prose) | checkpoint/resume, filing a bug | Its `CLAUDE.md` `@import`s the shared prose by path. |
+
+**Local changes — edit it once, here, and every connected project picks it up automatically, with
+nothing leaving your machine:**
+- **Add or fix a tool.** Build and test it in whichever project prompted the need, strip anything
+  project-specific, drop it in `hooks\`/`agents\`/`scripts\`, add a row + opt-in snippet to
+  `MENU.md`. An automatic hook must exit code **2** with its failure report on **stderr** on a FAIL
+  — any other exit code is silently non-blocking, so a real failure would never reach the agent.
+  Full steps: `AGENTS.md` ("Adding a new tool").
+- **Refine a convention.** A purely additive or prose-only fix propagates to your own projects on
+  their next session with no announcement, logged in the Work Log only — no need for the full
+  change-request ceremony that a behavior-changing fix gets.
+
+**The public repo — the one channel that reaches beyond your own machine:**
+- **Pull in updates.** The `update` action reviews and merges whatever's changed in
+  `konvesdigital/tower-crane` since you last approved it.
+- **Propose a change back.** `"propose upstream"` is an ordinary fork-branch-PR flow Claude Code
+  drives for you.
+- **What actually ships there** is exactly this `toolkit\` repo — your outer repo's tickets,
+  registry, and notes are never part of it; there's no git history shared between the two, so
+  there's no channel for them to leak in either direction.
+
+Setting up another of your own machines is covered in [How to get it](#how-to-get-it) above — same
+courier, same steps, just run once more on the new machine.
 
 ---
 
-## Track 2 — Hub Operator
+## Why you can trust it
 
-You're running a Tower Crane hub — or about to start one, including if you just downloaded this
-from GitHub and want to set it up as your own.
+**Nothing reaches your projects, and nothing you propose reaches anyone else, without you seeing
+exactly what changed and approving it.** Three gates govern everything that moves between your hub
+and the outside world:
 
-### 2.1 Start a hub for the first time
-A hub is **two nested git repos in one folder**: an outer, private repo (your own continuity
-data — `project_progress.md`, `consumers\`, `change_requests\`) and an inner `toolkit\` repo (the
-shared tools/templates/`AGENTS.md`, tracking the public `konvesdigital/tower-crane` repo). Neither
-carries machine-specific paths — each clone/download provides its own via a gitignored config
-inside `toolkit\`. Two cases reach this step:
-
-1. **You just cloned or downloaded the public `konvesdigital/tower-crane` repo** — what you have
-   on disk right now *is* `toolkit\`, with no outer wrapper around it yet. **Open it in Claude
-   Code and say "read `templates\setup_machine.md` and follow it."** Its Step 0 detects this ("a
-   fresh public clone") and walks you through wrapping it in a new outer, private folder before
-   anything else.
-2. **You already have an outer folder** (your Nth machine on an existing hub, or one you just
-   bootstrapped per case 1) — any path, any folder name, as long as it ends up somewhere under
-   your home directory. That's the one real constraint: consumers' `@import` lines only resolve
-   Claude Code's home-relative `~/...` form, so the outer folder needs to live under `~` for that
-   to work. `shared_root` / `import_base` compute themselves from wherever `toolkit\` actually
-   ends up — nothing to type in. **Open the outer folder in Claude Code and say "read
-   `toolkit\templates\setup_machine.md` and follow it."** This is the canonical, ask-don't-assume
-   setup courier — it checks live for Python/git/`gh` rather than assuming any of them, fills
-   `toolkit\config.local.json` for this machine, and runs `relocate.py` + `check_tower_crane.py`
-   to confirm a clean bill of health. **The only assumed prerequisite is Claude Code itself**;
-   without it, the same file is still just a plain checklist of CLI commands a human can run and
-   read the output of directly.
-
-**If `toolkit\` ever moves or gets renamed later:** the next script you run notices on its own
-and prints a `[NOTICE]` explaining what changed. Nothing is broken — the location marker
-self-corrects automatically — but every already-onboarded consumer still has the OLD path baked
-into its hook command / `@import` lines. When you see that notice, run
-`toolkit\scripts\relocate.py` to bring them back in sync.
-
-Maintainer tooling (`relocate.py`, `check_tower_crane.py`, the scaffolder, `seed_hub.py`,
-`publish_release.py`) is cross-platform Python, living in `toolkit\scripts\`. Run each with
-whichever Python 3 launcher `setup_machine.md` found on this machine (`python` on Windows,
-typically `python3` on macOS/Linux).
-
-### 2.2 Onboard a project as a consumer
-
-**Your own project (new or existing):**
-
-*A brand-new project* → run the scaffolder, from inside `toolkit\`:
-```
-scripts\new_consumer.py --target-path C:\Users\you\Documents\MyNewProject --project-name "My New Project"
-```
-It creates *all* of the consumer's files in one shot — `.claude\settings.json` (opt-in hooks),
-`CLAUDE.md` (with `@import` lines pointing into `toolkit\templates\`), a skeleton
-`project_progress.md`, and a one-time `FIRST_RUN.md` checklist — plus the registry entry here. By
-default it opts into the `consistency_check` hook and imports the `filing` + `compliance` +
-`continuity` workflow pieces. Useful flags: `--no-continuity` (skip that piece), `--tools` with no
-values (no hooks), `--force` (overwrite). The new project's first session then runs
-`FIRST_RUN.md`: `git init`, **accept the one-time import dialog** (declining it disables `@import`
-permanently), and fill in the project overview.
-
-*An existing, hand-built project* → copy `toolkit\templates\register.md` into that project's
-root, open it in Claude Code, and say *"read register.md and follow it."* Its agent swaps any
-pasted workflow prose for `@import` lines and writes + commits + pushes a registration request
-into the **hub root's** `change_requests\` folder (not inside `toolkit\`) — that's part of
-register.md's own steps. Only once it lands on the hub root's GitHub remote does your next
-session here turn it into a registry entry. This is the migration path — it preserves everything
-project-specific and only replaces shared, canonical prose.
-
-**Someone else's project:** mechanically identical to the above — you can run `new_consumer.py`
-pointed at their path yourself, or just point them at
-[Track 1](#track-1--consumer--project-user) and let them self-serve `register.md` from there
-(covered under its "Getting set up"). Either way, they're now a **consumer, not an operator** —
-Track 1 is the complete set of hub mechanics they need; nothing else here is required.
-
-### 2.3 Run the hub day-to-day
-
-**Health check.** `toolkit\scripts\check_tower_crane.py` is the platform's health check. It runs two
-passes: a **golden regression suite** (exercises each tool against known fixtures so a behavior
-regression is caught before it ships to consumers) and a **reference & drift scan** (confirms
-every consumer's wiring still resolves — hook paths exist, opt-in snippets still match, every
-`@import` a consumer is registered for is still present). Run it before shipping any
-behavior-changing fix, and any time you want to confirm the fleet is healthy. Exit code is
-non-zero if anything fails.
-
-**The change-request round-trip.** A consumer that finds a bug or thinks of an improvement
-*files a request* rather than editing the shared file directly — this keeps each repo's git
-history honest (filing and fixing happen in separate repos and sessions).
-1. The consumer's agent drops a ticket into the **hub root's** `change_requests\` folder (not
-   inside `toolkit\`), `Status: OPEN`, and commits/pushes it — per `templates\filing.md`'s own
-   steps. An uncommitted ticket is invisible to the hub.
-2. The next time someone works in the hub and scans `change_requests\`, it gets picked up,
-   validated against *every* consumer (not just the filer), and fixed — committed locally to
-   `toolkit\`'s own `main` (the fix itself is never auto-pushed; that's exclusively
-   ["propose upstream"](#track-3--hub-architect)'s job) — with the commit SHA recorded in the
-   ticket via a separate commit pushed to the hub root's own remote. The ticket stays **OPEN**.
-   If [2.8](#28-turn-on-unattended-ticket-processing-automation)'s automation is turned on, this
-   can also happen unattended, fully automatically — no PR, no waiting on a human to review it,
-   since it's your own fix against your own toolkit and there's no second person in the loop.
-   Automation is off by default; without it, processing only happens when a human is actually
-   working in the hub.
-3. The consumer re-runs its own test and appends "verified PASS." Only then does the hub flip
-   the ticket to **DONE**. *DONE means consumer-verified — not merely "fix applied."*
-
-The same machinery governs both executable tools **and** workflow prose. Not every change needs
-this ceremony, though — see [Track 3](#track-3--hub-architect) for when a change can propagate
-silently.
-
-**Push a fix down to one consumer.** When a consumer has drifted, the hub never reaches in and
-edits it. Instead, from inside `toolkit\`, run the checker with `--write-guidance`: it drops a
-`COMPLIANCE_GUIDANCE.md` into that consumer's folder listing the exact deviations and fixes. The
-consumer's own agent surfaces that file at session start, summarizes it, asks the human, applies
-on confirmation, and deletes it.
-
-**Broadcast a notice to everyone at once.** `toolkit\scripts\broadcast_guidance.py` pushes one
-hand-authored guidance file to the whole registry (or a single consumer via `--consumer`) through
-the same `COMPLIANCE_GUIDANCE.md` channel — for a one-off notice that isn't worth promoting into a
-permanent imported `templates\` piece. Run from inside `toolkit\`:
-```
-python scripts\broadcast_guidance.py --broadcast <notice.md>              # push to everyone
-python scripts\broadcast_guidance.py --broadcast <notice.md> --consumer geo_rank_tracker
-python scripts\broadcast_guidance.py --status                             # who still has it pending
-```
-`--status` is a live re-scan (recomputes from the registry every run) — a consumer's
-`## Broadcast` section still present means pending/declined; gone means their agent applied it.
-
-**Turn this hub's own tools on for itself (dogfooding).** Tower Crane is not a registered
-consumer of itself by default. `toolkit\scripts\self_hooks.py` closes that gap, per machine (run
-from inside `toolkit\`):
-```
-python scripts\self_hooks.py --list                       # what's available, what's on here
-python scripts\self_hooks.py --enable consistency_check    # turn one on
-python scripts\self_hooks.py --disable consistency_check   # turn it back off
-```
-State lives in `.claude\settings.local.json` (gitignored). Check what's on without running
-anything by opening `.claude\self_hooks_status.md`.
-
-### 2.4 Bring another machine onto this hub (Federate)
-**This is for your own additional machines, not another person.** A 2026-07-25 design pass
-(`design\local_first_reframe.md`) retired "true multi-user, one shared hub" as a target use
-case — the write-access/trust boundary it implied has no real instance under normal use, and it's
-replaced by a simpler model: **each person runs their own private hub, and collaboration happens
-through the public `konvesdigital/tower-crane` repo's fork+PR channel** ([Track 3](#track-3--hub-architect)),
-never through shared write access to one person's outer (private) repo. If someone wants to build
-on your work, point them at [1. Track 1](#track-1--consumer--project-user) or
-[2.1](#21-start-a-hub-for-the-first-time) to stand up their **own** hub, not at write access to
-yours.
-
-Federating your own machines together (same person, N machines, one hub — unaffected by the
-retirement above):
-1. **Clone the outer folder wherever you want** on the new machine (anywhere under your own home
-   directory — see 2.1), using your own git credentials against the outer repo's own (private)
-   remote.
-2. Run [2.1](#21-start-a-hub-for-the-first-time) case 2 on that machine — it walks through
-   `setup_machine.md` for the new clone.
-3. **`gh auth login` + `git config user.*`** on that machine — ambient auth, never stored in a
-   tracked file.
-4. Everything under `consumers\`/`change_requests\`/`project_progress.md` syncs the same way any
-   git-backed continuity data does — ordinary `checkpoint`/`resume` on the outer repo.
-
-### 2.5 Stand up a separate, independent hub (Replicate)
-To hand someone a **separate** hub — its own GitHub repo, its own empty registry, none of this
-hub's state — run the generator:
-```
-scripts\seed_hub.py --out <path>                          # clean copy to hand off directly
-scripts\seed_hub.py --out <path> --version 1.0.0 --zip    # + a versioned release zip
-```
-It **allowlist-copies** only the reusable pattern into a fresh directory, so this hub's instance
-state (`design\`, `consumers\`, `change_requests\`, progress docs) and anything new not on the
-allowlist are excluded by default. It regenerates a skeleton `README.md`/`project_progress.md`,
-writes a recipient `SETUP.md`, scrubs the source consumer names + your machine path from the
-copied prose, and runs a leak scan.
-
-**Before you hand the output to anyone: read the leak-scan output.** It's the one safety check
-standing between "clean hub" and "a copy that leaks your consumer names or machine path" — don't
-skip past it just because the command exited 0.
-
-The in-place courier `templates\bootstrap_hub.md` is the ad-hoc alternative if someone already
-cloned the whole repo and wants to convert it in place — it's one-way and destructive, meant for
-a fresh copy, never a live hub.
-
-### 2.6 Publish a versioned public release
-`scripts\publish_release.py` cuts a version and puts it on GitHub, at a **separate public
-storefront repo**. The one deliberately manual step is writing the release notes; everything else
-is automatic:
-
-| Step | Do this | Detail |
+| Gate | Fires when | What happens |
 |---|---|---|
-| 1 | Write a `## [X.Y.Z] - YYYY-MM-DD` section in `CHANGELOG.md` | Plain language — the audience is often non-technical. |
-| 2 | Commit it here | A new file only ships once it's git-tracked. |
-| 3 | Run `python scripts\publish_release.py --version X.Y.Z` | Regenerates the hub, syncs it into the persistent local public clone, commits, tags, pushes, and runs `gh release create` with the CHANGELOG section as notes plus a zip. Requires `gh auth login` once on this machine. |
-| 4 (optional) | Fix a past release's notes | Edit `CHANGELOG.md`, then `--sync-notes` — no regenerate/tag/new-release. |
+| **Update** | You pull changes from the public repo into your own `toolkit\` | A regression suite runs, then the literal diff is shown to you verbatim alongside a plain-language read — nothing merges without your approval. |
+| **Merge** | Any proposed change tries to land on the public repo's `main` | Required owner review plus a battery of automated checks must all pass before it can merge. |
+| **Upstream** | You propose a change from your own hub back to the public repo | An authoring assistant checks it before it's even opened as a PR, so it doesn't arrive at Merge already broken. |
 
-**Deciding when the public repo goes public is a separate, one-time call — not part of this
-mechanism.** The repo is created private by default; nothing about publishing a release changes
-that. When you're ready: `gh repo edit <owner>/<repo> --visibility public`. No code change either
-way.
+You stay in control throughout: your outer (private) repo never touches the public repo at all, your
+own tickets against your own toolkit process automatically because there's no one else who needs to
+review them, and anything arriving from outside waits for your explicit yes — declining an update is
+a fully supported, permanent choice, not a nag. The one honest exception: if you own the public repo
+yourself, your own `checkpoint` pushes straight to it (GitHub requires *some* owner override, or an
+owner could never merge their own change at all) — but even then, a change to the directive file's
+binding rules is flagged to you explicitly before it goes out, so that class of change is never made
+without you knowing you made it.
 
-### 2.7 Add a new shareable tool to the catalog
-Full mechanical steps live in `toolkit\AGENTS.md` ("Adding a new tool") since that's what your agent
-follows — but in short: build and test the tool in whichever project prompted the need, strip
-anything project-specific (no hardcoded paths or project names — it must work unmodified from any
-future project), drop it in the matching folder (`hooks\`, `agents\`, or `scripts\`), and add a
-row + opt-in snippet to `MENU.md`. If it's an automatic hook, it must exit code 2 with the failure
-report on stderr on a FAIL — see [Track 3](#track-3--hub-architect) for why. Commit and push like
-any other change.
+### The directive file's own safeguards
 
-### 2.8 Turn on unattended ticket processing (automation)
-Piece 3 of `design\sync_automation.md`: an hourly, unattended tick that keeps the hub clone
-current, refreshes compliance guidance, and proposes a PR for at most one fix-worthy
-`change_requests\` ticket — without anyone opening an interactive Claude Code session in this repo
-that day. It **never** merges its own PR and **never** flips a ticket's `Status`; a human still
-reviews and merges every actual change, same as always. Off by default
-(`automation.enabled: false`). To turn it on: **"read `templates\setup_automation.md` and follow
-it."** That runbook checks `gh`/`claude` prerequisites live, walks the `automation` config block,
-and gives the OS-scheduler command (Windows Task Scheduler, with cron/launchd documented for
-later).
+`AGENTS.md` — the file that actually governs an agent's behavior in this repo — is written to be
+checked, not just trusted:
 
-A tighter, event-driven alternative — a GitHub Actions webhook firing on `push`/`pull_request`
-against `change_requests\` — remains documented as an **operator-only future upgrade**, not the
-default: it needs CI access on the target repo, which a pure consumer of someone else's hub
-doesn't have, so it can't be the one mechanism Piece 3 relies on (design\sync_automation.md,
-"Trigger: cadence vs. event-driven").
+- Opens with a bounded list of what it may ever direct an agent to do (git, local filesystem — never
+  network, never credentials).
+- Its binding rules ("Standing Constraints") are written in explicit MUST/MUST NOT language, so a
+  script can grep for the exact wording instead of trusting a paraphrase.
+- Carries an explicit anti-override clause: nothing later in the file, or anything it imports, can
+  weaken that section.
+- **That clause isn't just prose — it's mechanically enforced.** `check_standing_constraints.py`
+  runs as part of the Merge gate on every pull request and blocks, unconditionally, any change to
+  the Standing Constraints' exact wording — no override built into the check itself, and no
+  "legitimate tightening" exception, since a script can't tell that apart from a weakening edit. The
+  only way past it is the repo owner's own GitHub-level merge override, a distinct, logged action —
+  never something granted by any script in this project.
+- A stated, enforced line-count ceiling keeps "this file stays short" a falsifiable claim, not just
+  an assertion.
 
----
+The same principle extends to every other file in this repo that hands Claude Code a procedure to
+follow — `setup_machine.md`, `register.md`, `setup_automation.md`, and the rest of `templates\`.
+None of them are designed to compel anything: each is read and carried out as a suggested sequence
+of steps, phrased for a human to approve along the way, and you can stop, skip, or override any step
+at any time. Nothing in this repo hijacks your local agent or acts on your machine without your
+say-so — these are instructions a session chooses to follow, never code that runs itself.
 
-## Track 3 — Hub Architect
+### Every safety mechanism, in full
 
-You're extending Tower Crane's own protocol or mechanics — not just running a hub.
+For full transparency, every concrete check currently built, which gate it belongs to, and the
+script that enforces it:
 
-### The mental model
-Two kinds of things are shared, and they reach a consumer two different ways:
+| Gate | Hard / Soft | Mechanism (script) | What it checks | Runs when |
+|---|---|---|---|---|
+| Update | Hard, no override | `update_toolkit.py` — golden suite | The regression suite must pass before any pending commit can be trusted. | Every `update` |
+| Update | Hard abort (`--check`/`--approve`) / soft WARN (`--notify`) | `update_toolkit.py` — origin remote-identity check | The remote you're pulling from is actually the expected public repo, not a repointed or typosquatted one. | Every `update` |
+| Update | Mandatory human step | `update_toolkit.py` — diff-review gate | Shows the literal diff verbatim alongside a plain-language assessment; nothing merges without explicit approval. A large pending batch can be approved commit-by-commit instead of all at once. | Every non-empty `update` |
+| Merge | Hard | `check_file_surface.py` — known AI-directive filename | Blocks a new file mimicking `CLAUDE.md`/`.cursorrules`/a second `AGENTS.md` anywhere but the one canonical file. | Every PR |
+| Merge | Hard | `check_file_surface.py` — non-Python script | Blocks a script in any language but Python, by extension *and* shebang (catches a rename-to-evade attempt). | Every PR |
+| Merge | Hard | `check_file_surface.py` — script outside its home | Blocks a `.py` file added anywhere but `hooks\`/`scripts\`/`agents\`/a test fixture. | Every PR |
+| Merge | Hard | `check_file_surface.py` — binary file | Blocks any binary blob anywhere in the diff — this is a text-based repo; there's never a legitimate one. | Every PR |
+| Merge | Soft | `check_file_surface.py` — disguised-code heuristic | Flags eval/exec/base64/curl-pipe-shell content in a file not already classified as code. | Every PR |
+| Merge | Hard | `check_file_surface.py` — invisible/formatting Unicode | Blocks zero-width, bidi-control, variation-selector, and Unicode "tag" characters in any added line — text that can render blank or reordered in a diff view while still parsing as instructions. | Every PR |
+| Merge | Soft | `check_file_surface.py` — Python capability creep | Flags new code introducing a network call, dynamic-exec, or deserialization primitive not covered by `AGENTS.md`'s declared capabilities. | Every PR |
+| Merge | Hard | `check_scripts_gate.py` | Runs `consistency_check.py`'s static analysis (undefined names, arity mismatches, string-key drift) over every changed script. | Every PR |
+| Merge | Hard | `check_agents_pr_gate.py` — filename invariant | `AGENTS.md` must still exist, at that path. | PRs touching `AGENTS.md` |
+| Merge | Hard | `check_agents_pr_gate.py` — frontmatter schema | Required metadata fields are present and well-formed. | PRs touching `AGENTS.md` |
+| Merge | Hard, unconditional | `check_agents_pr_gate.py` / `check_standing_constraints.py` — Standing Constraints match | The binding-rules section matches `main` verbatim, exact text — no exceptions, since a script can't tell a weakening edit from a legitimate one. | PRs touching `AGENTS.md` |
+| Merge | Soft | `check_agents_pr_gate.py` — capability-vs-content | Flags diff content outside the file's own declared capability list. | PRs touching `AGENTS.md` |
+| Merge | Soft | `check_agents_pr_gate.py` — diff-size gate | Flags a single PR changing more than ~60 lines of `AGENTS.md`, or growing it past its own declared limit. | PRs touching `AGENTS.md` |
+| Merge | Hard | `check_agents_pr_gate.py` — required PR trailer | The PR body must carry both a "Contributor statement" and an "Independent read" section. | PRs touching `AGENTS.md` |
+| Merge | Structural | CODEOWNERS + branch protection | Requires the repo owner's review before any PR touching `hooks\`/`scripts\`/`templates\`/`agents\`/`AGENTS.md`/`.github\` can merge. | Every PR |
+| Merge | Structural | SHA-pinned GitHub Actions | Third-party Actions are pinned to an exact commit, not a movable tag, so a rewritten tag can't change what runs. | Every workflow run |
+| Merge | Structural | Least-privilege workflow permissions | Workflows declare read-only `contents` access and pass PR title/body through `env:` rather than interpolating them into a shell command. | Every workflow run |
+| Upstream | Overridable warning | `check_standing_constraints.py` — proposal-time check | Flags, and asks you to confirm, if your own proposed change touches the binding-rules section — before it's even opened as a PR. | `"propose upstream"`, when `AGENTS.md` is touched |
+| Upstream | Disclosure only, non-blocking | `check_standing_constraints.py` — checkpoint-time check | Flags it to you if your own direct push (as repo owner) changes the binding-rules section — can't block the push, guarantees you know you made the change. | Every `checkpoint` touching `AGENTS.md` |
+| Local | Hard contract | Hook exit-2/stderr contract | Any automatic hook (e.g. `consistency_check.py`) must exit code 2 with its failure on stderr, or a real FAIL never reaches the agent — any other exit code is silently non-blocking. | Every hook run |
 
-| Shared thing | Example | How a consumer gets it |
-|---|---|---|
-| **Tools** — executable | `hooks\consistency_check.py` (a Python static-analysis hook) | The consumer's `.claude\settings.json` points at the shared file by a command generated per machine from `config.local.json`. |
-| **Workflow** — prose conventions | how to file a bug, checkpoint/resume, receive compliance guidance | The consumer's `CLAUDE.md` `@import`s the shared prose by path. |
-
-Both are **referenced, never copied** ("float-on-HEAD"). A project that has opted in is a
-**consumer**; the registry (`consumers\`) is the source of truth for who has opted into what.
-
-It is also a **cooperative convention system, not a sandbox.** A consumer can always opt out of
-any piece or override a rule locally. Opt-out can't be *prevented*, only *detected* — the checker
-flags drift as a tripwire, never a lock.
-
-### Why hooks exit 2, not 1
-The hooks in this repo exist because a human's judgment about what's genuinely necessary is worth
-encoding as a script that doesn't drift, doesn't get talked out of itself, and doesn't forget.
-That only works if a failing hook actually reaches the agent instead of quietly writing to a log
-file nobody's watching. Claude Code only auto-feeds a PostToolUse hook's output back into the
-calling agent's context when the hook exits **code 2** on **stderr** — any other non-zero exit is
-"non-blocking," shown to the human only. `hooks\consistency_check.py` originally exited 1 to
-stdout only: every FAIL was logging correctly but never reaching the agent that needed to see it
-— found 2026-07-23 via this repo's own dogfooding. This is now the standing contract for any
-automatic Claude Code hook in this repo (`toolkit\AGENTS.md` "Adding a new tool" step 2a). It doesn't
-apply to a manually-invoked maintainer script like `check_tower_crane.py` — its output is already
-fully visible to whoever runs it.
-
-### Silent minor-change propagation
-Not every shared fix needs the full change-request ceremony. A *minor benevolent* change made
-here — a prose or workflow refinement, a strictly-additive guardrail, nothing a consumer must
-re-verify or re-wire — is allowed to propagate silently: it reaches consumers on their next
-session with no announcement, and the only requirement is that it's logged in this repo's Work
-Log. This is safe because **one human is the user across every project** — that human's own
-memory is the backstop for noticing something changed. Revisit once projects have separate human
-owners.
-
-### What actually ships — private vs. public content
-| Category | Files | Effect of editing here |
-|---|---|---|
-| **KEEP** (git-tracked, copied verbatim + scrubbed) | `hooks\`, `agents\`, `scripts\`, `tests\`, `templates\`, `AGENTS.md`, `config.example.json`, `.gitignore`, `CHANGELOG.md` | Ships in the next generate/release — once committed. |
-| **Derived** | `MENU.md` | Catalog rows/opt-in snippets ship through; "In use by" cells are blanked. |
-| **Regenerated** (hardcoded inside `scripts\seed_hub.py`'s own script body) | `README.md`, `project_progress.md`, `SETUP.md` | No effect — this repo's own copy is never read. To change what a *new* hub's public README says, edit the `readme` string inside `scripts\seed_hub.py`. |
-| **Excluded** | `design\`, `consumers\`, `change_requests\`, `project_progress_archive.md` | Never ships. |
-
-This file (`README.md`) and `project_progress.md` are safe places for private, internal notes —
-they structurally cannot leak into a public release. `AGENTS.md`, by contrast, *is* a KEEP file,
-so keep it to generic process rules only.
-
-> **Never hand-edit files inside the local `tower_crane_public` clone.** `publish_release.py`
-> fully overwrites its tracked content (preserving `.git`) on every run. To make a change, edit
-> the source here per the table above, then re-run `publish_release.py`.
-
-Full design rationale: `design\consumer_platform.md` (the 11 locked decisions behind the
-platform), `design\portability.md` (config-driven install, cross-platform runtime, Federate vs.
-Replicate), `design\broadcast_guidance.md` (the broadcast primitive's scoping decisions).
+This is a real, substantial mitigation — not a guarantee. No mechanism fully solves "the
+maintainer's own account or machine is compromised"; that's true of code signing and every other
+supply-chain defense in production use today. Build/CI-infrastructure compromise is explicitly out
+of scope for the same reason (though this project's zero third-party Python dependencies close off
+one major version of that risk on their own) — named here so it's a known limit, not an
+unconsidered one.
 
 ---
 
 ## Reference
 
 ### Where things live
-The hub is two nested git repos. Paths below are grouped by which one actually owns them.
+**Outer repo (private):** `consumers\` (registry), `change_requests\` (ticket inbox), `design\`
+(rationale docs), `project_progress.md` (working state), `CLAUDE.md` (a one-line `@import` pointer
+at `toolkit\AGENTS.md`), `toolkit\` (gitignored by this repo entirely).
 
-**Outer repo (private — your own continuity data, never shared publicly):**
-| Path | What it is |
-|---|---|
-| `consumers\` | The consumer registry — one file per opted-in project. |
-| `change_requests\` | The inbox — tickets from consumers and registration requests. |
-| `design\` | Rationale docs — see Track 3. |
-| `project_progress.md` | Cross-session working state for this hub. |
-| `CLAUDE.md` | A one-line pointer (`@import`) at `toolkit\AGENTS.md` — kept here only so Claude Code auto-loads it, and where personal/unshared customization belongs. |
-| `.claude\settings.local.json`, `.claude\self_hooks_status.md` | This hub's own self-use state — gitignored, per-machine. |
-| `toolkit\` | The inner repo below — gitignored by this outer repo entirely. |
-
-**Inner `toolkit\` repo (shared, tracks the public `konvesdigital/tower-crane` repo):**
-| Path | What it is |
-|---|---|
-| `MENU.md` | Catalog of the shareable tools and their opt-in snippets. |
-| `templates\` | Shared workflow prose (`filing`, `compliance`, `continuity`) + couriers (`register.md`, `bootstrap_hub.md`, `setup_machine.md`) + opt-in JSON under `optins\`. |
-| `scripts\` | Maintainer tooling, including `update_toolkit.py` (the `update` action) — see 2.1-2.7 above for what each one does. |
-| `hooks\`, `agents\` | The executable tools themselves. |
-| `CHANGELOG.md` | What's in each public release. |
-| `config.example.json` / `config.local.json` | Per-machine config. `.example` committed; `.local` gitignored. |
-| `AGENTS.md` | The canonical hub-operating instructions — imported whole by the outer `CLAUDE.md`. Not human onboarding — that's this file. Carries the standard AI-directive preamble (`design\update_trust_review.md`'s Fix 3) since it's the file a crowd-sourced PR would ever touch. |
-| `.last_reviewed_sha`, `.update_pending.json` | The `update` action's per-machine trust-review state — gitignored. |
+**Inner `toolkit\` repo (public, `konvesdigital/tower-crane`):** `MENU.md` (catalog), `templates\`
+(shared prose + couriers), `scripts\` (maintainer tooling), `hooks\`/`agents\` (the executable
+tools), `CHANGELOG.md`, `config.example.json`/`config.local.json` (per-machine config, `.local`
+gitignored), `AGENTS.md` (the canonical operating instructions).
 
 ### Quick-start cheat sheet
 | I want to... | Do this |
 |---|---|
-| Onboard a project | `toolkit\scripts\new_consumer.py` (new) or `toolkit\templates\register.md` (existing) — 2.2 |
-| Confirm the fleet is healthy | `toolkit\scripts\check_tower_crane.py` — 2.3 |
-| Push a drift fix to one consumer | checker with `--write-guidance` — 2.3 |
-| Push a notice to everyone | `scripts\broadcast_guidance.py --broadcast <file>` (from inside `toolkit\`) — 2.3 |
-| Turn on this hub's own tools | `scripts\self_hooks.py --enable <tool>` (from inside `toolkit\`) — 2.3 |
-| Set up on a new machine | 2.1 |
-| Add another of your own machines (Federate) | 2.4 |
-| Pull a reviewed toolkit update | `update` action, via `toolkit\scripts\update_toolkit.py` — see `toolkit\AGENTS.md`'s `"update"` procedure |
-| Propose a fix upstream | `"propose upstream"` — see `toolkit\AGENTS.md`'s procedure |
-| Generate an independent hub (Replicate) | `toolkit\scripts\seed_hub.py --out <path>` — 2.5 |
-| Publish a release | `CHANGELOG.md` entry + `toolkit\scripts\publish_release.py --version X.Y.Z` — 2.6 |
-| Flip the public repo public | `gh repo edit <owner>/<repo> --visibility public` — 2.6 |
-| Add a new shareable tool | 2.7 |
+| Set up my hub | `templates\setup_machine.md` |
+| Set up another of my own machines | `templates\setup_machine.md` |
+| Connect a project | `scripts\new_consumer.py` (new) or `templates\register.md` (existing) |
+| Save/resume progress in a project | say `"checkpoint"` / `"resume"` |
+| Keep everything running itself | `templates\setup_automation.md` |
+| Confirm the fleet is healthy | `scripts\check_tower_crane.py` |
+| Push a fix to one project | checker with `--write-guidance` |
+| Push a notice to all my projects | `scripts\broadcast_guidance.py --broadcast <file>` |
+| Add or fix a shareable tool | see "Working within Tower Crane itself" above |
+| Pull a reviewed toolkit update | the `update` action — see `AGENTS.md` |
+| Propose a fix upstream | `"propose upstream"` — see `AGENTS.md` |
+| Turn on this hub's own tools | `scripts\self_hooks.py --enable <tool>` |
