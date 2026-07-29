@@ -143,6 +143,11 @@ template is deferred to the planned new-project setup workflow (see `project_pro
 `Type: registration`): an existing project onboarding itself onto the platform via `templates\register.md`.
 They ride the same inbox but have **no round-trip** — see "Registration tickets" below.
 
+**Proposal tickets** are a recognized subtype (`Type: proposal`, template in `templates\filing.md`):
+a consumer proposing new shared content rather than reporting a bug in something that exists. Same
+round-trip as an ordinary ticket — action per "Applying a fix" below, reading "Proposed content" as
+the equivalent of "Proposed fix."
+
 ### `DONE` means consumer-verified — not "fix applied"
 `DONE` = the **filing consumer** has re-run its own test and confirmed the fix works. It does NOT
 mean this agent applied a fix. Applying a fix and pushing it leaves the ticket **OPEN**, awaiting

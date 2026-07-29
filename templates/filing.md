@@ -53,6 +53,32 @@ history honest. The tower_crane hub is the single place a shared tool actually c
    against every consumer (which this project can't see) and owns the final call. Make the
    Symptom/repro concrete enough to reproduce, and make the Suggested test something the shared
    agent (and later you) can actually run.
+
+   **Proposing new shared content** (a template or reference doc that doesn't exist yet, rather
+   than a bug/improvement in something that already exists) doesn't fit the shape above — use
+   `Type: proposal` instead:
+   ```
+   Status: OPEN
+   Filed by: <this project's full name> — <YYYY-MM-DD>
+   Tool: <what's being proposed, and where it would live>
+   Type: proposal
+
+   ## Use case
+   ## Proposed content
+   ## Where it lives
+   ## Suggested test
+
+   ## Round-trip log
+   ```
+   Same round-trip as any other ticket (only `Type: registration` skips it) — the shared repo
+   creates the proposed content and you still verify before it closes.
+
+   **Before filing a proposal whose content would live in `toolkit\`:** confirm it contains no
+   real absolute paths, machine-specific detail, or client/project names. `toolkit\` tracks the
+   public `konvesdigital/tower-crane` repo; anything naming *what* the hub operator knows — a
+   person, a path, a client — belongs in the hub root instead (e.g. a private, non-`toolkit\`
+   folder there), never in `toolkit\templates\`. If unsure, describe it as living in the hub root
+   and let the shared agent decide the right file — don't guess a `toolkit\` path for it yourself.
 3. **From inside the hub root** — not `toolkit\`; `change_requests\` belongs to a different git
    repo with a different remote — `git add` the new ticket file, commit (e.g.
    `git commit -m "File ticket: <slug>"`), and `git push`. Filing isn't done until the ticket
