@@ -149,3 +149,17 @@ upkeep. None of that should silently change this project's behavior. If an adopt
 longer resolves (a broken `@import`, a pointer to a file that's gone), that's a signal something
 was restructured without a working stub left behind — treat it as worth a note back to a hub
 session, not something to silently work around.
+
+### Checking adopted references at resume
+
+Only relevant if this project has actually adopted anything from `shared_resources\` — otherwise
+skip this. At `resume`, run
+`python <hub root>\toolkit\scripts\check_shared_resource_refs.py --project-root <this project's
+root>` (the `<hub root>` prefix is whatever this file's own `@import` line resolves to, one level
+above its `toolkit\`). It's a deterministic file-existence check, not an LLM judgment call — zero
+tokens either way, and it catches 100% of the case it checks rather than relying on this session
+noticing on its own. Every `@import` line pointing into `shared_resources\` gets a `[FAIL]` if its
+target no longer exists; report any `[FAIL]` to the user plainly (per "Shared resources folder
+maintenance" — a broken reference must never fail silently). Out of scope by design: a `tool`-kind
+entry adopted as free-text "pointer note" prose rather than a literal `@import` line — that has no
+fixed shape to check deterministically, so it isn't covered.

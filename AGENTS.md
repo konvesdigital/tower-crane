@@ -269,10 +269,22 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
         text to the user as an explicit, unmissable notice before committing, so this class of
         change is never made without the operator knowing they made it. Never skip this check
         silently when `AGENTS.md` is among the changed files.
-      - `git -C toolkit add -A && git -C toolkit commit -m "Checkpoint: <summary>" &&
-        git -C toolkit push`. This pushes to the user's own remote (their own private hub, or this
-        canonical repo if they're the operator) — always safe to push freely with no gate
-        (`design\update_trust_review.md`).
+      - `git -C toolkit add -A && git -C toolkit commit -m "Checkpoint: <summary>"`.
+      - **Hard outgoing leak-scan gate, before pushing** (`design\resource_sharing_model.md`'s B1 —
+        the actual fix for the near-miss that started that whole design doc: private client
+        content almost landing in this public repo, caught by the user before commit, not by
+        anything technical). From inside `toolkit\`: `git fetch origin`, then
+        `python scripts\check_file_surface.py --base-sha origin/main --head-sha HEAD`. A `[FAIL]`
+        (check 8a — added content matching a live `consumers\*.md` name or path segment) is a
+        **hard block**: do not push. Report the FAIL(s) to the user verbatim, fix the offending
+        content (it likely belongs in `shared_resources\` instead — see
+        `templates\shared_resources.md` — or just needs rephrasing if it's a coincidental match),
+        then re-run this gate on the next checkpoint; the bad commit stays local-only until it
+        passes. A `[WARN]` (check 8b — generic absolute-path shape) does not block; mention it to
+        the user as a nudge, same as the existing disguised-code heuristic's WARNs.
+      - `git -C toolkit push`. This pushes to the user's own remote (their own private hub, or this
+        canonical repo if they're the operator) — always safe to push freely once the gate above
+        passes (`design\update_trust_review.md`, extended by `design\resource_sharing_model.md`).
       - If the push fails (e.g. no remote configured, no write access, diverged from upstream):
         report it to the user; don't let it block or roll back the outer-repo checkpoint above.
 3. Confirm to the user: saved and pushed (note separately whether a `toolkit\` push happened,

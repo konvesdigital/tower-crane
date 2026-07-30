@@ -72,12 +72,43 @@ Seven checks, five hard-fail, two soft-flag:
                                                   and deliberately narrow: subprocess/os.system are NOT
                                                   flagged, since invoking git/gh via subprocess is this
                                                   project's own normal, sanctioned pattern everywhere.
+  8. Outgoing private-content leak     MIXED  - added 2026-07-30 (design\\resource_sharing_model.md's
+                                                  B1), the OUTGOING direction every check above is
+                                                  blind to - this repo's other gates all defend
+                                                  against a malicious/careless *incoming* change; this
+                                                  is the one that would have caught the near-miss that
+                                                  started that whole design doc (private client
+                                                  content nearly landing in this public repo, caught
+                                                  by the user before commit, not by anything here).
+                                                  Two parts sharing one signal source (the outer hub's
+                                                  private consumers\\*.md registry - the exact same
+                                                  detector templates\\shared_resources.md's own
+                                                  save-trigger heuristic uses, Locked as "one
+                                                  implementation, not two"):
+                                                    8a HARD - added content literally matching a live
+                                                       consumer's registered name or identifying path
+                                                       segment. Deterministic and low-false-positive,
+                                                       since it's matched against real registry data,
+                                                       not a shape guess.
+                                                    8b SOFT - added content matching a generic
+                                                       absolute-user-home-path shape (`C:\\Users\\...`,
+                                                       `/home/...`, `/Users/...`) that isn't an obvious
+                                                       placeholder (you/your/<user>/username). Kept
+                                                       soft because this repo's own docs legitimately
+                                                       use placeholder paths like `C:\\Users\\you\\...`
+                                                       as examples.
+                                                  Both gracefully report PASS/N-A (not a false FAIL)
+                                                  when consumers\\ isn't reachable from this checkout -
+                                                  expected for a standalone toolkit\\ clone or this
+                                                  repo's own CI runner, which never checks out the
+                                                  outer private repo and shouldn't.
 
 Usage: python scripts\\check_file_surface.py --base-sha <sha> --head-sha <sha>
 Run from anywhere; always resolves paths against this toolkit\\ repo, not the caller's cwd.
 """
 
 import argparse
+import re
 import subprocess
 import sys
 from pathlib import PurePosixPath
@@ -142,6 +173,12 @@ CAPABILITY_CREEP_TOKENS = [
     'paramiko', 'telnetlib', 'eval(', 'exec(', '__import__(', 'marshal.loads(', 'pickle.loads(',
     'base64.b64decode(',
 ]
+
+# Check 8: outgoing private-content leak. ABS_PATH_RE matches an absolute user-home path and
+# captures the first path segment after it (the part that would actually identify a real user/
+# project, as opposed to the generic C:\Users\/home\ prefix every machine has).
+ABS_PATH_RE = re.compile(r'(?:[A-Za-z]:[\\/]Users[\\/]|/home/|/Users/)([^\s\\/<>]+)')
+PLACEHOLDER_SEGMENTS = {'you', 'your', 'username', 'user', '<user>', '<you>'}
 
 
 def report(level, message):
@@ -353,6 +390,92 @@ def check_python_capability_creep(shared_root, files, base_sha, head_sha):
         print(f"  {norm} matched {token!r}: {line}")
 
 
+def _load_consumer_signals(shared_root):
+    """Live consumer names + identifying path segments, read fresh from the outer hub's private
+    consumers\\*.md registry (one level above this toolkit\\ repo - design\\local_first_reframe.md's
+    outer/inner split). This is the same signal source templates\\shared_resources.md's own
+    save-trigger heuristic uses (Locked as "one detector, not two"). Returns ([], []) when
+    consumers\\ isn't reachable - expected and correct for a standalone toolkit\\ checkout (e.g.
+    this repo's own CI runner, which only checks out toolkit\\ and never the outer private repo)."""
+    consumers_dir = shared_root.parent / 'consumers'
+    if not consumers_dir.is_dir():
+        return [], []
+    names, path_segments = [], []
+    for md in sorted(consumers_dir.glob('*.md')):
+        raw = md.read_text(encoding='utf-8')
+        block_m = re.search(r'```yaml\s*\r?\n(.*?)\r?\n```', raw, re.DOTALL)
+        if not block_m:
+            continue
+        block = block_m.group(1)
+        name_m = re.search(r'^name:\s*(.+?)\s*$', block, re.MULTILINE)
+        if name_m and name_m.group(1).strip():
+            names.append(name_m.group(1).strip())
+        path_m = re.search(r'^path:\s*(.+?)\s*$', block, re.MULTILINE)
+        if path_m and path_m.group(1).strip():
+            segs = [s for s in re.split(r'[\\/]', path_m.group(1).strip()) if s and s != '~']
+            if segs:
+                path_segments.append(segs[-1])  # the leaf project folder - the actual identifier
+    return names, path_segments
+
+
+def check_outgoing_private_content(shared_root, files, base_sha, head_sha):
+    """Check 8a, HARD - see check 8 in the module docstring for the full rationale. Added content
+    literally matching a live consumer's registered name or leaf path segment."""
+    names, path_segments = _load_consumer_signals(shared_root)
+    signals = sorted(set(names) | set(path_segments), key=len, reverse=True)
+    if not signals:
+        report('PASS', "no live consumer registry reachable from this checkout - nothing to "
+                       "match against (expected for a standalone toolkit\\ checkout, e.g. CI).")
+        return
+    hits = []
+    for status, path in files:
+        norm = path.replace('\\', '/')
+        proc = git(shared_root, ['diff', f'{base_sha}..{head_sha}', '--', path])
+        for line in proc.stdout.splitlines():
+            if not line.startswith('+') or line.startswith('+++'):
+                continue
+            content = line[1:]
+            for sig in signals:
+                if sig in content:
+                    hits.append((norm, sig, content.strip()))
+                    break
+    if not hits:
+        report('PASS', "no live consumer name or identifying path segment found in added content.")
+        return
+    for norm, sig, content in hits[:10]:
+        report('FAIL', f"'{norm}' adds content matching a live consumer identifier ({sig!r}) - "
+                       "this looks like private project/client content about to reach toolkit\\'s "
+                       "public remote. If this is a coincidental match on generic prose, rephrase "
+                       "it; otherwise this belongs in shared_resources\\ (hub root), never toolkit\\.")
+
+
+def check_generic_absolute_paths(shared_root, files, base_sha, head_sha):
+    """Check 8b, SOFT - see check 8 in the module docstring for the full rationale. Kept soft
+    (not hard-fail) because this repo's own docs legitimately use placeholder absolute paths like
+    `C:\\Users\\you\\...` as examples - a shape-only match can't tell those from a real leak."""
+    hits = []
+    for status, path in files:
+        norm = path.replace('\\', '/')
+        proc = git(shared_root, ['diff', f'{base_sha}..{head_sha}', '--', path])
+        for line in proc.stdout.splitlines():
+            if not line.startswith('+') or line.startswith('+++'):
+                continue
+            content = line[1:]
+            for m in ABS_PATH_RE.finditer(content):
+                seg = m.group(1).strip('<>')
+                if seg.lower() in PLACEHOLDER_SEGMENTS:
+                    continue
+                hits.append((norm, m.group(0), content.strip()))
+    if not hits:
+        report('PASS', "no non-placeholder absolute user-home path found in added content.")
+        return
+    report('WARN', "added content contains an absolute user-home path that isn't an obvious "
+                   "placeholder (you/your/<user>/username) - heuristic nudge, confirm it's "
+                   "generic documentation, not a real leaked path:")
+    for norm, matched, content in hits[:10]:
+        print(f"  {norm} matched {matched!r}: {content}")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="File-surface classifier: language, location, and disguise checks over a "
@@ -378,6 +501,8 @@ def main():
     check_disguised_code(shared_root, files, args.base_sha, args.head_sha)
     check_invisible_unicode(shared_root, files, args.base_sha, args.head_sha)
     check_python_capability_creep(shared_root, files, args.base_sha, args.head_sha)
+    check_outgoing_private_content(shared_root, files, args.base_sha, args.head_sha)
+    check_generic_absolute_paths(shared_root, files, args.base_sha, args.head_sha)
 
     print()
     print(f"=== Summary: {COUNTS['PASS']} passed, {COUNTS['WARN']} warning(s), {COUNTS['FAIL']} failure(s) ===")
