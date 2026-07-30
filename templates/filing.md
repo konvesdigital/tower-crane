@@ -1,12 +1,18 @@
 <!--
-Shared protocol piece: filing.md (MANDATORY for every consumer).
+Shared protocol piece: filing.md (MANDATORY for every consumer — Track 1, on-demand).
 Home: ~\Documents\Claude\tower_crane\toolkit\templates\filing.md
-Imported by a consumer's CLAUDE.md via:
-  @~/Documents/Claude/tower_crane/toolkit/templates/filing.md
-Float-on-HEAD: edits here reach every consumer the next time it runs. Keep this file
-project-agnostic — it must read correctly imported into ANY consumer. Refer to "this
-project", never a specific consumer name. Changes to this file go through the tower_crane
-change-request round-trip like any other shared artifact.
+As of 2026-07-30 (design\directive_economy.md's pilot) this file is no longer @imported
+directly. A consumer instead carries a thin skill stub at .claude\skills\filing\SKILL.md
+(sourced from toolkit\templates\skills\filing\SKILL.md) whose body says to read this file in
+full when the model recognizes a filing-shaped moment. Float-on-HEAD still holds — this file is
+the one canonical source the stub always re-reads live. Keep this file project-agnostic — it
+must read correctly from ANY consumer. Refer to "this project", never a specific consumer name.
+Changes to this file go through the tower_crane change-request round-trip like any other shared
+artifact.
+
+The one part of the old filing.md that must stay always-resident (a resume-time
+change_requests\ scan can't wait for the model to notice a filing-shaped moment) now lives in
+the separate, still-@imported templates\filing_resume_check.md — see that file.
 -->
 
 ## Reporting bugs & improvements in shared tools
@@ -104,19 +110,11 @@ not that the shared repo applied one. The ticket stays **OPEN through the entire
 Every hand-off appends one dated line to the ticket's `## Round-trip log` (newest at the
 bottom).
 
-**At session start (and on `resume`), scan
-the hub root's `change_requests\` folder for OPEN tickets that need this
-project's attention.** Two kinds need it, and you catch both the same way — read each OPEN
-ticket's **last** `## Round-trip log` line:
-
-- a ticket **this project filed** whose latest line reads `… awaiting <this project> verify` —
-  the shared repo shipped a fix and is waiting on you; **or**
-- a **verify-request ticket that names this project** (`Relates to: <original>`) — filed when a
-  shared fix affects more than one consumer, so each *other* consumer re-checks.
-
-Skip tickets whose last line shows the ball is elsewhere (e.g. `awaiting <another project>
-verify`, or a fix the shared agent still owns). For any ticket the scan surfaces, re-run its
-Suggested test on your side:
+**Finding which tickets need your attention at resume is handled by the always-resident
+`filing_resume_check.md` piece** (imported alongside this skill, mandatory for every consumer) —
+it scans the hub root's `change_requests\` folder on every `resume` and identifies anything
+awaiting this project. This section covers what to do once it's found one: re-run its Suggested
+test on your side:
 
 - If it works: append `YYYY-MM-DD — <this project> verified PASS`. **Leave `Status: OPEN`** —
   the tower_crane agent flips it to `DONE` on its next session (closing authority stays there).
