@@ -319,6 +319,18 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
    surfaced (e.g. "PR #N awaiting your review", "ticket X awaiting consumer verify", or "toolkit\
    has 2 new commits upstream, run `update` to review"). Do not replay full history.
 
+**"quick resume"** — a deliberately thinner `resume`, for the close-terminal-and-reopen-seconds-later
+case right after a `checkpoint` (the only way to actually flush a long context window mid-session,
+since nothing invoked from inside a session can flush that same session). Skips every sync check —
+no outer-repo `git pull`, no `toolkit\` update-check, no `change_requests\` scan — on the reasoning
+that a session opened moments after its own `checkpoint`'s push has nothing new to find. No tag or
+disclaimer noting what was skipped: the point is speed back into the work that was just interrupted,
+not a staleness warning the user doesn't need in this specific case. Use plain `resume` instead for
+the start of a day or any gap long enough that something could actually have changed.
+1. Read `project_progress.md`: Current Status, Next Up, Decisions table, most recent Work Log
+   entry only.
+2. State status and next step in 1-3 lines. Do not replay full history.
+
 **"update"** — pulls `toolkit\`'s `origin` remote under a diff-review trust gate
 (`design\update_trust_review.md` Fix 1, `design\local_first_reframe.md`'s "`update` action
 mechanics"). Never runs on its own — only when the user asks for it (e.g. after `resume` flags

@@ -128,3 +128,17 @@ single Decisions table. The procedures below read whatever is present.
    sections), the **active Phase** if the project is phased, and the **most recent Work Log
    entry** only. Skip settled Work Log history and anything already Locked.
 5. State status and next step in 1–3 lines. Do not replay full history.
+
+### "quick resume"
+
+A deliberately thinner `resume`, for reopening a terminal seconds after closing one — the only way
+to actually flush a long context window mid-session, since nothing invoked from inside a session
+can flush that same session. Typically right after a `checkpoint`. Skips step 1 (`git pull`) and
+step 2-3 above (the shared-hub update/compliance checks) entirely, on the reasoning that a session
+opened moments after its own `checkpoint`'s push has nothing new to find. No tag or disclaimer
+noting what was skipped — the point is speed back into the work that was just interrupted, not a
+staleness warning. Use plain `resume` instead at the start of a day or after any gap long enough
+that something could actually have changed.
+
+1. Read `project_progress.md` — same scope as `resume` step 4 above.
+2. State status and next step in 1–3 lines. Do not replay full history.
