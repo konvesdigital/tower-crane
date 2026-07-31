@@ -91,10 +91,24 @@ place a shared tool actually changes.
    **Before filing a proposal whose content would live in `toolkit\`:** confirm it contains no
    real absolute paths, machine-specific detail, or client/project names — `toolkit\` tracks the
    public `konvesdigital/tower-crane` repo. If it does carry any of that, it isn't a `toolkit\`
-   proposal at all: private reference material, a proprietary-tool pointer, or a reusable
-   `CLAUDE.md` pattern belongs in `shared_resources\` instead (see `templates\shared_resources.md`,
-   if this project has opted in) — written directly, no ticket, no round-trip. Only file a
-   `Type: proposal` ticket here for content that's genuinely generic and public.
+   proposal at all: private reference material, a proprietary tool pointer, or a reusable insight
+   belongs in `shared_resources\` instead (see `templates\shared_resources.md`, if this project has
+   opted in) — written directly, no ticket, no round-trip. Only file a `Type: proposal` ticket here
+   for content that's genuinely generic and public.
+
+   **Graduating a `shared_resources\` entry into a `toolkit\` default:** a personal setting (a
+   `reference`/`tool` entry, or an `insight` that's proven itself broadly enough it's now adopted
+   the same way everywhere) can graduate into an actual shared default — but only through this same
+   `Type: proposal` shape, never by editing `toolkit\` directly (`shared_resources\` writes stay
+   settings-space; only the shared repo's own session decides what becomes a default — see
+   `design\resource_sharing_model.md`'s "Settings vs. defaults"). File it exactly as above, with one
+   added citation line right after `Type: proposal`:
+   ```
+   Originated from: shared_resources\<entry name>
+   ```
+   (the same lightweight cross-reference shape a regression ticket already uses with
+   `Regression of:`). This still isn't a mandate — the shared repo's session owns the final call on
+   whether it becomes the default, same as any other proposal.
 3. **From inside the hub root** — not `toolkit\`; `change_requests\` belongs to a different git
    repo with a different remote — `git add` the new ticket file, commit (e.g.
    `git commit -m "File ticket: <slug>"`), and `git push`. Filing isn't done until the ticket

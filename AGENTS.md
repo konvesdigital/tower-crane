@@ -417,3 +417,37 @@ specifically**, step 2a below adds Fix 3 Checkpoint 1's authoring-assistant beha
    `.github\CODEOWNERS`, reviewed by whoever administers `konvesdigital/tower-crane` (the author).
    Current branch-protection status: see `project_progress.md`. This is an ordinary GitHub PR
    review, not the internal `change_requests\` ticket/round-trip system — don't file a ticket for it.
+
+**"curate shared resources"** — occasional, deliberate bulk distribution of `shared_resources\`
+entries to every (or one) registered consumer, reusing `scripts\broadcast_guidance.py`'s existing
+`--broadcast` primitive completely unchanged (`design\resource_sharing_model.md`'s "Bulk
+broadcast" — reversed 2026-07-31 from an earlier "dropped" call). This is genuinely "cab work": the
+mechanism it distributes through (each consumer's own pull-only `templates\shared_resources.md`
+search/browse/apply flow) stays entirely unchanged and unaware anything proactive happened —
+broadcast only ever changes *awareness*, landing one pointer-only notice in the same namespaced
+`## Broadcast` section of a consumer's `COMPLIANCE_GUIDANCE.md` that `templates\compliance.md`
+already checks every `resume`. User-initiated only — never automatic, never triggered by a
+`checkpoint` or scheduled run — since a growing catalog pushing notifications on every unrelated
+project is exactly the noise "Discovery is pull-only" (`design\resource_sharing_model.md`) exists
+to avoid; broadcast is the one deliberate exception to that rule, not a backdoor around it.
+1. **Curate** — list `shared_resources\CATALOG.md` (optionally filtered to recently added/updated
+   entries; skip anything already marked `Archived` in the `Status` column — it's already been
+   independently absorbed everywhere active). Ask the user which entries are worth pushing broadly
+   right now.
+2. **Author a pointer-only file** — one line per selected entry (e.g. `<Name> — <one-line
+   retrieval hook or description>, say "shared resources" to review`), written to a scratch
+   markdown file. Never the full entry content — `COMPLIANCE_GUIDANCE.md` is Track-2, always
+   resident, checked every `resume`, so anything written into it is standing cost until resolved;
+   it should carry the minimum needed to remind, not duplicate content that already lives in
+   `shared_resources\`.
+3. **Push**: `python scripts\broadcast_guidance.py --broadcast <file.md>` from every registered
+   consumer at once, or `--broadcast <file.md> --consumer <slug>` for one. Confirm the drafted
+   pointer file with the user before running this — same approval-before-consequential-action
+   pattern as every other step in this project, since this writes into every targeted consumer's
+   own `COMPLIANCE_GUIDANCE.md`.
+4. **Land** — nothing further to do on this side. The existing resume-time compliance check
+   surfaces the new `## Broadcast` content on its own; the consumer sees "tower_crane curated N
+   `shared_resources\` items — review?" and, if they want to, drops into the ordinary
+   search/browse/apply flow `templates\shared_resources.md` already defines. Still fully
+   confirm-before-write at that apply step — broadcast only ever changed awareness, never the
+   underlying write discipline.

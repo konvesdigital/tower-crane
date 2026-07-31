@@ -1,6 +1,6 @@
 <!--
 Shared protocol piece: shared_resources.md (OPTIONAL — opt in when a project wants to use the
-resource/pattern-sharing mechanism; not yet wired into the scaffolder or filing.md's mandatory
+resource/insight-sharing mechanism; not yet wired into the scaffolder or filing.md's mandatory
 set — that wiring is separate follow-up work).
 Home: ~\Documents\Claude\tower_crane\toolkit\templates\shared_resources.md
 Imported by a consumer's CLAUDE.md via:
@@ -11,21 +11,22 @@ project", never a specific consumer name, and never a real path/client name (thi
 `toolkit\`, the public repo).
 -->
 
-## Using shared resources and patterns
+## Using shared resources and insights
 
 This hub keeps a **`shared_resources\`** folder at the hub root (one level up from `toolkit\` —
 see `templates\filing.md` if the hub-root/`toolkit\` split is unfamiliar). Unlike everything else
 at the hub root, this one folder is not off-limits to write from inside a project session — see
 "Saving" below. It holds three kinds of entry, indexed in one catalog,
-`shared_resources\CATALOG.md` (`Name | Kind | File | Description | Added`):
+`shared_resources\CATALOG.md` (`Name | Kind | File | Description | Added | Status`):
 
 - **`reference`** — passive, read-on-demand domain knowledge (methodology, facts). Using one means
   reading it, or `@import`ing it if it's plain prose with no spaced paths.
 - **`tool`** — a pointer to a proprietary or personal script/tool that lives elsewhere on disk,
   invoked on demand rather than auto-run. Using one means knowing it exists and how to call it.
-- **`pattern`** — a `CLAUDE.md` convention or workflow habit. Unlike the other two kinds, a
-  pattern is copied and adapted into this project's own `CLAUDE.md`, not referenced by pointer —
-  see "Patterns are different" below.
+- **`insight`** — a workflow habit, code fragment, decision, or diagnosis that gets *consumed
+  into* this project (adapted or copied in), not pointed at externally. Unlike the other two
+  kinds, an insight is retrieved by deliberate human recall of a past pain point, never a keyword
+  match — see "Insights are different" below.
 
 This is a **pull-only** mechanism: nothing here scans or prompts automatically at `resume`.
 Discovery only happens when this project's own session goes looking, because a resource relevant
@@ -42,8 +43,8 @@ appear somewhere in a sentence.
 the same bar the hub's own `checkpoint`/`resume` triggers already use: mentioned in passing
 mid-conversation about something else, it does nothing; said as the message's lead content, it
 fires. It can be followed immediately by the actual request in the same breath (*"shared
-resources — save this as a pattern"*) or stand alone, in which case ask what's wanted (search,
-browse, save, retrieve, forget).
+resources — save this as an insight"*) or stand alone, in which case ask what's wanted (search,
+browse, save, apply, forget, archive).
 
 On firing, say so out loud before doing anything else — e.g. *"Switching to shared resources —
 thinking across projects now, not just this one."* — so the context-switch is visible, not just
@@ -60,17 +61,24 @@ distinct match.
 1. **Search or browse** the catalog:
    - **Search** — ask in natural language, e.g. *"shared resources — any SEO resources in
      there?"*. Check `shared_resources\CATALOG.md` (cheap — one line per entry) and list what
-     matches.
+     matches, across both active and archived entries (a deliberate query can still legitimately
+     want something archived — label any archived hit clearly as such).
    - **Browse/list** — ask to see everything, e.g. *"shared resources — list everything"*, with no
      keyword. Useful when you don't remember what's there, or don't remember whether *this*
-     project already adopted something. Always lists every entry, refinable by:
+     project already adopted something. Lists every **active** entry by default (an entry marked
+     `Archived` in the `Status` column is hidden unless asked for — e.g. *"include archived"* —
+     since an archived entry has already been independently absorbed by every active project and
+     shouldn't clutter an ordinary listing, while still staying reachable for a brand-new project
+     that hasn't hit that pain point yet). Refinable by:
      - a count limit (most recent N);
      - an added-date filter (e.g. "added in the last month");
      - an **in-use indicator relative to this project** — for `reference`/`tool`, check whether
        this project's own `CLAUDE.md` already contains a pointer/`@import` to that entry's file,
        or a project-local `.claude\skills\<name>\SKILL.md` stub carrying that entry's adoption
-       marker (see "Apply", below); for `pattern`, check for that entry's adoption marker (see
-       "Patterns are different") since adapted prose won't verbatim-match its source.
+       marker (see "Apply", below); for `insight`, check for that entry's adoption marker (see
+       "Insights are different") — where one exists. An insight applied with nothing persisted
+       (see "Apply routes through a destination question" there) has no marker to find; that's an
+       accepted gap, not a bug.
 2. **Select** — ask which of the matching/listed entries actually apply here. Don't assume a
    single match is automatically wanted.
 3. **Apply** — adopt the selected entry:
@@ -88,7 +96,7 @@ distinct match.
      3. Carry forward into the stub's body any provenance/authorship framing the entry itself
         draws (e.g. distinguishing the entry-author's own synthesized material from third-party
         material kept only for cross-reference) — never flatten that distinction away. Add an
-        adoption marker, same convention as a `pattern`'s (see "Patterns are different"), so
+        adoption marker, same convention as an `insight`'s (see "Insights are different"), so
         browse's in-use indicator and forget can find it later:
         ```
         <!-- shared_resources: <entry name> adopted YYYY-MM-DD -->
@@ -100,20 +108,21 @@ distinct match.
         private-only by construction (see "Two homes within Track 1" in
         `design\directive_economy.md`): no canonical stub source for it ever lives in the public
         toolkit repo, not even the trigger wording or the target path.
-   - **`pattern`** — see "Patterns are different" below; never a plain pointer and not a skill
-     stub either — a pattern is `CLAUDE.md` prose adapted by value, not content referenced by
-     pointer or lazily loaded.
+   - **`insight`** — see "Insights are different" below; never a plain pointer and not a
+     lazily-loaded skill stub either in the `reference`/`tool` sense — an insight is content that
+     gets consumed into the project, by a destination decided at apply time.
 
 ### Forgetting
 
 **Forget** removes *this project's own adopted reference* — the `@import` line, pointer note,
-project-local `.claude\skills\<name>\SKILL.md` stub, or adapted `pattern` section plus its
-adoption marker — from this project. It never
-touches the entry in `shared_resources\` itself, which stays available for this or any other
-project to re-adopt later. Use it when a resource was adopted for a one-off task and is now just
-`CLAUDE.md` bloat, or to reset this project's behavior back to before adoption. If Claude's advice
-in some domain seems off, checking whether a relevant resource was ever adopted (via browse's
-in-use indicator) — and forgetting it if it's stale — is a reasonable first move.
+project-local `.claude\skills\<name>\SKILL.md` stub, or an adopted `insight` artifact (a
+`CLAUDE.md` section, pasted code/config, or a skill stub — whichever destination Apply chose) plus
+its adoption marker where one exists — from this project. It never touches the entry in
+`shared_resources\` itself, which stays available for this or any other project to re-adopt later.
+Use it when a resource was adopted for a one-off task and is now just `CLAUDE.md` bloat, or to
+reset this project's behavior back to before adoption. If Claude's advice in some domain seems
+off, checking whether a relevant resource was ever adopted (via browse's in-use indicator) — and
+forgetting it if it's stale — is a reasonable first move.
 
 ### Saving — the narrow write exception
 
@@ -132,7 +141,9 @@ formality:
 - **Requests a change to Claude's own deterministic behavior** — a hook, a script, a workflow
   convention that should apply generically, not domain knowledge — → this is **not**
   `shared_resources\` content. Don't save it here; point at the ticket system instead
-  (`templates\filing.md`'s `Type: proposal` ticket, or an ordinary bug ticket).
+  (`templates\filing.md`'s `Type: proposal` ticket, or an ordinary bug ticket). If this same
+  content already lives in `shared_resources\` and has proven itself broadly, see filing.md's
+  graduation path instead of re-filing from scratch.
 - **Neither is obvious** → ask before saving.
 
 Then, before writing anything, state what's about to happen and get an explicit go-ahead: the
@@ -141,33 +152,132 @@ entry's name, its `kind`, a one-line description, and that it's about to be writ
 disk-writing action in the whole mechanism and the one carrying the classification call above, so
 it gets its own explicit checkpoint even though entering the mode already got one.
 
-When saving: create one new file in `shared_resources\` (kind `reference` or `tool`; for `pattern`
-see below), then append one row to `shared_resources\CATALOG.md`.
+When saving a `reference` or `tool` entry: create one new file in `shared_resources\`, then append
+one row to `shared_resources\CATALOG.md` (`Status` column left blank — active by default). For
+`insight`, see "Insights are different" below — its save flow is a negotiation, not a fixed
+write.
 
-### Patterns are different
+### Insights are different
 
-A `pattern` entry is a `CLAUDE.md` convention or workflow habit — referenced **by value** (copied
-and adapted), not by pointer, because each project's `CLAUDE.md` is its own tailored prose. This
-needs its own pair of actions rather than the resource save/apply pair above:
+An `insight` isn't referenced in place or lazily loaded — it's consumed into the adopting project,
+by value. It carries up to three parts, and how much of each varies per entry rather than being
+fixed by a template:
 
-- **Save a pattern** — triggered by something like *"shared resources — note this CLAUDE.md
-  pattern"*. Copy the actual resulting `CLAUDE.md` section **verbatim** — the pattern's real text,
-  not a git-diff-style before/after, and not a paraphrase — into a new `shared_resources\` file
-  with `Kind: pattern` in `CATALOG.md`. Don't generalize or strip this project's specifics at save
-  time: the saved entry is a faithful record of what actually worked here, and it's private
-  hub-root storage, so carrying this project's own names/paths in it is fine. Generalizing now
-  would just be a second lossy paraphrase on top of whatever the retrieving session does later — do
-  it once, at retrieve time, from the real source. Same confirm-before-write step as above: name,
-  kind, one-line description, destination — confirmed before the file is written.
-- **Retrieve a pattern** — triggered by something like *"shared resources — get the checkpoint
-  pattern from XYZ and apply it here"*. Runs the same search/browse/select flow above to find the
-  right entry, then **adapts** the verbatim saved text into this project's own `CLAUDE.md` wording —
-  this is the one point where generalization happens, informed by the actual concrete original
-  rather than an earlier summary of it. Never pastes it verbatim. After adapting, add an adoption
-  marker near the new section so browse's in-use indicator and forget can find it later, e.g.:
-  ```
-  <!-- shared_resources: <entry name> adopted YYYY-MM-DD -->
-  ```
+1. **Retrieval hook** — the pain-point framing that should trigger a *future session's human*
+   recall. Written symptom-first, not solution-first (*"SEO client wants AI-visibility metrics we
+   can't get from Search Console"*, not *"notes on AEO/GEO tracking limitations"*) — retrieval
+   depends on a future session's human recognizing "I've hit this exact wall before," not on
+   scanning a catalog description written for a different job.
+2. **Summary** — the settled conclusion, framed so retrieval means "apply this, don't re-derive or
+   re-argue it." The judgment call already happened once; the point of saving it is to not pay
+   that reasoning cost again.
+3. **Zero or more verbatim blocks** — content marked "use this exactly," not "understand and
+   adapt." Can be absent entirely (a pure judgment call, like a diagnosis or a strategic decision),
+   present alongside a summary, or be effectively the entire entry.
+
+**Why retrieval is always human-triggered, never a model trigger:** `reference`/`tool` are
+converging toward autonomous Track-1 skill triggers because the *model* needs to recognize
+relevance across a conversation without the user saying the right words. `insight` deliberately
+never gets this treatment — the retrieval trigger is a human noticing **"I've already solved this
+exact pain point in another project,"** a memory chain only the human has, since one Claude Code
+session in one project has no memory of any other. This is permanent, not a gap waiting on a
+future Track-1 conversion.
+
+#### Saving an insight — a negotiation, not a fixed write
+
+Triggered by something like *"shared resources — save this as an insight."* Unlike a `reference`/
+`tool` save (fixed classify → confirm → write), Claude actively helps shape the entry, because the
+right hook/summary/verbatim split genuinely varies per entry and isn't derivable from a template:
+
+1. **Propose** a retrieval hook drawn from whatever pain point actually triggered the preceding
+   conversation — never a blank "what should the trigger be?" — and propose which parts of the
+   conversation warrant a verbatim block versus synthesis into the summary.
+2. The user confirms or adjusts both.
+3. Same confirm-before-write checkpoint every other write in this mechanism requires: show the
+   full drafted entry, get an explicit go-ahead, then write it as one new file in
+   `shared_resources\` with `Kind: insight` in `CATALOG.md`, roughly shaped:
+   ```markdown
+   # <Entry Name>
+
+   **Kind:** insight
+   **Retrieval hook:** <symptom-first framing>
+
+   ## Summary
+   <settled conclusion>
+
+   ## Verbatim: <label>
+   ```
+   <exact content to reuse as-is>
+   ```
+   ```
+   (repeat the `## Verbatim:` block zero or more times; omit the whole section if this entry is a
+   pure judgment call with nothing to reuse verbatim)
+
+This can be as small as a one-line hook plus a one-sentence summary, saved in under a minute, or as
+long as several separately-labeled verbatim blocks for a deep investigation — don't impose ceremony
+on the simple end.
+
+#### Applying an insight — routes through a destination question
+
+Triggered by something like *"shared resources — get the checkpoint insight from another project
+and apply it here."* Runs the same search/browse/select flow above to find the right entry, then
+asks which destination fits — decided **per adopting project, at apply time**, not fixed at save
+time, since the same insight can legitimately land differently in different projects:
+
+1. **Becomes project code/config** (a verbatim permissions list, a code fragment) — write it
+   directly into the file it belongs in. Zero ongoing context/token cost afterward — it's just
+   normal file content now, not a directive sitting in `CLAUDE.md`. Add the adoption marker as a
+   comment near what was written if the file format supports comments; if it doesn't (e.g. JSON),
+   skip the marker — adoption tracking for this destination is an accepted gap (see "Adoption
+   tracking" below).
+2. **Becomes a standing `CLAUDE.md` rule** — run the same Track 1/2 test `continuity.md`'s split
+   already established: needed at or near the start of every session, with an unacceptable failure
+   mode if missed (Track 2 — write it directly into `CLAUDE.md`, adapting the summary/verbatim
+   content into this project's own wording where adaptation is needed, verbatim blocks kept
+   verbatim), or only relevant in occasional, recognizable moments (Track 1 — reuse the skill-stub
+   Apply procedure above: draft a trigger description from the retrieval hook, confirm, write the
+   adapted summary/verbatim content directly into this project's own `.claude\skills\<name>\
+   SKILL.md` — the insight's content itself, not a live pointer back into `shared_resources\`,
+   since the whole point of an insight is that the judgment call already happened and doesn't need
+   re-reading from the source). Either way, add the adoption marker:
+   ```
+   <!-- shared_resources: <entry name> adopted YYYY-MM-DD -->
+   ```
+3. **Informs judgment only, right now** — the conclusion changes this conversation's answer or
+   action; nothing gets persisted anywhere. Zero cost by construction, and a legitimate, common
+   outcome, not a failure to produce an artifact. No adoption marker, since nothing was written.
+
+In every case, never paste an insight's saved content verbatim into a *different* wording context
+without adapting it first, except inside an actual `## Verbatim:` block — the summary exists
+precisely so the rest of the entry can be adapted rather than copy-pasted wholesale.
+
+#### Adoption tracking and archiving
+
+In-use tracking for `insight` is fuzzier than for `reference`/`tool`: once "nothing persisted" is a
+legitimate Apply outcome, there's no reliable place to leave a marker for browse to find. Where an
+artifact *is* created (destinations 1 or 2 above), add the adoption marker so browse's in-use
+indicator and forget can find it; where nothing is persisted, that's an accepted gap, not a bug —
+adoption tracking there reverts to the same human-memory-chain reasoning that makes discovery work
+in the first place.
+
+**An insight can outlive its usefulness in `shared_resources\`, unlike `reference`/`tool`.** Once
+every currently-active project has independently rediscovered and adopted a given insight, it's no
+longer earning its slot in an ordinary browse listing — it's already folded into however many
+projects absorbed it. **Archive** it rather than deleting: triggered by something like *"shared
+resources — archive the checkpoint-pattern insight, it's everywhere now."* This is a narrow write
+in the same self-approving spirit as Saving above — no ticket, no round-trip:
+
+1. State what's about to happen and get an explicit go-ahead, same as every other write here.
+2. Edit that entry's row in `CATALOG.md`, setting the `Status` column to `Archived YYYY-MM-DD`.
+   Never delete the entry's own file or its catalog row — an archived entry stays fully readable
+   and re-adoptable, just hidden from an ordinary browse listing (see "Discovery" above) so a
+   brand-new project that hasn't hit this pain point yet can still find it instead of quietly
+   re-solving the same problem from zero.
+
+Archiving is always a deliberate, user-initiated call — never automatic, matching this project's
+own `project_progress_archive.md` archiving stance. `reference`/`tool` entries don't get this
+treatment: they don't expire the way an insight does, since ongoing domain knowledge stays useful
+indefinitely rather than being "absorbed" once and done.
 
 ### Maintenance you might encounter
 
@@ -175,12 +285,16 @@ needs its own pair of actions rather than the resource save/apply pair above:
 upkeep. None of that should silently change this project's behavior. If an adopted entry's file no
 longer resolves (a broken `@import`, a pointer to a file that's gone), that's a signal something
 was restructured without a working stub left behind — treat it as worth a note back to a hub
-session, not something to silently work around.
+session, not something to silently work around. This risk doesn't apply to an already-adopted
+`insight`: its content was copied or adapted into this project at apply time, not referenced live,
+so deleting or restructuring the source entry later can't retroactively break what this project
+already has.
 
 ### Checking adopted references at resume
 
-Only relevant if this project has actually adopted anything from `shared_resources\` — otherwise
-skip this. At `resume`, run
+Only relevant if this project has actually adopted a `reference`/`tool` entry (or an `insight`
+applied via the Track-1 skill-stub destination that still needed one — see above, most insight
+destinations don't carry a live reference at all) — otherwise skip this. At `resume`, run
 `python <hub root>\toolkit\scripts\check_shared_resource_refs.py --project-root <this project's
 root>` (the `<hub root>` prefix is whatever this file's own `@import` line resolves to, one level
 above its `toolkit\`). It's a deterministic file-existence check, not an LLM judgment call — zero
@@ -191,8 +305,9 @@ noticing on its own. It covers two adopted forms: a literal `@import` line point
 form gets a `[FAIL]` if its target no longer exists; report any `[FAIL]` to the user plainly (per
 "Shared resources folder maintenance" — a broken reference must never fail silently). Out of scope
 by design: a `tool`-kind entry adopted as free-text "pointer note" prose with no fixed shape (not a
-literal `@import` line and not a backtick-quoted `~/...` path inside a skill stub) — that has no
-fixed shape to check deterministically. Separately, a skill stub's **trigger description** going
-stale relative to its source entry's current topic footprint is a different, non-existence
-concern — see `design\directive_economy.md`'s "Drift mechanics" for why that's notify-only and not
-covered by this existence check.
+literal `@import` line and not a backtick-quoted `~/...` path inside a skill stub); an adopted
+`insight`, since its content was copied/adapted into this project rather than referenced live, so
+there's nothing left pointing back at `shared_resources\` for this check to verify. Separately, a
+skill stub's **trigger description** going stale relative to its source entry's current topic
+footprint is a different, non-existence concern — see `design\directive_economy.md`'s "Drift
+mechanics" for why that's notify-only and not covered by this existence check.
