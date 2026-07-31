@@ -7,7 +7,8 @@ session (consumer_platform design, decision 10):
   <target>/.claude/settings.json   - opt-in hook snippet(s) for the chosen tools (merged)
   <target>/CLAUDE.md               - from templates/consumer_CLAUDE.md.tmpl, with @import lines
   <target>/.claude/skills/<name>/  - Track-1 skill stub(s) for toolkit-governed pieces in
-                                     SKILL_PIECES (design\\directive_economy.md) - just `filing` so far
+                                     SKILL_PIECES (design\\directive_economy.md) - `filing`,
+                                     `checkpoint`, `archive` so far
   <target>/project_progress.md      - continuity skeleton (only when continuity is on)
   <target>/FIRST_RUN.md             - one-time checklist the new project runs then deletes
   consumers/<slug>.md               - registry entry (this repo)
@@ -53,12 +54,14 @@ TOOL_BLURBS = {
 }
 
 # Toolkit-governed Track-1 skill pieces (design\\directive_economy.md): a piece name in here is
-# scaffolded as a project-local skill stub (sourced from templates/skills/<name>/SKILL.md) plus its
-# still-@imported Track-2 "resume check" companion, instead of a flat @import <name>.md. Only
-# `filing` has been split this way so far (2026-07-30 pilot) - compliance/continuity stay flat
-# until/unless they're piloted the same way.
+# scaffolded as one or more project-local skill stubs (each sourced from
+# templates/skills/<skill>/SKILL.md) plus a still-@imported Track-2 "resume check" companion,
+# instead of a flat @import <name>.md. `filing` -> one skill of the same name (2026-07-30 pilot);
+# `continuity` -> two skills, `checkpoint` and `archive` (2026-07-31 - `resume` itself stays
+# Track 2, see continuity_resume_check.md). compliance stays flat - never piloted this way.
 SKILL_PIECES = {
-    'filing': 'filing_resume_check',
+    'filing': {'companion': 'filing_resume_check', 'skills': ['filing']},
+    'continuity': {'companion': 'continuity_resume_check', 'skills': ['checkpoint', 'archive']},
 }
 
 
@@ -122,11 +125,13 @@ def main():
     if not args.no_continuity:
         pieces.append('continuity')
     for p in pieces:
-        companion = SKILL_PIECES.get(p)
-        if companion:
-            stub_src = TEMPLATES_DIR / 'skills' / p / 'SKILL.md'
-            if not stub_src.exists():
-                raise RuntimeError(f"Canonical skill stub missing for protocol piece '{p}': {stub_src}")
+        skill_piece = SKILL_PIECES.get(p)
+        if skill_piece:
+            for skill_name in skill_piece['skills']:
+                stub_src = TEMPLATES_DIR / 'skills' / skill_name / 'SKILL.md'
+                if not stub_src.exists():
+                    raise RuntimeError(f"Canonical skill stub missing for protocol piece '{p}': {stub_src}")
+            companion = skill_piece['companion']
             companion_path = TEMPLATES_DIR / f"{companion}.md"
             if not companion_path.exists():
                 raise RuntimeError(f"Protocol piece '{p}' companion '{companion}' missing: {companion_path}")
@@ -137,7 +142,7 @@ def main():
 
     # the piece names actually @imported into CLAUDE.md - a SKILL_PIECES entry substitutes its
     # companion (e.g. 'filing' -> 'filing_resume_check'); everything else imports itself directly.
-    import_pieces = [SKILL_PIECES.get(p, p) for p in pieces]
+    import_pieces = [SKILL_PIECES[p]['companion'] if p in SKILL_PIECES else p for p in pieces]
 
     print(f"Scaffolding consumer '{project_name}' (slug: {slug})")
     print(f"  target : {target_path}")
@@ -203,16 +208,17 @@ def main():
     for p in pieces:
         if p not in SKILL_PIECES:
             continue
-        stub_src = TEMPLATES_DIR / 'skills' / p / 'SKILL.md'
-        skill_dir = claude_dir / 'skills' / p
-        skill_dir.mkdir(parents=True, exist_ok=True)
-        stub_path = skill_dir / 'SKILL.md'
-        if stub_path.exists() and not args.force:
-            print(f"  skip   {stub_path} exists (use --force to overwrite)")
-            continue
-        stub_content = stub_src.read_text(encoding='utf-8').replace('{{IMPORT_BASE}}', import_base)
-        write_utf8(stub_path, stub_content)
-        print(f"  wrote  {stub_path}")
+        for skill_name in SKILL_PIECES[p]['skills']:
+            stub_src = TEMPLATES_DIR / 'skills' / skill_name / 'SKILL.md'
+            skill_dir = claude_dir / 'skills' / skill_name
+            skill_dir.mkdir(parents=True, exist_ok=True)
+            stub_path = skill_dir / 'SKILL.md'
+            if stub_path.exists() and not args.force:
+                print(f"  skip   {stub_path} exists (use --force to overwrite)")
+                continue
+            stub_content = stub_src.read_text(encoding='utf-8').replace('{{IMPORT_BASE}}', import_base)
+            write_utf8(stub_path, stub_content)
+            print(f"  wrote  {stub_path}")
 
     # --- 4. project_progress.md skeleton (continuity only) -----------------------------------
     if not args.no_continuity:

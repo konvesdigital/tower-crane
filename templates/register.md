@@ -59,7 +59,7 @@ pasted prose** they replace:
 ```
 @<import_base>/filing_resume_check.md
 @<import_base>/compliance.md
-@<import_base>/continuity.md
+@<import_base>/continuity_resume_check.md
 ```
 (e.g. if Step 0 computed `~/Documents/Claude/tower_crane/toolkit/templates`, the first line reads
 `@~/Documents/Claude/tower_crane/toolkit/templates/filing_resume_check.md`.)
@@ -77,9 +77,15 @@ pasted prose** they replace:
   This is what lets the shared side's audit reach this project; without it, guidance files are never
   seen. There is almost certainly no pasted equivalent (this protocol post-dates most copies) — just
   add it.
-- `continuity.md` (**default-on**) — checkpoint / resume / archive conventions. Replaces the pasted
-  checkpoint/resume/archive prose. **Omit only** if this project deliberately manages continuity a
-  different way; if so, tell the user it's being skipped and why.
+- `continuity_resume_check.md` + **`checkpoint` and `archive` skill stubs** (**default-on**) — the
+  `resume` procedure (and the "Two tiers" project_progress.md shape it explains) stays Track-2,
+  always-resident, since it fires almost immediately in nearly every session. `checkpoint` and
+  `archive` are Track-1: create `.claude\skills\checkpoint\SKILL.md` and
+  `.claude\skills\archive\SKILL.md` by copying `<import_base>/skills/checkpoint/SKILL.md` and
+  `<import_base>/skills/archive/SKILL.md` verbatim, replacing every `{{IMPORT_BASE}}` placeholder
+  with `<import_base>`. Both stubs point at the still-canonical `<import_base>/continuity.md`.
+  Replaces the pasted checkpoint/resume/archive prose. **Omit only** if this project deliberately
+  manages continuity a different way; if so, tell the user it's being skipped and why.
 
 Put them under a `## Shared Workflow Protocol` heading. If this project has **no** `CLAUDE.md`, create
 one: a project-overview placeholder + a `## Shared Workflow Protocol` section with the imports above.
@@ -147,7 +153,7 @@ imported:
     since: <YYYY-MM-DD>
   - piece: compliance
     since: <YYYY-MM-DD>
-  - piece: continuity
+  - piece: continuity_resume_check
     since: <YYYY-MM-DD>
 ```
 
@@ -163,8 +169,8 @@ Rules for filling the block:
   needed if this hub has more than one contributor (multi-user); omit the line if you're the sole
   owner of this tower_crane hub.
 - **`opted_in`** = one `{ tool, since }` per shared hook found in Step 1; use `opted_in: []` if none.
-- **`imported`** = one `{ piece, since }` per `@import` line you added in Step 2 (drop `continuity` if
-  you skipped it). `since` = today.
+- **`imported`** = one `{ piece, since }` per `@import` line you added in Step 2 (drop
+  `continuity_resume_check` if you skipped continuity). `since` = today.
 
 Once the ticket file is written and filled in, **from inside the hub root** (not `toolkit\` —
 `change_requests\` belongs to the hub root's own repo, with its own remote), `git add` it, commit

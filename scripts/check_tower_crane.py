@@ -24,8 +24,9 @@ Two passes, plus an optional compliance-guidance writer:
       - mandatory-piece glance: filing + compliance not imported -> WARN (a SKILL_PIECES entry
         like 'filing' is also satisfied by its Track-1 skill-stub form - design\\directive_economy.md);
       - Track-1 skill stub drift (toolkit-governed only, design\\directive_economy.md): for each
-        SKILL_PIECES name, a consumer's project-local .claude/skills/<name>/SKILL.md must still
-        match the canonical templates/skills/<name>/SKILL.md (with {{IMPORT_BASE}} resolved).
+        skill name any SKILL_PIECES entry scaffolds, a consumer's project-local
+        .claude/skills/<name>/SKILL.md must still match the canonical
+        templates/skills/<name>/SKILL.md (with {{IMPORT_BASE}} resolved).
 
   Compliance guidance (decision 11, the two-way channel, down direction):
     With --write-guidance, for each reachable consumer that has consumer-actionable FAILs,
@@ -73,11 +74,14 @@ SKILLS_DIR = TEMPLATES_DIR / 'skills'
 CONSUMERS_DIR = PROJECT_ROOT / 'consumers'
 TESTS_DIR = SHARED_ROOT / 'tests'
 
-# Toolkit-governed Track-1 skill pieces (design\directive_economy.md): name -> the Track-2
-# "resume check" companion a consumer imports instead of a flat @import <name>.md once it has
-# adopted the skill-stub form. Mirrors scripts\new_consumer.py's SKILL_PIECES - keep in sync.
+# Toolkit-governed Track-1 skill pieces (design\directive_economy.md): piece name -> the Track-2
+# "resume check" companion a consumer imports instead of a flat @import <name>.md, plus the list
+# of skill-stub folder names it scaffolds (usually one, but 'continuity' splits into two:
+# 'checkpoint' + 'archive', since 'resume' itself stays Track 2). Mirrors
+# scripts\new_consumer.py's SKILL_PIECES - keep in sync.
 SKILL_PIECES = {
-    'filing': 'filing_resume_check',
+    'filing': {'companion': 'filing_resume_check', 'skills': ['filing']},
+    'continuity': {'companion': 'continuity_resume_check', 'skills': ['checkpoint', 'archive']},
 }
 
 COUNTS = {'PASS': 0, 'WARN': 0, 'FAIL': 0}
@@ -377,16 +381,19 @@ def test_consumer(c, config):
     for m in ('filing', 'compliance'):
         if m in md_imports:
             continue
-        companion = SKILL_PIECES.get(m)
-        if companion and companion in md_imports:
-            stub_path = cpath / '.claude' / 'skills' / m / 'SKILL.md'
-            if stub_path.exists():
+        skill_piece = SKILL_PIECES.get(m)
+        if skill_piece and skill_piece['companion'] in md_imports:
+            missing = [s for s in skill_piece['skills']
+                       if not (cpath / '.claude' / 'skills' / s / 'SKILL.md').exists()]
+            if not missing:
                 continue
             devs.append(Dev('FAIL', 'consumer',
-                             f"Imports '{companion}' (the Track-1 resume-check companion for '{m}') but has "
-                             f"no skill stub at .claude/skills/{m}/SKILL.md.",
-                             f"Copy {SKILLS_DIR}/{m}/SKILL.md into .claude/skills/{m}/SKILL.md, replacing "
-                             f"{{{{IMPORT_BASE}}}} with '{config['import_base']}'."))
+                             f"Imports '{skill_piece['companion']}' (the Track-1 resume-check companion for "
+                             f"'{m}') but is missing the skill stub(s): "
+                             + ', '.join(f".claude/skills/{s}/SKILL.md" for s in missing) + ".",
+                             f"Copy each missing stub from {SKILLS_DIR}/<name>/SKILL.md into "
+                             f".claude/skills/<name>/SKILL.md, replacing {{{{IMPORT_BASE}}}} with "
+                             f"'{config['import_base']}'."))
             continue
         devs.append(Dev('WARN', 'consumer', f"Mandatory protocol piece '{m}' is not imported by CLAUDE.md.",
                          f"Add '@{config['import_base']}/{m}.md' to CLAUDE.md's Shared Workflow Protocol section."))
@@ -394,7 +401,10 @@ def test_consumer(c, config):
     # --- Track-1 skill stub drift (toolkit-governed only) -----------------------------------
     # Same mechanism as the opt-in hook check above: a consumer's project-local stub must still
     # match the canonical source (with {{IMPORT_BASE}} resolved), or its trigger/body has drifted.
-    for name in SKILL_PIECES:
+    # One piece can scaffold more than one skill (e.g. 'continuity' -> checkpoint + archive), so
+    # iterate the flattened skill-name list, not the piece names themselves.
+    skill_names = sorted({name for sp in SKILL_PIECES.values() for name in sp['skills']})
+    for name in skill_names:
         stub_path = cpath / '.claude' / 'skills' / name / 'SKILL.md'
         if not stub_path.exists():
             continue
