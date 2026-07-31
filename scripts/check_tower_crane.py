@@ -21,7 +21,11 @@ Two passes, plus an optional compliance-guidance writer:
         exists shared-side (broken import);
       - IMPORT DRIFT tripwire: a consumer whose CLAUDE.md no longer imports a piece its
         registry lists (decision 8 - opt-out is detectable, not preventable);
-      - mandatory-piece glance: filing + compliance not imported -> WARN.
+      - mandatory-piece glance: filing + compliance not imported -> WARN (a SKILL_PIECES entry
+        like 'filing' is also satisfied by its Track-1 skill-stub form - design\\directive_economy.md);
+      - Track-1 skill stub drift (toolkit-governed only, design\\directive_economy.md): for each
+        SKILL_PIECES name, a consumer's project-local .claude/skills/<name>/SKILL.md must still
+        match the canonical templates/skills/<name>/SKILL.md (with {{IMPORT_BASE}} resolved).
 
   Compliance guidance (decision 11, the two-way channel, down direction):
     With --write-guidance, for each reachable consumer that has consumer-actionable FAILs,
@@ -65,8 +69,16 @@ PROJECT_ROOT = SHARED_ROOT.parent
 HOOKS_DIR = SHARED_ROOT / 'hooks'
 TEMPLATES_DIR = SHARED_ROOT / 'templates'
 OPTINS_DIR = TEMPLATES_DIR / 'optins'
+SKILLS_DIR = TEMPLATES_DIR / 'skills'
 CONSUMERS_DIR = PROJECT_ROOT / 'consumers'
 TESTS_DIR = SHARED_ROOT / 'tests'
+
+# Toolkit-governed Track-1 skill pieces (design\directive_economy.md): name -> the Track-2
+# "resume check" companion a consumer imports instead of a flat @import <name>.md once it has
+# adopted the skill-stub form. Mirrors scripts\new_consumer.py's SKILL_PIECES - keep in sync.
+SKILL_PIECES = {
+    'filing': 'filing_resume_check',
+}
 
 COUNTS = {'PASS': 0, 'WARN': 0, 'FAIL': 0}
 
@@ -359,11 +371,47 @@ def test_consumer(c, config):
                              f"Import drift: registry lists piece '{pi['name']}' but CLAUDE.md no longer imports it.",
                              f"Re-add the line '@{config['import_base']}/{pi['name']}.md' to CLAUDE.md, or (if the opt-out was intentional) file a request to update this consumer's registry entry."))
 
-    # mandatory pieces (filing + compliance) - a glance, not a hard fail
+    # mandatory pieces (filing + compliance) - a glance, not a hard fail. A SKILL_PIECES entry
+    # (e.g. 'filing') is satisfied either the old flat way (imports itself directly) or the
+    # Track-1 way (imports its companion + carries a project-local skill stub).
     for m in ('filing', 'compliance'):
-        if m not in md_imports:
-            devs.append(Dev('WARN', 'consumer', f"Mandatory protocol piece '{m}' is not imported by CLAUDE.md.",
-                             f"Add '@{config['import_base']}/{m}.md' to CLAUDE.md's Shared Workflow Protocol section."))
+        if m in md_imports:
+            continue
+        companion = SKILL_PIECES.get(m)
+        if companion and companion in md_imports:
+            stub_path = cpath / '.claude' / 'skills' / m / 'SKILL.md'
+            if stub_path.exists():
+                continue
+            devs.append(Dev('FAIL', 'consumer',
+                             f"Imports '{companion}' (the Track-1 resume-check companion for '{m}') but has "
+                             f"no skill stub at .claude/skills/{m}/SKILL.md.",
+                             f"Copy {SKILLS_DIR}/{m}/SKILL.md into .claude/skills/{m}/SKILL.md, replacing "
+                             f"{{{{IMPORT_BASE}}}} with '{config['import_base']}'."))
+            continue
+        devs.append(Dev('WARN', 'consumer', f"Mandatory protocol piece '{m}' is not imported by CLAUDE.md.",
+                         f"Add '@{config['import_base']}/{m}.md' to CLAUDE.md's Shared Workflow Protocol section."))
+
+    # --- Track-1 skill stub drift (toolkit-governed only) -----------------------------------
+    # Same mechanism as the opt-in hook check above: a consumer's project-local stub must still
+    # match the canonical source (with {{IMPORT_BASE}} resolved), or its trigger/body has drifted.
+    for name in SKILL_PIECES:
+        stub_path = cpath / '.claude' / 'skills' / name / 'SKILL.md'
+        if not stub_path.exists():
+            continue
+        canon_path = SKILLS_DIR / name / 'SKILL.md'
+        if not canon_path.exists():
+            devs.append(Dev('FAIL', 'shared',
+                             f"Consumer has a '{name}' skill stub but tower_crane has no canonical source "
+                             f"at templates/skills/{name}/SKILL.md.", None))
+            continue
+        expected = canon_path.read_text(encoding='utf-8').replace('{{IMPORT_BASE}}', str(config['import_base']))
+        actual = stub_path.read_text(encoding='utf-8')
+        if actual != expected:
+            devs.append(Dev('FAIL', 'consumer',
+                             f"'{name}' skill stub (.claude/skills/{name}/SKILL.md) has drifted from the "
+                             f"canonical source.",
+                             f"Re-copy {canon_path} into .claude/skills/{name}/SKILL.md, replacing "
+                             f"{{{{IMPORT_BASE}}}} with '{config['import_base']}'."))
 
     return devs
 

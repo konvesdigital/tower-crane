@@ -6,6 +6,8 @@ Creates ALL files a new consumer needs so it works like existing consumers from 
 session (consumer_platform design, decision 10):
   <target>/.claude/settings.json   - opt-in hook snippet(s) for the chosen tools (merged)
   <target>/CLAUDE.md               - from templates/consumer_CLAUDE.md.tmpl, with @import lines
+  <target>/.claude/skills/<name>/  - Track-1 skill stub(s) for toolkit-governed pieces in
+                                     SKILL_PIECES (design\\directive_economy.md) - just `filing` so far
   <target>/project_progress.md      - continuity skeleton (only when continuity is on)
   <target>/FIRST_RUN.md             - one-time checklist the new project runs then deletes
   consumers/<slug>.md               - registry entry (this repo)
@@ -48,6 +50,15 @@ TMPL_PATH = TEMPLATES_DIR / 'consumer_CLAUDE.md.tmpl'
 TOOL_BLURBS = {
     'consistency_check': 'AST static analysis on Python writes/edits - undefined names, arg-count, '
                           'string-key spelling (PostToolUse hook).',
+}
+
+# Toolkit-governed Track-1 skill pieces (design\\directive_economy.md): a piece name in here is
+# scaffolded as a project-local skill stub (sourced from templates/skills/<name>/SKILL.md) plus its
+# still-@imported Track-2 "resume check" companion, instead of a flat @import <name>.md. Only
+# `filing` has been split this way so far (2026-07-30 pilot) - compliance/continuity stay flat
+# until/unless they're piloted the same way.
+SKILL_PIECES = {
+    'filing': 'filing_resume_check',
 }
 
 
@@ -111,9 +122,22 @@ def main():
     if not args.no_continuity:
         pieces.append('continuity')
     for p in pieces:
-        piece_path = TEMPLATES_DIR / f"{p}.md"
-        if not piece_path.exists():
-            raise RuntimeError(f"Protocol piece '{p}' missing: {piece_path}")
+        companion = SKILL_PIECES.get(p)
+        if companion:
+            stub_src = TEMPLATES_DIR / 'skills' / p / 'SKILL.md'
+            if not stub_src.exists():
+                raise RuntimeError(f"Canonical skill stub missing for protocol piece '{p}': {stub_src}")
+            companion_path = TEMPLATES_DIR / f"{companion}.md"
+            if not companion_path.exists():
+                raise RuntimeError(f"Protocol piece '{p}' companion '{companion}' missing: {companion_path}")
+        else:
+            piece_path = TEMPLATES_DIR / f"{p}.md"
+            if not piece_path.exists():
+                raise RuntimeError(f"Protocol piece '{p}' missing: {piece_path}")
+
+    # the piece names actually @imported into CLAUDE.md - a SKILL_PIECES entry substitutes its
+    # companion (e.g. 'filing' -> 'filing_resume_check'); everything else imports itself directly.
+    import_pieces = [SKILL_PIECES.get(p, p) for p in pieces]
 
     print(f"Scaffolding consumer '{project_name}' (slug: {slug})")
     print(f"  target : {target_path}")
@@ -162,7 +186,7 @@ def main():
         tools_list = '\n'.join(
             f"- `{t}` - {TOOL_BLURBS.get(t, 'see tower_crane MENU.md.')}" for t in tools
         )
-    protocol_imports = '\n'.join(f"@{import_base}/{p}.md" for p in pieces)
+    protocol_imports = '\n'.join(f"@{import_base}/{p}.md" for p in import_pieces)
 
     tmpl = TMPL_PATH.read_text(encoding='utf-8')
     # strip the template's own leading HTML-comment header (documentation for maintainers, not consumers)
@@ -174,6 +198,21 @@ def main():
                  .replace('{{PROTOCOL_IMPORTS}}', protocol_imports))
     write_utf8(claude_md_path, claude_md)
     print(f"  wrote  {claude_md_path}")
+
+    # --- 3b. Track-1 skill stubs (toolkit-governed pieces only) ------------------------------
+    for p in pieces:
+        if p not in SKILL_PIECES:
+            continue
+        stub_src = TEMPLATES_DIR / 'skills' / p / 'SKILL.md'
+        skill_dir = claude_dir / 'skills' / p
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        stub_path = skill_dir / 'SKILL.md'
+        if stub_path.exists() and not args.force:
+            print(f"  skip   {stub_path} exists (use --force to overwrite)")
+            continue
+        stub_content = stub_src.read_text(encoding='utf-8').replace('{{IMPORT_BASE}}', import_base)
+        write_utf8(stub_path, stub_content)
+        print(f"  wrote  {stub_path}")
 
     # --- 4. project_progress.md skeleton (continuity only) -----------------------------------
     if not args.no_continuity:
@@ -228,7 +267,7 @@ Scaffolded from tower_crane on {scaffold_date}. Do these once, then delete this 
         opted_in_yaml = 'opted_in: []'
     else:
         opted_in_yaml = 'opted_in:\n' + '\n'.join(f"  - tool: {t}\n    since: {scaffold_date}" for t in tools)
-    imported_yaml = 'imported:\n' + '\n'.join(f"  - piece: {p}\n    since: {scaffold_date}" for p in pieces)
+    imported_yaml = 'imported:\n' + '\n'.join(f"  - piece: {p}\n    since: {scaffold_date}" for p in import_pieces)
 
     registry_path_forward_slash = str(target_path).replace('\\', '/')
     registry = f"""# {project_name}

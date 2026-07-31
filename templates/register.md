@@ -57,15 +57,22 @@ Step 0 (forward-slash form — the documented, Windows-safe syntax) and **remove
 pasted prose** they replace:
 
 ```
-@<import_base>/filing.md
+@<import_base>/filing_resume_check.md
 @<import_base>/compliance.md
 @<import_base>/continuity.md
 ```
-(e.g. if Step 0 computed `~/Documents/Claude/tower_crane/templates`, the first line reads
-`@~/Documents/Claude/tower_crane/templates/filing.md`.)
+(e.g. if Step 0 computed `~/Documents/Claude/tower_crane/toolkit/templates`, the first line reads
+`@~/Documents/Claude/tower_crane/toolkit/templates/filing_resume_check.md`.)
 
-- `filing.md` (**mandatory**) — how to report bugs/improvements in shared tools up the change-request
-  channel. Replaces any pasted filing/change-request prose.
+- `filing_resume_check.md` + a **`filing` skill stub** (**mandatory**, on-demand) — the substantive
+  filing/round-trip content (how to report bugs/improvements in shared tools, the round-trip verify
+  mechanics) is Track-1: instead of a flat `@import` of `filing.md`, create
+  `.claude\skills\filing\SKILL.md` in this project by copying `<import_base>/skills/filing/SKILL.md`
+  verbatim, replacing every `{{IMPORT_BASE}}` placeholder in it with `<import_base>`. The
+  `filing_resume_check.md` import above stays always-resident (it's just the resume-time
+  change-request ticket scan — the one part that can't wait for the model to notice a filing-shaped
+  moment); the skill stub loads the rest only when actually needed. Replaces any pasted
+  filing/change-request prose.
 - `compliance.md` (**mandatory**) — surfaces `COMPLIANCE_GUIDANCE.md` at session start / on `resume`.
   This is what lets the shared side's audit reach this project; without it, guidance files are never
   seen. There is almost certainly no pasted equivalent (this protocol post-dates most copies) — just
@@ -136,7 +143,7 @@ opted_in:
   - tool: <tool name, e.g. consistency_check>
     since: <YYYY-MM-DD>
 imported:
-  - piece: filing
+  - piece: filing_resume_check
     since: <YYYY-MM-DD>
   - piece: compliance
     since: <YYYY-MM-DD>
