@@ -67,21 +67,48 @@ distinct match.
      - a count limit (most recent N);
      - an added-date filter (e.g. "added in the last month");
      - an **in-use indicator relative to this project** — for `reference`/`tool`, check whether
-       this project's own `CLAUDE.md` already contains a pointer/`@import` to that entry's file;
-       for `pattern`, check for that entry's adoption marker (see "Patterns are different") since
-       adapted prose won't verbatim-match its source.
+       this project's own `CLAUDE.md` already contains a pointer/`@import` to that entry's file,
+       or a project-local `.claude\skills\<name>\SKILL.md` stub carrying that entry's adoption
+       marker (see "Apply", below); for `pattern`, check for that entry's adoption marker (see
+       "Patterns are different") since adapted prose won't verbatim-match its source.
 2. **Select** — ask which of the matching/listed entries actually apply here. Don't assume a
    single match is automatically wanted.
-3. **Apply** — adopt the selected entry into this project's own `CLAUDE.md`:
-   - `reference`/`tool` — add an `@import` line (plain prose, no spaced paths) or a short pointer
-     note (a spaced path, or a `tool`-kind entry that's invoked rather than read) under a section
-     naming what was adopted and from where.
-   - `pattern` — see "Patterns are different" below; never a plain pointer.
+3. **Apply** — adopt the selected entry:
+   - **`reference`/`tool`** — turn it into a project-local Claude Code Skill rather than a
+     standing `@import` (`design\directive_economy.md`'s Track 1: autonomous on-demand
+     loading — the model notices when a live question matches and pulls the content in, instead
+     of it sitting resident in every session forever). Concretely:
+     1. Read the entry's own file. Many entries are themselves a thin index over further
+        material rather than the content itself (see the entry's own file for whether it points
+        further, and if so, on demand rather than preloading all of it).
+     2. Draft a trigger description ("use when...") from the entry's own topic/file breakdown,
+        tuned to this project's context — never copied from `CATALOG.md`'s `Description` column,
+        which is written for a human scanning many rows, not for recognizing an
+        organically-arising question in conversation.
+     3. Carry forward into the stub's body any provenance/authorship framing the entry itself
+        draws (e.g. distinguishing the entry-author's own synthesized material from third-party
+        material kept only for cross-reference) — never flatten that distinction away. Add an
+        adoption marker, same convention as a `pattern`'s (see "Patterns are different"), so
+        browse's in-use indicator and forget can find it later:
+        ```
+        <!-- shared_resources: <entry name> adopted YYYY-MM-DD -->
+        ```
+     4. **Show the draft — trigger description and stub body — to the user and confirm before
+        writing anything.** Same checkpoint this file already requires for Saving, below.
+     5. On confirmation, write the skill stub to this project's own
+        `.claude\skills\<name>\SKILL.md` only — never into `toolkit\`. This content is
+        private-only by construction (see "Two homes within Track 1" in
+        `design\directive_economy.md`): no canonical stub source for it ever lives in the public
+        toolkit repo, not even the trigger wording or the target path.
+   - **`pattern`** — see "Patterns are different" below; never a plain pointer and not a skill
+     stub either — a pattern is `CLAUDE.md` prose adapted by value, not content referenced by
+     pointer or lazily loaded.
 
 ### Forgetting
 
-**Forget** removes *this project's own adopted reference* — the `@import` line, pointer note, or
-adapted `pattern` section plus its adoption marker — from this project's `CLAUDE.md`. It never
+**Forget** removes *this project's own adopted reference* — the `@import` line, pointer note,
+project-local `.claude\skills\<name>\SKILL.md` stub, or adapted `pattern` section plus its
+adoption marker — from this project. It never
 touches the entry in `shared_resources\` itself, which stays available for this or any other
 project to re-adopt later. Use it when a resource was adopted for a one-off task and is now just
 `CLAUDE.md` bloat, or to reset this project's behavior back to before adoption. If Claude's advice
@@ -158,8 +185,14 @@ skip this. At `resume`, run
 root>` (the `<hub root>` prefix is whatever this file's own `@import` line resolves to, one level
 above its `toolkit\`). It's a deterministic file-existence check, not an LLM judgment call — zero
 tokens either way, and it catches 100% of the case it checks rather than relying on this session
-noticing on its own. Every `@import` line pointing into `shared_resources\` gets a `[FAIL]` if its
-target no longer exists; report any `[FAIL]` to the user plainly (per "Shared resources folder
-maintenance" — a broken reference must never fail silently). Out of scope by design: a `tool`-kind
-entry adopted as free-text "pointer note" prose rather than a literal `@import` line — that has no
-fixed shape to check deterministically, so it isn't covered.
+noticing on its own. It covers two adopted forms: a literal `@import` line pointing into
+`shared_resources\`, and a `~/...`-form path referenced inside a project-local
+`.claude\skills\<name>\SKILL.md` stub (the Track-1 form "Apply" now produces — see above). Either
+form gets a `[FAIL]` if its target no longer exists; report any `[FAIL]` to the user plainly (per
+"Shared resources folder maintenance" — a broken reference must never fail silently). Out of scope
+by design: a `tool`-kind entry adopted as free-text "pointer note" prose with no fixed shape (not a
+literal `@import` line and not a backtick-quoted `~/...` path inside a skill stub) — that has no
+fixed shape to check deterministically. Separately, a skill stub's **trigger description** going
+stale relative to its source entry's current topic footprint is a different, non-existence
+concern — see `design\directive_economy.md`'s "Drift mechanics" for why that's notify-only and not
+covered by this existence check.
