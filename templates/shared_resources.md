@@ -97,9 +97,14 @@ distinct match.
         draws (e.g. distinguishing the entry-author's own synthesized material from third-party
         material kept only for cross-reference) — never flatten that distinction away. Add an
         adoption marker, same convention as an `insight`'s (see "Insights are different"), so
-        browse's in-use indicator and forget can find it later:
+        browse's in-use indicator and forget can find it later — plus a sha256 of the entry
+        file's own current content, so a later `resume` can notice if that content has changed
+        since the trigger above was drafted from it (`design\directive_economy.md`'s "Drift
+        mechanics", checked by `scripts\check_shared_resource_drift.py` — see "Checking adopted
+        references at resume" below):
         ```
-        <!-- shared_resources: <entry name> adopted YYYY-MM-DD -->
+        <!-- shared_resources: <entry name> adopted YYYY-MM-DD index-sha256:<hash of the entry
+        file's content at adoption time> -->
         ```
      4. **Show the draft — trigger description and stub body — to the user and confirm before
         writing anything.** Same checkpoint this file already requires for Saving, below.
@@ -311,3 +316,16 @@ there's nothing left pointing back at `shared_resources\` for this check to veri
 skill stub's **trigger description** going stale relative to its source entry's current topic
 footprint is a different, non-existence concern — see `design\directive_economy.md`'s "Drift
 mechanics" for why that's notify-only and not covered by this existence check.
+
+Same `resume`, also run `python <hub root>\toolkit\scripts\check_shared_resource_drift.py
+--project-root <this project's root>` — the notify-only counterpart just named above. It compares
+the sha256 stamped into a Track-1 stub's adoption marker at Apply time against the source entry
+file's current content; a mismatch prints `[DRIFT]` but the script always exits 0, so it never
+blocks `resume` the way a `[FAIL]` from `check_shared_resource_refs.py` does. On a `[DRIFT]` line:
+re-read the named source file, compare its current topic footprint against the flagged stub's
+existing trigger description, and — only if it's genuinely grown a topic the trigger doesn't cover
+— redraft the trigger and confirm with the user before overwriting the stub (same
+confirm-before-write pattern as every write in this file), then re-run the script so the marker's
+hash reflects the new current content. A stub with no `index-sha256` in its marker (an `insight`
+adoption, a pre-existing stub predating this check, or a free-text `tool` adoption) prints `[N/A]`
+— out of scope, not a gap.
