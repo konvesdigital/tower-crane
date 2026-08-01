@@ -74,6 +74,7 @@ file (an H1, a `name:` field, a MENU cell) still use full Title Case (e.g. the f
 `consumers\geo_rank_tracker.md` carries `name: Geo Rank Tracker`).
 
 ## Adding a new tool
+**Trigger: "new tool".**
 1. Build and test it like normal project work (in whichever project prompted the need).
 2. Strip anything project-specific — no hardcoded paths, project names, or assumptions about a
    particular repo's structure. It must work unmodified if any future project points at it.
@@ -90,6 +91,7 @@ file (an H1, a `name:` field, a MENU cell) still use full Title Case (e.g. the f
 5. Checkpoint (below): commit and push like any other project.
 
 ## Self-use (dogfooding)
+**Trigger: "self hooks".**
 This repo is not a registered consumer of itself — its own tools don't run here automatically.
 `scripts\self_hooks.py` turns one on for THIS repo/machine only: `--list` (default), `--enable
 <tool>`, `--disable <tool>`. State lives in gitignored `.claude\settings.local.json`; a
@@ -99,8 +101,9 @@ check current state — no command needed). Every tool is available to self-enab
 for the full human-facing explanation.
 
 ## Adding a consumer
-Two entry points, depending on whether the project already exists. Either way the consumer ends up
-in the registry (`consumers\<slug>.md`) and floats on this repo's HEAD.
+**Trigger: "connect project".** Ask whether this is a new project from scratch or an existing one
+first — the two paths below differ. Either way the consumer ends up in the registry
+(`consumers\<slug>.md`) and floats on this repo's HEAD.
 1. **New project from scratch** — run the scaffolder here:
    `scripts\new_consumer.py --target-path <abs path> --project-name "<Full Title>"`. It writes ALL of
    the consumer's files (`.claude\settings.json` with opt-in hooks, `CLAUDE.md` with `@import`
@@ -117,6 +120,7 @@ in the registry (`consumers\<slug>.md`) and floats on this repo's HEAD.
 After either path, run `scripts\check_tower_crane.py` to confirm the new consumer validates clean.
 
 ## Changing or removing an existing tool
+**Trigger: "modify tool".**
 1. Check the consumer registry (`consumers\`, the source of truth) for who's opted in first.
 2. If any project uses it, confirm the change with the user before editing — a consuming
    project has no visibility into this repo's Work Log and won't know behavior changed.
