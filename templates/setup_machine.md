@@ -75,10 +75,16 @@ outer hub" below before continuing to Step 1.
 5. If they want a private GitHub repo backing the new outer folder (recommended, for backup/
    continuity — see `design\local_first_reframe.md` if curious why this matters), offer to help once
    the new session starts: `gh repo create <name> --private`, `git init`, add the remote, a
-   `.gitignore` with `/toolkit/`, a thin `CLAUDE.md` pointer (`@~/<path-to-outer>/toolkit/AGENTS.md`),
-   empty `consumers\`/`change_requests\`/`design\` folders, and a skeleton `project_progress.md`
-   (same shape `templates\register.md`'s Step 3 writes). One-time setup, only for a brand-new outer
-   hub.
+   `.gitignore` with `/toolkit/` plus `/.claude/settings.local.json` and `/.claude/self_hooks_status.md`
+   (both personal/per-machine state — `AGENTS.md`'s "Self-use (dogfooding)" section assumes these are
+   already gitignored; without this, a fresh operator's own local settings would end up tracked in
+   their new private outer repo, colliding across their own machines the moment they have more than
+   one). Deliberately leave `.claude\hooks\` OUT of this list — `design\resource_sharing_model.md`'s
+   three-rung settings ladder relies on that folder staying tracked, so a hook script written on one
+   machine reaches every other machine the operator owns via the outer repo's ordinary `git pull`.
+   Then a thin `CLAUDE.md` pointer (`@~/<path-to-outer>/toolkit/AGENTS.md`), empty
+   `consumers\`/`change_requests\`/`design\` folders, and a skeleton `project_progress.md` (same shape
+   `templates\register.md`'s Step 3 writes). One-time setup, only for a brand-new outer hub.
 
 ## Step 1 — This machine's OS
 You already know this from your own environment context (the platform your session is running on) —

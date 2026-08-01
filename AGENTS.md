@@ -311,18 +311,27 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
    further. If it reports an update is available, note it in the status summary (e.g. "toolkit\
    has N commit(s) available — run `update` to review and pull them in"); if `toolkit\` doesn't
    exist, skip this step silently.
-3. Read `project_progress.md`: Current Status, Next Up, Decisions table, most recent Work Log
+3. Rung-2 hook activation (`design\resource_sharing_model.md`'s three-rung settings ladder,
+   Option D): `python toolkit\scripts\check_hook_activation.py --project-root .` — a narrow,
+   notify-only check for whether every `.claude\hooks\` script tracked in the outer repo (synced
+   here via step 1's `git pull`) is actually referenced in this machine's own gitignored
+   `settings.local.json`. If it prints any `[UNWIRED]` line, note it in the status summary (e.g.
+   "hook X is present but not wired in on this machine"); if it prints only `[WIRED]`/`[N/A]`, say
+   nothing further. Never blocks — a missing wiring line is a one-time fix, not a broken state.
+4. Read `project_progress.md`: Current Status, Next Up, Decisions table, most recent Work Log
    entry only.
-4. Scan `change_requests\` per "Scanning at session start" below — this is what surfaces a Piece 3
+5. Scan `change_requests\` per "Scanning at session start" below — this is what surfaces a Piece 3
    automation PR (`design\sync_automation.md`).
-5. State status and next step in 1-3 lines, folding in anything the scan or the toolkit\ check
-   surfaced (e.g. "PR #N awaiting your review", "ticket X awaiting consumer verify", or "toolkit\
-   has 2 new commits upstream, run `update` to review"). Do not replay full history.
+6. State status and next step in 1-3 lines, folding in anything the scan, the toolkit\ check, or
+   the hook-activation check surfaced (e.g. "PR #N awaiting your review", "ticket X awaiting
+   consumer verify", "toolkit\ has 2 new commits upstream, run `update` to review", or "hook X
+   isn't wired in on this machine"). Do not replay full history.
 
 **"quick resume"** — a deliberately thinner `resume`, for the close-terminal-and-reopen-seconds-later
 case right after a `checkpoint` (the only way to actually flush a long context window mid-session,
 since nothing invoked from inside a session can flush that same session). Skips every sync check —
-no outer-repo `git pull`, no `toolkit\` update-check, no `change_requests\` scan — on the reasoning
+no outer-repo `git pull`, no `toolkit\` update-check, no rung-2 hook-activation check, no
+`change_requests\` scan — on the reasoning
 that a session opened moments after its own `checkpoint`'s push has nothing new to find. No tag or
 disclaimer noting what was skipped: the point is speed back into the work that was just interrupted,
 not a staleness warning the user doesn't need in this specific case. Use plain `resume` instead for
