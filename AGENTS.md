@@ -64,26 +64,22 @@ version record. (Why this differs from other projects: `project_progress.md`'s "
 Decisions row.)
 
 ## Filename convention
-Multi-word filenames use **lowercase words separated by underscores** — never spaces or
-CamelCase. Examples: `geo_rank_tracker.md`, `consistency_check.py`, `new_consumer.py`,
-`consumer_platform.md`, and the `YYYY-MM-DD_<tool>_<slug>.md` tickets. Two intentional
-exceptions: (1) names a tool requires keep their required spelling (`CLAUDE.md`); (2) all-caps
-sentinel/marker files are deliberately shouty so they stand out (`MENU.md`, `FIRST_RUN.md`,
-`COMPLIANCE_GUIDANCE.md`). The convention governs the **filename only** — display titles inside a
-file (an H1, a `name:` field, a MENU cell) still use full Title Case (e.g. the file
-`consumers\geo_rank_tracker.md` carries `name: Geo Rank Tracker`).
+Multi-word filenames use **lowercase words separated by underscores** — never spaces or CamelCase
+(`consistency_check.py`, `new_consumer.py`, `consumer_platform.md`, `YYYY-MM-DD_<tool>_<slug>.md`
+tickets). Two exceptions: names a tool requires (`CLAUDE.md`); all-caps sentinel/marker files
+(`MENU.md`, `FIRST_RUN.md`). Governs the **filename only** — display titles (an H1, a `name:`
+field, a MENU cell) still use full Title Case (e.g. `consumers\<slug>.md` carries
+`name: <Full Title>`).
 
 ## Adding a new tool
 **Trigger: "new tool".**
 1. Build and test it like normal project work (in whichever project prompted the need).
 2. Strip anything project-specific — no hardcoded paths, project names, or assumptions about a
    particular repo's structure. It must work unmodified if any future project points at it.
-2a. If it's wired as an automatic Claude Code hook (`hooks\`, or a future auto-invoked
-   `agents\` subagent): on a failure state, exit code **2** and write the failure report to
-   **stderr** (in addition to stdout/log files) — never exit 1 for a failure. See README.md
-   "Why hooks exit 2, not 1" for the reasoning. `hooks\consistency_check.py` is the reference
-   implementation. Does not apply to a manually-invoked maintainer script (e.g.
-   `check_tower_crane.py`).
+2a. If wired as an automatic hook (`hooks\`, or a future auto-invoked `agents\` subagent): on
+   failure, exit code **2** and write the failure report to **stderr** — never exit 1. See
+   README.md "Why hooks exit 2, not 1". `hooks\consistency_check.py` is the reference
+   implementation. Doesn't apply to a manually-invoked script (e.g. `check_tower_crane.py`).
 3. Place it in the matching subfolder: `hooks\`, `agents\`, or `scripts\`.
 4. Add a row to `MENU.md` — name, file, what it does, trigger (if a hook) — and write the exact
    opt-in snippet a consuming project needs. Use a literal absolute path matching the working
@@ -92,42 +88,35 @@ file (an H1, a `name:` field, a MENU cell) still use full Title Case (e.g. the f
 
 ## Self-use (dogfooding)
 **Trigger: "self hooks".**
-This repo is not a registered consumer of itself — its own tools don't run here automatically.
-`scripts\self_hooks.py` turns one on for THIS repo/machine only: `--list` (default), `--enable
-<tool>`, `--disable <tool>`. State lives in gitignored `.claude\settings.local.json`; a
-human-readable mirror auto-regenerates at `.claude\self_hooks_status.md` (open it directly to
-check current state — no command needed). Every tool is available to self-enable the moment its
-`templates\optins\<tool>.json` exists — nothing else to wire up. See README.md's "Self-use" section
-for the full human-facing explanation.
+This repo is not a registered consumer of itself. `scripts\self_hooks.py` turns a tool on for THIS
+repo/machine only: `--list` (default), `--enable <tool>`, `--disable <tool>`. State lives in
+gitignored `.claude\settings.local.json`; a mirror auto-regenerates at
+`.claude\self_hooks_status.md` (open directly to check state). Every tool self-enables the moment
+its `templates\optins\<tool>.json` exists. See README.md's "Self-use" section for more.
 
 ## Adding a consumer
-**Trigger: "connect project".** Ask whether this is a new project from scratch or an existing one
-first — the two paths below differ. Either way the consumer ends up in the registry
-(`consumers\<slug>.md`) and floats on this repo's HEAD.
-1. **New project from scratch** — run the scaffolder here:
-   `scripts\new_consumer.py --target-path <abs path> --project-name "<Full Title>"`. It writes ALL of
-   the consumer's files (`.claude\settings.json` with opt-in hooks, `CLAUDE.md` with `@import`
+**Trigger: "connect project".** Ask new-from-scratch vs. existing project first — the two paths
+below differ. Either way the consumer ends up in the registry (`consumers\<slug>.md`) and floats
+on this repo's HEAD.
+1. **New project from scratch** — `scripts\new_consumer.py --target-path <abs path> --project-name
+   "<Full Title>"`. Writes ALL consumer files (`.claude\settings.json`, `CLAUDE.md` with `@import`
    lines, skeleton `project_progress.md`, `FIRST_RUN.md`) plus the registry entry. Defaults: opts
-   into `consistency_check` and imports `filing` + `compliance` + `continuity`. Flags: `-Tools @()`
-   for no hooks, `-NoContinuity` to skip that piece, `-Force` to overwrite. This agent does NOT run
-   git — the new project's first session does that via its `FIRST_RUN.md` (git init, accept the one-
-   time import-approval dialog, fill the overview).
-2. **Existing (hand-copied) project** — the human copies `templates\register.md` into that project's
-   root and tells its agent to follow it. That agent swaps its pasted workflow prose for `@import`
-   lines and files a `register` ticket here — which you action per "Registration tickets" below
-   (consumers can't edit shared files, so the registry entry is authored on this side).
+   into `consistency_check`, imports `filing` + `compliance` + `continuity`. Flags: `-Tools @()` for
+   no hooks, `-NoContinuity` to skip, `-Force` to overwrite. Does NOT run git — the new project's
+   first session does that via its `FIRST_RUN.md`.
+2. **Existing (hand-copied) project** — the human copies `templates\register.md` into that
+   project's root and tells its agent to follow it; that agent swaps pasted workflow prose for
+   `@import` lines and files a `register` ticket here (action per "Registration tickets" below).
 
 After either path, run `scripts\check_tower_crane.py` to confirm the new consumer validates clean.
 
 ## Changing or removing an existing tool
 **Trigger: "modify tool".**
 1. Check the consumer registry (`consumers\`, the source of truth) for who's opted in first.
-2. If any project uses it, confirm the change with the user before editing — a consuming
-   project has no visibility into this repo's Work Log and won't know behavior changed.
-   Exception: a minor benevolent change (a prose/workflow refinement or strictly-additive guardrail
-   — nothing a consumer must re-verify or re-wire) propagates silently. Make it and log it in the
-   Work Log here; no announcement or verify ticket. Reserve confirm-first and verify tickets for
-   behavior-changing fixes with real regression risk. (Rationale: see README.)
+2. If any project uses it, confirm with the user before editing — a consuming project can't see
+   this repo's Work Log. Exception: a minor benevolent change (prose/workflow refinement or
+   strictly-additive guardrail) propagates silently, logged in the Work Log only. (Rationale: see
+   README.)
 3. Update `MENU.md`. If the opt-in snippet itself changed, say so clearly in the Work Log entry
    so it's obvious which consuming projects need to update their own `.claude\settings.json`.
 
@@ -162,13 +151,12 @@ line, and this agent flips `Status` to `DONE` on its next session.
 Every hand-off appends one dated line to a `## Round-trip log` section at the bottom of the same
 ticket (same pattern as this repo's Work Log — chronological, newest at bottom). The whole
 back-and-forth lives in one file:
-- this agent: `2026-07-18 — fix applied (commit <sha>), affects: GRT; awaiting GRT verify`
-- consumer:   `2026-07-19 — GRT re-verified, still fails: <what>`   (ticket stays OPEN)
-- consumer:   `2026-07-20 — GRT verified PASS`                       (this agent flips DONE next session)
+- this agent: `2026-07-18 — fix applied (commit <sha>), affects: <slug>; awaiting <slug> verify`
+- consumer:   `2026-07-19 — <slug> re-verified, still fails: <what>`   (ticket stays OPEN)
+- consumer:   `2026-07-20 — <slug> verified PASS`                       (this agent flips DONE next session)
 
-**Multi-user attribution:** if more than one person has commit access to this hub, name the acting
-person alongside the project in each line — e.g. `fix applied by <name> (commit <sha>)…` /
-`<name> (GRT) verified PASS` — so the log stays legible with concurrent contributors. A single-owner
+**Multi-user attribution:** if more than one person has commit access, name the acting person
+alongside the project in each line (e.g. `fix applied by <name> (commit <sha>)…`). A single-owner
 hub keeps the terser project-only form above.
 
 ### Scanning at session start (including on `resume` — see above) or when asked to process requests
@@ -186,60 +174,52 @@ know whose turn it is:
   awaiting consumer verify (treat like any other applied fix); `CLOSED` (not merged) → this agent's
   turn again, same as "still fails."
 
-Round-trip lines an unattended run of `scripts\run_automation.py` writes are prefixed
-`automation:` so you can tell at a glance which lines were unattended vs. written in a live
-session. It never flips `Status` to DONE itself except via `ticket_scan.py`'s mechanical
-already-verified-PASS handling (the same zero-deliberation action this section already performs),
-and it never merges a PR — a human always does that on GitHub.
+Round-trip lines an unattended `scripts\run_automation.py` run writes are prefixed `automation:` to
+distinguish them from live-session lines. It never flips `Status` to DONE itself except via
+`ticket_scan.py`'s mechanical already-verified-PASS handling, and never merges a PR — a human
+always does that on GitHub.
 
 ### Registration tickets (this agent's turn — no round-trip)
 An OPEN `register` ticket is an existing project asking to join the platform (filed by
-`templates\register.md` running in that project — the consumer can't edit shared files, so it files a
-request instead). Action it immediately:
+`templates\register.md`, since the consumer can't edit shared files itself). Action it immediately:
 1. Read its fenced `yaml` block (name / path / opted_in / imported).
 2. **Validate before trusting the block:** confirm `path` exists on disk; for each `opted_in` tool,
    confirm `templates\optins\<tool>.json` exists; for each `imported` piece, confirm the project's
-   `CLAUDE.md` actually imports it (the block should reflect what register.md wired). If something is
-   off, note it in the ticket and reconcile rather than blindly copying.
-3. Create `consumers\<slug>.md` from the block (same format as `consumers\geo_rank_tracker.md`).
+   `CLAUDE.md` actually imports it. If something is off, note it in the ticket and reconcile rather
+   than blindly copying.
+3. Create `consumers\<slug>.md` from the block (same format as an existing `consumers\` entry).
    Never record a project/client name anywhere in `toolkit\` itself (including `MENU.md`) — that
    repo tracks the public `konvesdigital/tower-crane` repo, and `consumers\` exists in the outer,
    private repo specifically so this kind of detail never reaches it.
 4. Run `scripts\check_tower_crane.py --consumer <slug>` to confirm the new entry validates clean.
 5. Flip `Status` to **DONE** (registration has no consumer-verify round-trip — the registry entry
-   existing *is* the completion; the checker validates it from here on). Log it in `project_progress.md`,
-   commit, and push.
+   existing *is* the completion). Log it in `project_progress.md`, commit, and push.
 
 ### Applying a fix (this agent's turn)
 1. Read the symptom/repro, root cause, and Proposed fix (a suggestion, not a mandate).
 2. **Mandatory pre-apply validation:** enumerate *every* consumer in the registry (`consumers\`,
-   the source of truth — `MENU.md` never carries consumer-identifying detail, since it's tracked
-   in the public `toolkit\` repo) and reason about impact on each — not just the filer, who can't
-   see the others. Consumers float on this repo's HEAD (no version pinning), so a fix reaches all
-   of them the moment they next run.
-3. Apply the fix (or a better one). Then run **`scripts\check_tower_crane.py`** — the executable
-   teeth for step 2: its golden suite (`tests\<tool>\`) catches a behavior regression, and its
-   reference scan confirms no consumer's wiring/imports broke. Also run the ticket's Suggested test
-   plus your own. Add/extend a golden fixture when the fix is behavior-changing so the regression is
-   caught next time. (Invocation is manual by design — Locked decision 5, "manual first.")
+   the source of truth) and reason about impact on each — not just the filer, who can't see the
+   others. Consumers float on this repo's HEAD, so a fix reaches all of them the moment they next
+   run.
+3. Apply the fix (or a better one). Then run **`scripts\check_tower_crane.py`**: its golden suite
+   (`tests\<tool>\`) catches a behavior regression, and its reference scan confirms no consumer's
+   wiring/imports broke. Also run the ticket's Suggested test plus your own. Add/extend a golden
+   fixture when the fix is behavior-changing so the regression is caught next time.
 4. Append a `## Round-trip log` line recording the **commit SHA** and which consumers the change
-   affects (the SHA is the version handle a later revert points at — always record it for any
-   behavior-changing fix). Leave `Status: OPEN`. Log it in `project_progress.md`, naming affected
-   consumers there too. Commit and push. The ticket closes only when the consumer verifies.
+   affects. Leave `Status: OPEN`. Log it in `project_progress.md`, naming affected consumers there
+   too. Commit and push. The ticket closes only when the consumer verifies.
 
 ### Cross-consumer verify tickets (only when 2+ consumers exist)
 When a behavior-changing fix ships and the registry (`consumers\`) lists consumers *other* than the
-filer, file a one-line verify-request ticket in `change_requests\` for each other consumer (`Status: OPEN`,
-`Relates to: <original ticket>`, naming the consumer to verify). Consumers scan the inbox for
-tickets naming them, so this is how a third project learns it must re-check. With a single
+filer, file a one-line verify-request ticket in `change_requests\` for each other consumer
+(`Status: OPEN`, `Relates to: <original ticket>`, naming the consumer to verify). With a single
 consumer this step is a no-op.
 
 ### Reverts and regressions
-There are no version tags or changelog — the **commit SHA recorded in the round-trip log is the
-version handle**. A revert or regression is just another ticket: `Status: OPEN`,
-`Regression of: <original ticket>`, citing the bad SHA. This agent decides revert vs. forward-fix
-and re-runs the same pre-apply validation. Do NOT add per-consumer version pinning or `_vN` copies
-— that contradicts the Locked float-on-HEAD versioning rule above.
+No version tags or changelog — the **commit SHA in the round-trip log is the version handle**. A
+revert or regression is just another ticket: `Status: OPEN`, `Regression of: <original ticket>`,
+citing the bad SHA. This agent decides revert vs. forward-fix and re-runs the same pre-apply
+validation. Do NOT add per-consumer version pinning or `_vN` copies.
 
 ## Session Continuity
 Source of truth: `project_progress.md`. At session start read only Current Status, Next Up,
@@ -247,15 +227,12 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
 
 **"checkpoint"**
 1. Update `project_progress.md`:
-   - Refresh Current Status and Next Up so they describe only the PRESENT — where things stand now
-     and what is still open. When something is finished, remove it from these sections; its detail
-     belongs solely in the dated Work Log entry (added below). **Never accumulate completed work
-     here** — no "Landed so far" recap, no growing list of done/`[x]` items. Done work has exactly
-     one home: its dated Work Log entry. (Rationale: `README.md` "Why this exists".)
-   - Move any resolved rows in Decisions from Open → Locked.
-   - Prepend one dated Work Log entry (what changed, what's next). Newest entry on top.
-   - Do NOT prune or move older entries automatically. Work Log stays complete until the user
-     runs "archive" (below).
+   - Refresh Current Status and Next Up to describe only the PRESENT. When something is finished,
+     remove it from these sections — its detail belongs solely in the dated Work Log entry. **Never
+     accumulate completed work here.** (Rationale: `README.md` "Why this exists".)
+   - Move resolved Decisions rows from Open → Locked.
+   - Prepend one dated Work Log entry (what changed, what's next). Newest on top.
+   - Do NOT prune or move older entries automatically — only "archive" does that.
 2. Git — the outer/inner split (`design\local_first_reframe.md`) means two independent repos live
    in this folder; handle both:
    a. Outer project repo (this repo root — `project_progress.md`, `consumers\`, `change_requests\`,
@@ -264,39 +241,28 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
         should always have git — flag it rather than skip silently.
    b. Inner `toolkit\` repo — only if `toolkit\` exists and `git -C toolkit status --porcelain`
       shows changes:
-      - **Soft disclosure guardrail, before committing** (`design\update_trust_review.md`'s
-        "Refinement 2026-07-27"): if the pending changes touch `AGENTS.md`, run
-        `python scripts\check_standing_constraints.py --base HEAD --head worktree` from inside
-        `toolkit\`. `[UNCHANGED]`: say nothing, proceed silently — this is the common case and
-        asking every time would just be noise. `[CHANGED]`: this is disclosure-only, not a block
-        — nothing can or should stop the operator's own push — surface the printed before/after
-        text to the user as an explicit, unmissable notice before committing, so this class of
-        change is never made without the operator knowing they made it. Never skip this check
-        silently when `AGENTS.md` is among the changed files.
+      - **Soft disclosure guardrail** (`design\update_trust_review.md`): if the pending changes
+        touch `AGENTS.md`, run `python scripts\check_standing_constraints.py --base HEAD --head
+        worktree` from inside `toolkit\`. `[UNCHANGED]`: proceed silently. `[CHANGED]`: surface the
+        printed before/after text to the user as an explicit notice before committing — never skip
+        this check silently when `AGENTS.md` is among the changed files.
       - `git -C toolkit add -A && git -C toolkit commit -m "Checkpoint: <summary>"`.
-      - **Hard outgoing leak-scan gate, before pushing** (`design\resource_sharing_model.md`'s B1 —
-        the actual fix for the near-miss that started that whole design doc: private client
-        content almost landing in this public repo, caught by the user before commit, not by
-        anything technical). From inside `toolkit\`: `git fetch origin`, then
+      - **Hard outgoing leak-scan gate, before pushing** (`design\resource_sharing_model.md` B1).
+        From inside `toolkit\`: `git fetch origin`, then
         `python scripts\check_file_surface.py --base-sha origin/main --head-sha HEAD`. A `[FAIL]`
         (check 8a — added content matching a live `consumers\*.md` name or path segment) is a
-        **hard block**: do not push. Report the FAIL(s) to the user verbatim, fix the offending
-        content (it likely belongs in `shared_resources\` instead — see
-        `templates\shared_resources.md` — or just needs rephrasing if it's a coincidental match),
-        then re-run this gate on the next checkpoint; the bad commit stays local-only until it
-        passes. A `[WARN]` (check 8b — generic absolute-path shape) does not block; mention it to
-        the user as a nudge, same as the existing disguised-code heuristic's WARNs.
-      - `git -C toolkit push`. This pushes to the user's own remote (their own private hub, or this
-        canonical repo if they're the operator) — always safe to push freely once the gate above
-        passes (`design\update_trust_review.md`, extended by `design\resource_sharing_model.md`).
-      - If the push fails (e.g. no remote configured, no write access, diverged from upstream):
-        report it to the user; don't let it block or roll back the outer-repo checkpoint above.
-3. Confirm to the user: saved and pushed (note separately whether a `toolkit\` push happened,
-   was skipped as clean, or failed).
-4. **Suggest archiving when the file has grown:** if it has grown past roughly **400 lines
-   (~40 KB)**, or the Work Log holds many months of settled entries, *suggest* the user run
-   "archive". Only a prompt — never archive automatically (that stays user-initiated, below).
-   (Why: `README.md`, Track 1 "archive".)
+        **hard block**: do not push. Report the FAIL(s) verbatim, fix the offending content (likely
+        belongs in `shared_resources\` instead, or just needs rephrasing if coincidental), then
+        re-run this gate next checkpoint; the bad commit stays local-only until it passes. A
+        `[WARN]` (check 8b — generic absolute-path shape) does not block; mention it as a nudge.
+      - `git -C toolkit push` — safe once the gate above passes.
+      - If the push fails (no remote/access/diverged): report it; don't block or roll back the
+        outer-repo checkpoint above.
+3. Confirm to the user: saved and pushed (note whether `toolkit\` push happened, was skipped
+   clean, or failed).
+4. **Suggest archiving** if the file has grown past roughly **400 lines (~40 KB)**, or the Work Log
+   holds many settled entries — a prompt only, never automatic. (Why: `README.md`, Track 1
+   "archive".)
 
 **"archive"** (user-initiated only — never automatic, never during "checkpoint")
 1. List current Work Log entries — date + one-line title only, newest first.
@@ -307,49 +273,35 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
 
 **"resume"**
 1. Outer project repo: `git pull`.
-2. Inner `toolkit\` repo — check only, never pull/merge (a reviewed merge is the separate `update`
-   action below — `design\update_trust_review.md`). If `toolkit\` exists and is a git repo:
-   `python scripts\update_toolkit.py --notify` (the "check for update" proactive notice,
-   `design\local_first_reframe.md`) from inside `toolkit\` — a plain fetch + comparison against
-   `last_reviewed_sha`, no golden suite, no state mutation. If it prints "up to date," say nothing
-   further. If it reports an update is available, note it in the status summary (e.g. "toolkit\
-   has N commit(s) available — run `update` to review and pull them in"); if `toolkit\` doesn't
-   exist, skip this step silently.
-3. Rung-2 hook activation (`design\resource_sharing_model.md`'s three-rung settings ladder,
-   Option D): `python toolkit\scripts\check_hook_activation.py --project-root .` — a narrow,
-   notify-only check for whether every `.claude\hooks\` script tracked in the outer repo (synced
-   here via step 1's `git pull`) is actually referenced in this machine's own gitignored
-   `settings.local.json`. If it prints any `[UNWIRED]` line, note it in the status summary (e.g.
-   "hook X is present but not wired in on this machine"); if it prints only `[WIRED]`/`[N/A]`, say
-   nothing further. Never blocks — a missing wiring line is a one-time fix, not a broken state.
+2. Inner `toolkit\` repo — check only, never pull/merge (`update` is separate, below). If
+   `toolkit\` exists and is a git repo: `python scripts\update_toolkit.py --notify` from inside
+   `toolkit\` (plain fetch + compare against `last_reviewed_sha`, no golden suite, no mutation). If
+   "up to date," say nothing further; if an update is available, note it in the status summary
+   (e.g. "toolkit\ has N commit(s) available — run `update` to review"); if `toolkit\` doesn't
+   exist, skip silently.
+3. Rung-2 hook activation: `python toolkit\scripts\check_hook_activation.py --project-root .` —
+   notify-only check for whether every `.claude\hooks\` script (synced via step 1's `git pull`) is
+   referenced in this machine's own gitignored `settings.local.json`. Note any `[UNWIRED]` line in
+   the status summary; say nothing if only `[WIRED]`/`[N/A]`. Never blocks.
 4. Read `project_progress.md`: Current Status, Next Up, Decisions table, most recent Work Log
    entry only.
 5. Scan `change_requests\` per "Scanning at session start" below — this is what surfaces a Piece 3
    automation PR (`design\sync_automation.md`).
-6. State status and next step in 1-3 lines, folding in anything the scan, the toolkit\ check, or
-   the hook-activation check surfaced (e.g. "PR #N awaiting your review", "ticket X awaiting
-   consumer verify", "toolkit\ has 2 new commits upstream, run `update` to review", or "hook X
-   isn't wired in on this machine"). Do not replay full history.
+6. State status and next step in 1-3 lines, folding in anything steps 2/3/5 surfaced. Do not
+   replay full history.
 
-**"quick resume"** — a deliberately thinner `resume`, for the close-terminal-and-reopen-seconds-later
-case right after a `checkpoint` (the only way to actually flush a long context window mid-session,
-since nothing invoked from inside a session can flush that same session). Skips every sync check —
-no outer-repo `git pull`, no `toolkit\` update-check, no rung-2 hook-activation check, no
-`change_requests\` scan — on the reasoning
-that a session opened moments after its own `checkpoint`'s push has nothing new to find. No tag or
-disclaimer noting what was skipped: the point is speed back into the work that was just interrupted,
-not a staleness warning the user doesn't need in this specific case. Use plain `resume` instead for
-the start of a day or any gap long enough that something could actually have changed.
+**"quick resume"** — a thinner `resume`, for reopening seconds after a `checkpoint` mid-session
+(the only way to flush a long context window mid-session). Skips every sync check — no outer-repo
+`git pull`, no `toolkit\` update-check, no rung-2 hook-activation check, no `change_requests\` scan
+— since a session opened moments after its own `checkpoint`'s push has nothing new to find. No
+staleness tag by design. Use plain `resume` for a day-start or any longer gap.
 1. Read `project_progress.md`: Current Status, Next Up, Decisions table, most recent Work Log
    entry only.
 2. State status and next step in 1-3 lines. Do not replay full history.
 
 **"update"** — pulls `toolkit\`'s `origin` remote under a diff-review trust gate
-(`design\update_trust_review.md` Fix 1, `design\local_first_reframe.md`'s "`update` action
-mechanics"). Never runs on its own — only when the user asks for it (e.g. after `resume` flags
-unreviewed upstream commits). Mechanical steps are scripted in `scripts\update_toolkit.py`; the
-diff-review-and-assessment step below is this procedure, since it's judgment work with no
-deterministic algorithm.
+(`design\update_trust_review.md`, `design\local_first_reframe.md`). User-initiated only. Mechanical
+steps are scripted in `scripts\update_toolkit.py`; diff review/assessment below is manual judgment.
 1. Run `python scripts\update_toolkit.py` (equivalent to `--check`) from inside `toolkit\`.
 2. If it reports "Already up to date": nothing else to do, say so.
 3. If it reports `[ABORT]` for a remote-identity mismatch (`origin`'s URL no longer matches the
@@ -377,13 +329,10 @@ deterministic algorithm.
    remainder. On no: `python scripts\update_toolkit.py --reject` — a fully supported, indefinite
    steady state ("tools go stale but stay safe"), not a holdout to re-nag about.
 
-**"propose upstream"** — sends a hand-built local fix or improvement in `toolkit\` back to the
-public repo (`konvesdigital/tower-crane`) as a fork + PR
-(`design\local_first_reframe.md`'s "Fork+PR contribution mechanics"). User-initiated only, never
-automatic. Plain fork/branch/commit/push/PR for most files — ordinary `git`/`gh` steps, run from
-inside `toolkit\` (`toolkit\` is an ordinary git repo with an ordinary GitHub remote, no
-Tower-Crane-specific script backs the basic flow). **When the change touches `AGENTS.md`
-specifically**, step 2a below adds Fix 3 Checkpoint 1's authoring-assistant behavior
+**"propose upstream"** — sends a hand-built local fix in `toolkit\` back to the public repo
+(`konvesdigital/tower-crane`) as a fork + PR (`design\local_first_reframe.md`). User-initiated
+only. Plain fork/branch/commit/push/PR, run from inside `toolkit\` — ordinary `git`/`gh` steps. **If
+the change touches `AGENTS.md`**, step 2a below adds Fix 3's authoring-assistant behavior
 (`design\update_trust_review.md`, Phase 2).
 1. Check whether a `fork` remote already exists: `git remote get-url fork`. If it errors (no such
    remote), the user doesn't have one wired up yet — don't assume they lack a GitHub fork either,
@@ -396,10 +345,8 @@ specifically**, step 2a below adds Fix 3 Checkpoint 1's authoring-assistant beha
       `git remote add fork https://github.com/<username>/tower-crane.git`.
 2. Branch off current `main`: `git checkout -b <descriptive-branch-name>` (name it for the change,
    e.g. `fix-relocate-symlink-check`).
-2a. **If this change touches `AGENTS.md`** — authoring-assistant behavior, before committing.
-   Nothing technical forces this step to run; skipping it just risks the PR coming back for rework
-   at Checkpoint 2 (the operator's manual read + `scripts\check_agents_pr_gate.py`). Say so if
-   asked to skip it.
+2a. **If this change touches `AGENTS.md`** — run this before committing. Nothing technical forces
+   it, but skipping risks rework at Checkpoint 2 (`scripts\check_agents_pr_gate.py`).
    a. **Silently auto-fix the frontmatter** (`scope`/`capabilities`/`human_review_required`) to
       match the new content — re-derive the capability list from what the new prose actually
       references (e.g. new content mentioning a network call would need `capabilities` updated and
@@ -426,41 +373,23 @@ specifically**, step 2a below adds Fix 3 Checkpoint 1's authoring-assistant beha
 6. On approval: `gh pr create --repo konvesdigital/tower-crane --head <username>:<branch-name>
    --title "<title>" --body "<body>"`.
 7. Nothing further to do on this side — a PR touching `AGENTS.md` runs the "AGENTS.md Fix 3 gate"
-   GitHub Actions check (`scripts\check_agents_pr_gate.py`) and is scoped to the operator via
-   `.github\CODEOWNERS`, reviewed by whoever administers `konvesdigital/tower-crane` (the author).
-   Current branch-protection status: see `project_progress.md`. This is an ordinary GitHub PR
-   review, not the internal `change_requests\` ticket/round-trip system — don't file a ticket for it.
+   GitHub Actions check (`scripts\check_agents_pr_gate.py`), scoped via `.github\CODEOWNERS`. This
+   is an ordinary GitHub PR review, not the `change_requests\` ticket system — don't file a ticket.
 
 **"curate shared resources"** — occasional, deliberate bulk distribution of `shared_resources\`
-entries to every (or one) registered consumer, reusing `scripts\broadcast_guidance.py`'s existing
-`--broadcast` primitive completely unchanged (`design\resource_sharing_model.md`'s "Bulk
-broadcast" — reversed 2026-07-31 from an earlier "dropped" call). This is genuinely "cab work": the
-mechanism it distributes through (each consumer's own pull-only `templates\shared_resources.md`
-search/browse/apply flow) stays entirely unchanged and unaware anything proactive happened —
-broadcast only ever changes *awareness*, landing one pointer-only notice in the same namespaced
-`## Broadcast` section of a consumer's `COMPLIANCE_GUIDANCE.md` that `templates\compliance.md`
-already checks every `resume`. User-initiated only — never automatic, never triggered by a
-`checkpoint` or scheduled run — since a growing catalog pushing notifications on every unrelated
-project is exactly the noise "Discovery is pull-only" (`design\resource_sharing_model.md`) exists
-to avoid; broadcast is the one deliberate exception to that rule, not a backdoor around it.
-1. **Curate** — list `shared_resources\CATALOG.md` (optionally filtered to recently added/updated
-   entries; skip anything already marked `Archived` in the `Status` column — it's already been
-   independently absorbed everywhere active). Ask the user which entries are worth pushing broadly
-   right now.
+entries to every (or one) registered consumer, via `scripts\broadcast_guidance.py --broadcast`
+(`design\resource_sharing_model.md`). Landing one pointer-only notice in the `## Broadcast` section
+of a consumer's `COMPLIANCE_GUIDANCE.md` (checked every `resume` by `templates\compliance.md`) —
+never the full entry content. User-initiated only, never automatic or triggered by `checkpoint`.
+1. **Curate** — list `shared_resources\CATALOG.md` (optionally filtered to recent entries; skip
+   anything already `Archived` in the `Status` column). Ask the user which entries are worth
+   pushing broadly right now.
 2. **Author a pointer-only file** — one line per selected entry (e.g. `<Name> — <one-line
    retrieval hook or description>, say "shared resources" to review`), written to a scratch
-   markdown file. Never the full entry content — `COMPLIANCE_GUIDANCE.md` is Track-2, always
-   resident, checked every `resume`, so anything written into it is standing cost until resolved;
-   it should carry the minimum needed to remind, not duplicate content that already lives in
-   `shared_resources\`.
-3. **Push**: `python scripts\broadcast_guidance.py --broadcast <file.md>` from every registered
-   consumer at once, or `--broadcast <file.md> --consumer <slug>` for one. Confirm the drafted
-   pointer file with the user before running this — same approval-before-consequential-action
-   pattern as every other step in this project, since this writes into every targeted consumer's
-   own `COMPLIANCE_GUIDANCE.md`.
-4. **Land** — nothing further to do on this side. The existing resume-time compliance check
-   surfaces the new `## Broadcast` content on its own; the consumer sees "tower_crane curated N
-   `shared_resources\` items — review?" and, if they want to, drops into the ordinary
-   search/browse/apply flow `templates\shared_resources.md` already defines. Still fully
-   confirm-before-write at that apply step — broadcast only ever changed awareness, never the
-   underlying write discipline.
+   markdown file. Never the full entry content — carry the minimum needed to remind.
+3. **Push**: `python scripts\broadcast_guidance.py --broadcast <file.md>` for every registered
+   consumer, or add `--consumer <slug>` for one. Confirm the drafted pointer file with the user
+   first — it writes into every targeted consumer's `COMPLIANCE_GUIDANCE.md`.
+4. **Land** — nothing further to do here. The resume-time compliance check surfaces the new
+   `## Broadcast` content on its own; the consumer sees it and, if they want to, follows the
+   ordinary search/browse/apply flow in `templates\shared_resources.md`.
