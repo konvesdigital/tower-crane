@@ -21,8 +21,9 @@ Two passes, plus an optional compliance-guidance writer:
         exists shared-side (broken import);
       - IMPORT DRIFT tripwire: a consumer whose CLAUDE.md no longer imports a piece its
         registry lists (decision 8 - opt-out is detectable, not preventable);
-      - mandatory-piece glance: filing + compliance not imported -> WARN (a SKILL_PIECES entry
-        like 'filing' is also satisfied by its Track-1 skill-stub form - design\\directive_economy.md);
+      - mandatory-piece glance: filing + compliance + shared_resources not imported -> WARN (a
+        SKILL_PIECES entry like 'filing' is also satisfied by its Track-1 skill-stub form -
+        design\\directive_economy.md);
       - Track-1 skill stub drift (toolkit-governed only, design\\directive_economy.md): for each
         skill name any SKILL_PIECES entry scaffolds, plus every STANDALONE_SKILLS entry (design\\
         consumer_update.md / design\\optimize_ux.md - a Track-1 skill with no @import companion,
@@ -88,6 +89,7 @@ TESTS_DIR = SHARED_ROOT / 'tests'
 SKILL_PIECES = {
     'filing': {'companion': 'filing_resume_check', 'skills': ['filing']},
     'continuity': {'companion': 'continuity_resume_check', 'skills': ['checkpoint', 'archive']},
+    'shared_resources': {'companion': 'shared_resources_resume_check', 'skills': ['shared_resources']},
 }
 
 # Standalone Track-1 skills with no @import companion (design\consumer_update.md, design\
@@ -386,10 +388,10 @@ def test_consumer(c, config):
                              f"Import drift: registry lists piece '{pi['name']}' but CLAUDE.md no longer imports it.",
                              f"Re-add the line '@{config['import_base']}/{pi['name']}.md' to CLAUDE.md, or (if the opt-out was intentional) file a request to update this consumer's registry entry."))
 
-    # mandatory pieces (filing + compliance) - a glance, not a hard fail. A SKILL_PIECES entry
-    # (e.g. 'filing') is satisfied either the old flat way (imports itself directly) or the
-    # Track-1 way (imports its companion + carries a project-local skill stub).
-    for m in ('filing', 'compliance'):
+    # mandatory pieces (filing + compliance + shared_resources) - a glance, not a hard fail. A
+    # SKILL_PIECES entry (e.g. 'filing') is satisfied either the old flat way (imports itself
+    # directly) or the Track-1 way (imports its companion + carries a project-local skill stub).
+    for m in ('filing', 'compliance', 'shared_resources'):
         if m in md_imports:
             continue
         skill_piece = SKILL_PIECES.get(m)

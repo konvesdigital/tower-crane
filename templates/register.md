@@ -59,6 +59,7 @@ pasted prose** they replace:
 ```
 @<import_base>/filing_resume_check.md
 @<import_base>/compliance.md
+@<import_base>/shared_resources_resume_check.md
 @<import_base>/continuity_resume_check.md
 ```
 (e.g. if Step 0 computed `~/Documents/Claude/tower_crane/toolkit/templates`, the first line reads
@@ -77,6 +78,17 @@ pasted prose** they replace:
   This is what lets the shared side's audit reach this project; without it, guidance files are never
   seen. There is almost certainly no pasted equivalent (this protocol post-dates most copies) — just
   add it.
+- `shared_resources_resume_check.md` + a **`shared_resources` skill stub** (**mandatory**, on-demand) —
+  the cross-project resource/insight-sharing mechanism (search/browse/select/apply/save/forget/
+  archive) is Track-1, same shape as `filing`: instead of a flat `@import` of `shared_resources.md`,
+  create `.claude\skills\shared_resources\SKILL.md` in this project by copying
+  `<import_base>/skills/shared_resources/SKILL.md` verbatim, replacing every `{{IMPORT_BASE}}`
+  placeholder with `<import_base>`. The `shared_resources_resume_check.md` import above stays
+  always-resident (it's just the resume-time check that an already-adopted reference hasn't broken or
+  drifted); the skill stub loads the rest only when the user says the exact phrase "shared resources."
+  **Do not omit this one** — unlike `continuity`, it has no opt-out; the ongoing cost once split this
+  way is near-zero. Replaces any pasted cross-project resource-sharing prose, if this project happened
+  to have any.
 - `continuity_resume_check.md` + **`checkpoint` and `archive` skill stubs** (**default-on**) — the
   `resume` procedure (and the "Two tiers" project_progress.md shape it explains) stays Track-2,
   always-resident, since it fires almost immediately in nearly every session. `checkpoint` and
@@ -153,6 +165,8 @@ imported:
     since: <YYYY-MM-DD>
   - piece: compliance
     since: <YYYY-MM-DD>
+  - piece: shared_resources_resume_check
+    since: <YYYY-MM-DD>
   - piece: continuity_resume_check
     since: <YYYY-MM-DD>
 ```
@@ -170,7 +184,8 @@ Rules for filling the block:
   owner of this tower_crane hub.
 - **`opted_in`** = one `{ tool, since }` per shared hook found in Step 1; use `opted_in: []` if none.
 - **`imported`** = one `{ piece, since }` per `@import` line you added in Step 2 (drop
-  `continuity_resume_check` if you skipped continuity). `since` = today.
+  `continuity_resume_check` if you skipped continuity — but never drop `shared_resources_resume_check`,
+  it has no opt-out). `since` = today.
 
 Once the ticket file is written and filled in, **from inside the hub root** (not `toolkit\` —
 `change_requests\` belongs to the hub root's own repo, with its own remote), `git add` it, commit

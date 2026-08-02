@@ -8,9 +8,9 @@ session (consumer_platform design, decision 10):
   <target>/CLAUDE.md               - from templates/consumer_CLAUDE.md.tmpl, with @import lines
   <target>/.claude/skills/<name>/  - Track-1 skill stub(s) for toolkit-governed pieces in
                                      SKILL_PIECES (design\\directive_economy.md) - `filing`,
-                                     `checkpoint`, `archive` so far - plus every STANDALONE_SKILLS
-                                     entry (design\\consumer_update.md, design\\optimize_ux.md) -
-                                     `update`, `commands` so far
+                                     `checkpoint`, `archive`, `shared_resources` so far - plus every
+                                     STANDALONE_SKILLS entry (design\\consumer_update.md,
+                                     design\\optimize_ux.md) - `update`, `commands` so far
   <target>/project_progress.md      - continuity skeleton (only when continuity is on)
   <target>/FIRST_RUN.md             - one-time checklist the new project runs then deletes
   consumers/<slug>.md               - registry entry (this repo)
@@ -64,6 +64,7 @@ TOOL_BLURBS = {
 SKILL_PIECES = {
     'filing': {'companion': 'filing_resume_check', 'skills': ['filing']},
     'continuity': {'companion': 'continuity_resume_check', 'skills': ['checkpoint', 'archive']},
+    'shared_resources': {'companion': 'shared_resources_resume_check', 'skills': ['shared_resources']},
 }
 
 # Standalone Track-1 skills with no @import companion at all (design\\consumer_update.md): scaffolded
@@ -94,8 +95,8 @@ def main():
                          help="Tools to opt into (each needs templates/optins/<tool>.json). Pass --tools with no "
                               "values for a consumer with no hooks. Default: consistency_check.")
     parser.add_argument('--no-continuity', action='store_true',
-                         help="Opt out of the (default-on) continuity protocol piece. filing + compliance are "
-                              "always imported.")
+                         help="Opt out of the (default-on) continuity protocol piece. filing + compliance + "
+                              "shared_resources are always imported.")
     parser.add_argument('--date', default=None, help="Scaffold date (YYYY-MM-DD). Defaults to today.")
     parser.add_argument('--force', action='store_true',
                          help="Overwrite an existing CLAUDE.md / project_progress.md / FIRST_RUN.md / registry entry.")
@@ -128,8 +129,8 @@ def main():
     if registry_path.exists() and not args.force:
         raise RuntimeError(f"Consumer '{slug}' already registered ({registry_path}). Use --force to overwrite.")
 
-    # protocol pieces: filing + compliance mandatory; continuity default-on
-    pieces = ['filing', 'compliance']
+    # protocol pieces: filing + compliance + shared_resources mandatory; continuity default-on
+    pieces = ['filing', 'compliance', 'shared_resources']
     if not args.no_continuity:
         pieces.append('continuity')
     for p in pieces:
@@ -286,7 +287,7 @@ Scaffolded from tower_crane on {scaffold_date}. Do these once, then delete this 
       one-time local step.)
 - [ ] On first launch, **accept the one-time CLAUDE.md import-approval dialog.** Declining
       disables `@import` permanently, so the shared protocol pieces (filing, compliance,
-      continuity) won't load.
+      shared_resources, continuity) won't load.
 - [ ] Fill in the project-overview placeholder near the top of `CLAUDE.md` (what this project
       is, who it's for, key constraints).
 - [ ] Delete this file (`FIRST_RUN.md`) once the above are done.

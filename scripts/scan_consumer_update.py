@@ -47,8 +47,9 @@ PROJECT_ROOT = SHARED_ROOT.parent  # hub root
 SKILL_PIECES = {
     'filing': {'companion': 'filing_resume_check', 'skills': ['filing']},
     'continuity': {'companion': 'continuity_resume_check', 'skills': ['checkpoint', 'archive']},
+    'shared_resources': {'companion': 'shared_resources_resume_check', 'skills': ['shared_resources']},
 }
-MANDATORY_OR_DEFAULT_PIECES = ['filing', 'compliance', 'continuity']
+MANDATORY_OR_DEFAULT_PIECES = ['filing', 'compliance', 'shared_resources', 'continuity']
 
 # Mirrors scripts\new_consumer.py's STANDALONE_SKILLS - keep in sync. These are the only
 # templates\skills\* entries a fresh scaffold ever gets; anything else under that folder (e.g.
