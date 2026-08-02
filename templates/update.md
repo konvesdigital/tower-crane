@@ -12,11 +12,19 @@ never a specific consumer name.
 ## Pulling in new hub features this project hasn't adopted yet
 
 This project imports mandatory/default-on pieces from a local **tower_crane** hub at scaffold or
-registration time, but a hub feature that ships *after* that point (a new hook, a new
-`shared_resources\` entry, a new toolkit Track-1 skill, a new mandatory/default-on protocol piece)
-never retroactively reaches an already-set-up project on its own. `update` is the on-demand,
-pull-only fix: run it whenever you want to check, never automatically, and never at `resume` (no
-staleness nagging by design - see `design\consumer_update.md`'s "Staleness nagging" decision).
+registration time, but a hub feature that ships *after* that point (a new hook, a new toolkit
+Track-1 skill, a new mandatory/default-on protocol piece) never retroactively reaches an
+already-set-up project on its own. `update` is the on-demand, pull-only fix: run it whenever you
+want to check, never automatically, and never at `resume` (no staleness nagging by design - see
+`design\consumer_update.md`'s "Staleness nagging" decision).
+
+**Scope is functionality, not data.** `update` exists to bring this project to *functionality
+parity with a project scaffolded fresh today* - the same hooks, toolkit skills, and protocol
+pieces `new_consumer.py` would wire in right now. It never touches `shared_resources\` content:
+that's data, not functionality, and adopting an individual entry from it is entirely the "shared
+resources" command's own job (search/browse/select/apply), once that optional mechanism has been
+adopted some other way. See `design\consumer_update.md`'s "Functionality, not data" correction
+(2026-08-01) if you're wondering why a shared_resources item never shows up here.
 
 You reached this file via a skill stub whose own path resolved somewhere under a `toolkit\`
 folder. That `toolkit\` folder's parent is **the hub root** (where `shared_resources\` lives); the
@@ -35,14 +43,14 @@ This is a deterministic scan - no hub-side read dependency beyond files already 
 trust-review gate (unlike the hub's own `update`, which pulls from a public remote; this source is
 the same local hub this project already imports mandatory pieces from at the same trust level).
 It checks this project's own local state directly (`.claude\settings.json`, `CLAUDE.md` `@import`
-lines, `.claude\skills\` listing) against four categories of hub-side surface:
+lines, `.claude\skills\` listing) against three categories of hub-side surface - every one of them
+something `new_consumer.py` would wire into a brand-new consumer today:
 
 | Category | What "available" means |
 |---|---|
 | Hook | A `MENU.md` hook this project hasn't opted into |
-| Toolkit skill | A `toolkit\templates\skills\*\` Track-1 skill not present under `.claude\skills\` |
+| Toolkit skill | A `STANDALONE_SKILLS` Track-1 skill (`update`, `commands`) not present under `.claude\skills\` |
 | Protocol piece | `filing`/`compliance`/`continuity` not `@import`ed (flat or Track-1 form) |
-| Shared-resources insight | An active (non-archived) `shared_resources\CATALOG.md` entry with no adoption marker found in this project |
 
 It prints an indexed, categorized list. If it's empty, this project already has everything the hub
 currently offers - stop here.
@@ -72,12 +80,6 @@ item type already uses elsewhere in this platform (a hook's opt-in JSON merge, a
 verbatim-copy-plus-`{{IMPORT_BASE}}`-substitution, a protocol piece's `@import` line) - nothing new
 to learn.
 
-For a chosen **shared-resources insight**, do **not** use `--apply` - `scan_consumer_update.py`
-deliberately skips these with a pointer, since adopting an insight is a negotiated draft (a
-retrieval hook and summary shaped for this project, confirmed before writing), not a mechanical
-copy. Instead follow `templates\shared_resources.md`'s own "Applying an insight" procedure for
-that entry (e.g. say "shared resources — apply `<entry name>`").
-
 ### Step 4 — tell the hub about what changed (hooks and toolkit skills only)
 
 After an `--apply` that touched a **hook** or a **toolkit skill**, the script prints a
@@ -86,7 +88,6 @@ change yet, and two things there actually depend on it staying accurate: `script
 regenerating hook commands after a machine move, and the "who's opted in" check before a
 behavior-changing shared-tool edit. File a short registration-update ticket the same way
 `templates\filing.md` describes (a lightweight ticket, not a bug report), naming what was added.
-**Not needed** for a `shared_resources` insight (already self-auditing, independent of the
-registry) or a flat `@import`-only protocol piece like `compliance` (a live reference, nothing
-copied to go stale) — see `design\consumer_update.md`'s "Does registry write-back actually
+**Not needed** for a flat `@import`-only protocol piece like `compliance` (a live reference,
+nothing copied to go stale) — see `design\consumer_update.md`'s "Does registry write-back actually
 matter?" for the full reasoning.

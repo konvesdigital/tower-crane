@@ -13,9 +13,9 @@ is purely on-demand, never a resume-time check (design\consumer_update.md's "no 
 -->
 ---
 name: update
-description: Use when the user says "update" or asks to check for new tower_crane hub features
-  (hooks, shared_resources entries, toolkit skills, protocol pieces) this project hasn't adopted
-  yet.
+description: Use when the user says "update" or asks to check for new tower_crane hub
+  functionality (hooks, toolkit skills, protocol pieces) this project hasn't adopted yet. Not for
+  shared_resources content - that's the "shared resources" command's own job.
 ---
 Read `{{IMPORT_BASE}}/update.md` in full and follow it exactly — scanning what's available,
 presenting the list, and applying chosen items are all covered there. Do not paraphrase or act

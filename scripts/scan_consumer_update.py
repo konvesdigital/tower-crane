@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """
 scan_consumer_update.py - the deterministic scan/apply half of the consumer-side `update` skill
-(design\\consumer_update.md). Lists hub features (hooks, toolkit Track-1 skills, shared_resources
-insights, mandatory/default-on protocol pieces) a consumer project hasn't adopted yet, and can
-apply the purely-mechanical categories on request.
+(design\\consumer_update.md). Scope is FUNCTIONALITY PARITY with a fresh new_consumer.py scaffold
+only - hooks, toolkit Track-1 skills (STANDALONE_SKILLS + SKILL_PIECES), and mandatory/default-on
+protocol pieces a consumer project hasn't adopted yet. Deliberately excludes shared_resources
+content - that's DATA, not functionality, and adopting it is the "shared resources" command's own
+job (search/browse/select/apply), never this script's (design\\consumer_update.md's "Functionality,
+not data" correction, 2026-08-01).
 
 Mirrors update_toolkit.py's indexed list-and-choose shape without its trust-review gate: the
 source here is the same local hub a consumer already imports mandatory pieces from at the same
@@ -11,10 +14,7 @@ trust level, so there is no diff to review - just a list and a choice.
 
 Two calls:
   --check (default)   scan and print an indexed list of everything available but not adopted.
-  --apply <spec>       apply items by their printed number (comma-separated) or 'all'. A
-                       shared_resources insight is never auto-applied here - it's a negotiated
-                       draft (templates\\shared_resources.md's own Apply procedure), not a
-                       mechanical copy; selecting one just prints a pointer to that procedure.
+  --apply <spec>       apply items by their printed number (comma-separated) or 'all'.
 
 Numbering is recomputed fresh on every call (no persisted pending-list file, unlike
 update_toolkit.py) - deterministic given unchanged project/hub state, which holds across the
@@ -41,17 +41,20 @@ TEMPLATES_DIR = SHARED_ROOT / 'templates'
 OPTINS_DIR = TEMPLATES_DIR / 'optins'
 SKILLS_DIR = TEMPLATES_DIR / 'skills'
 PROJECT_ROOT = SHARED_ROOT.parent  # hub root
-CATALOG_PATH = PROJECT_ROOT / 'shared_resources' / 'CATALOG.md'
 
 # Mirrors scripts\new_consumer.py's SKILL_PIECES / check_tower_crane.py's SKILL_PIECES - keep in
-# sync. 'update' itself is deliberately NOT in here: it has no always-resident companion (design\
-# consumer_update.md - purely Track 1, no resume-time check), so it falls out as an ordinary
-# toolkit skill in scan_skills() instead.
+# sync.
 SKILL_PIECES = {
     'filing': {'companion': 'filing_resume_check', 'skills': ['filing']},
     'continuity': {'companion': 'continuity_resume_check', 'skills': ['checkpoint', 'archive']},
 }
 MANDATORY_OR_DEFAULT_PIECES = ['filing', 'compliance', 'continuity']
+
+# Mirrors scripts\new_consumer.py's STANDALONE_SKILLS - keep in sync. These are the only
+# templates\skills\* entries a fresh scaffold ever gets; anything else under that folder (e.g.
+# hub_commands, which is hub-operator self-use only, distributed via self_hooks.py) must never be
+# offered here even though it physically lives alongside these in the same directory.
+STANDALONE_SKILLS = ['update', 'commands']
 
 
 def read_consumer_state(project_root):
@@ -70,15 +73,8 @@ def read_consumer_state(project_root):
     skills_dir = project_root / '.claude' / 'skills'
     have_skills = {d.name for d in skills_dir.iterdir() if d.is_dir()} if skills_dir.is_dir() else set()
 
-    # Text searched for shared_resources adoption markers - CLAUDE.md plus every project-local
-    # skill stub (the two places "Apply" (templates\shared_resources.md) can write one).
-    marker_text = md_text
-    if skills_dir.is_dir():
-        for f in skills_dir.glob('*/SKILL.md'):
-            marker_text += '\n' + f.read_text(encoding='utf-8')
-
     return {'md_text': md_text, 'md_imports': md_imports, 'settings': settings,
-            'have_skills': have_skills, 'marker_text': marker_text}
+            'have_skills': have_skills}
 
 
 def scan_hooks(cfg, state):
@@ -101,14 +97,11 @@ def scan_hooks(cfg, state):
 
 
 def scan_skills(state):
-    covered = {name for sp in SKILL_PIECES.values() for name in sp['skills']}
     items = []
-    if not SKILLS_DIR.is_dir():
-        return items
-    for d in sorted(SKILLS_DIR.iterdir(), key=lambda p: p.name):
-        if not d.is_dir() or d.name in covered or d.name in state['have_skills']:
+    for name in STANDALONE_SKILLS:
+        if name in state['have_skills'] or not (SKILLS_DIR / name).is_dir():
             continue
-        items.append({'category': 'skill', 'name': d.name, 'detail': f'templates/skills/{d.name}/SKILL.md'})
+        items.append({'category': 'skill', 'name': name, 'detail': f'templates/skills/{name}/SKILL.md'})
     return items
 
 
@@ -128,47 +121,11 @@ def scan_pieces(state):
     return items
 
 
-def parse_catalog():
-    rows = []
-    if not CATALOG_PATH.exists():
-        return rows
-    in_table = False
-    for line in CATALOG_PATH.read_text(encoding='utf-8').splitlines():
-        if line.startswith('| Name '):
-            in_table = True
-            continue
-        if not in_table:
-            continue
-        if line.startswith('|---'):
-            continue
-        if not line.startswith('|'):
-            in_table = False
-            continue
-        cells = [c.strip() for c in line.strip().strip('|').split('|')]
-        if len(cells) >= 6:
-            rows.append({'name': cells[0], 'kind': cells[1], 'file': cells[2],
-                         'description': cells[3], 'added': cells[4], 'status': cells[5]})
-    return rows
-
-
-def scan_insights(state):
-    items = []
-    for row in sorted(parse_catalog(), key=lambda r: r['name']):
-        if row['status'].startswith('Archived'):
-            continue
-        marker_re = re.compile(r'shared_resources:\s*' + re.escape(row['name']) + r'\s+adopted')
-        if marker_re.search(state['marker_text']):
-            continue
-        items.append({'category': 'insight', 'name': row['name'], 'detail': f"{row['kind']} - {row['file']}"})
-    return items
-
-
 def print_items(items):
     if not items:
         print("Nothing available - this project already has everything the hub currently offers.")
         return
-    labels = {'hook': 'Hook opt-ins', 'skill': 'Toolkit skills', 'piece': 'Protocol pieces',
-              'insight': 'Shared-resources insights'}
+    labels = {'hook': 'Hook opt-ins', 'skill': 'Toolkit skills', 'piece': 'Protocol pieces'}
     print(f"=== AVAILABLE ({len(items)}) ===")
     current_cat = None
     for i, it in enumerate(items, 1):
@@ -262,13 +219,6 @@ def apply_piece(project_root, cfg, item):
     return bool(sp)  # needs registry write-back only when a skill stub was (or already is) involved
 
 
-def apply_insight(item):
-    print(f"  [manual] '{item['name']}' is a shared_resources insight - not applied here. Adopt it "
-          "via templates\\shared_resources.md's own Apply procedure (negotiated trigger/summary, "
-          "confirm before writing), e.g. say \"shared resources - apply " + item['name'] + "\".")
-    return False
-
-
 def resolve_selection(spec, items):
     if spec.strip().lower() == 'all':
         return list(range(1, len(items) + 1))
@@ -302,14 +252,12 @@ def do_apply(project_root, cfg, items, spec):
         elif item['category'] == 'piece':
             if apply_piece(project_root, cfg, item):
                 writeback.append(item['name'])
-        elif item['category'] == 'insight':
-            apply_insight(item)
     if writeback:
         print()
         print("[reminder] The hub's consumers/<slug>.md registry doesn't know about this yet - file "
               "a short registration-update ticket (templates/filing.md's filing shape) naming: "
               + ', '.join(writeback) + ". Needed so scripts/relocate.py and future opted-in-tool "
-              "checks stay accurate; not needed for insights or flat @import-only pieces.")
+              "checks stay accurate; not needed for flat @import-only pieces.")
 
 
 def main():
@@ -318,8 +266,7 @@ def main():
     )
     parser.add_argument('--project-root', default='.', help="This consumer project's root (default: cwd).")
     parser.add_argument('--apply', default=None,
-                         help="Comma-separated item numbers from the last --check listing, or 'all'. "
-                              "Applies hook/skill/piece items; an insight item just prints a pointer.")
+                         help="Comma-separated item numbers from the last --check listing, or 'all'.")
     args = parser.parse_args()
 
     project_root = Path(args.project_root).resolve()
@@ -329,7 +276,7 @@ def main():
 
     cfg = get_shared_config(SHARED_ROOT)
     state = read_consumer_state(project_root)
-    items = scan_hooks(cfg, state) + scan_skills(state) + scan_pieces(state) + scan_insights(state)
+    items = scan_hooks(cfg, state) + scan_skills(state) + scan_pieces(state)
 
     if args.apply is None:
         print_items(items)
