@@ -25,9 +25,14 @@ Two passes, plus an optional compliance-guidance writer:
         like 'filing' is also satisfied by its Track-1 skill-stub form - design\\directive_economy.md);
       - Track-1 skill stub drift (toolkit-governed only, design\\directive_economy.md): for each
         skill name any SKILL_PIECES entry scaffolds, plus every STANDALONE_SKILLS entry (design\\
-        consumer_update.md - a Track-1 skill with no @import companion, e.g. `update`), a
-        consumer's project-local .claude/skills/<name>/SKILL.md must still match the canonical
-        templates/skills/<name>/SKILL.md (with {{IMPORT_BASE}} resolved).
+        consumer_update.md / design\\optimize_ux.md - a Track-1 skill with no @import companion,
+        e.g. `update`, `commands`), a consumer's project-local .claude/skills/<name>/SKILL.md must
+        still match the canonical templates/skills/<name>/SKILL.md (with {{IMPORT_BASE}} resolved).
+
+  Hub self-use skill drift (design\\optimize_ux.md, addendum to Pass B): the hub is not a
+    registered consumer of its own scaffolder, so `hub_commands` (installed only via
+    self_hooks.py's "skills" opt-in key) isn't covered by the per-consumer loop above - checked
+    separately, once, against this hub's own .claude/skills/ regardless of --consumer scoping.
 
   Compliance guidance (decision 11, the two-way channel, down direction):
     With --write-guidance, for each reachable consumer that has consumer-actionable FAILs,
@@ -85,10 +90,10 @@ SKILL_PIECES = {
     'continuity': {'companion': 'continuity_resume_check', 'skills': ['checkpoint', 'archive']},
 }
 
-# Standalone Track-1 skills with no @import companion (design\consumer_update.md): still
-# toolkit-governed, so a consumer's stub still gets the same drift check below. Mirrors
-# scripts\new_consumer.py's STANDALONE_SKILLS - keep in sync.
-STANDALONE_SKILLS = ['update']
+# Standalone Track-1 skills with no @import companion (design\consumer_update.md, design\
+# optimize_ux.md): still toolkit-governed, so a consumer's stub still gets the same drift check
+# below. Mirrors scripts\new_consumer.py's STANDALONE_SKILLS - keep in sync.
+STANDALONE_SKILLS = ['update', 'commands']
 
 COUNTS = {'PASS': 0, 'WARN': 0, 'FAIL': 0}
 
@@ -507,6 +512,43 @@ def invoke_reference_scan(config, this_host, consumer_filter, write_guidance_fla
             write_guidance(c, devs, head_sha, today)
 
 
+def check_hub_self_use_skills():
+    """Hub self-use skill drift (design\\optimize_ux.md): the hub isn't a registered consumer of
+    its own scaffolder, so a skill installed via self_hooks.py's "skills" opt-in key (e.g.
+    hub_commands) never passes through the per-consumer loop above. Scans every
+    templates/optins/*.json for a "skills" list and, for each name that's actually installed on
+    this machine (.claude/skills/<name>/SKILL.md exists - not installed is a valid off state, not
+    a drift), compares it verbatim against the canonical templates/skills/<name>/SKILL.md (no
+    {{IMPORT_BASE}} substitution - self-use always targets this one repo, never a floating
+    consumer path)."""
+    print()
+    print("--- Hub self-use skill drift ---")
+    found_any = False
+    for optin_path in sorted(OPTINS_DIR.glob('*.json')):
+        optin = json.loads(optin_path.read_text(encoding='utf-8'))
+        for name in optin.get('skills', []):
+            found_any = True
+            stub_path = PROJECT_ROOT / '.claude' / 'skills' / name / 'SKILL.md'
+            if not stub_path.exists():
+                print(f"  [skip] '{name}' not installed on this machine (self_hooks.py --enable {name} to turn it on).")
+                continue
+            canon_path = SKILLS_DIR / name / 'SKILL.md'
+            if not canon_path.exists():
+                report('FAIL', f"Hub self-use skill '{name}' is installed but tower_crane has no "
+                                f"canonical source at templates/skills/{name}/SKILL.md.")
+                continue
+            expected = canon_path.read_text(encoding='utf-8')
+            actual = stub_path.read_text(encoding='utf-8')
+            if actual != expected:
+                report('FAIL', f"Hub self-use skill '{name}' (.claude/skills/{name}/SKILL.md) has drifted "
+                                f"from the canonical source.")
+                print(f"        fix: re-run `python scripts\\self_hooks.py --enable {name}` to refresh it.")
+            else:
+                report('PASS', f"'{name}' matches canonical source.")
+    if not found_any:
+        print("  (no optin declares a 'skills' key yet)")
+
+
 def get_head_sha():
     try:
         result = subprocess.run(
@@ -546,6 +588,7 @@ def main():
         invoke_golden_suite(config)
     if not args.skip_reference:
         invoke_reference_scan(config, this_host, args.consumer, args.write_guidance, head_sha, today)
+        check_hub_self_use_skills()
 
     print()
     print(f"=== Summary: {COUNTS['PASS']} passed, {COUNTS['WARN']} warning(s), {COUNTS['FAIL']} failure(s) ===")

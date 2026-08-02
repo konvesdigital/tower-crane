@@ -9,7 +9,8 @@ session (consumer_platform design, decision 10):
   <target>/.claude/skills/<name>/  - Track-1 skill stub(s) for toolkit-governed pieces in
                                      SKILL_PIECES (design\\directive_economy.md) - `filing`,
                                      `checkpoint`, `archive` so far - plus every STANDALONE_SKILLS
-                                     entry (design\\consumer_update.md) - `update` so far
+                                     entry (design\\consumer_update.md, design\\optimize_ux.md) -
+                                     `update`, `commands` so far
   <target>/project_progress.md      - continuity skeleton (only when continuity is on)
   <target>/FIRST_RUN.md             - one-time checklist the new project runs then deletes
   consumers/<slug>.md               - registry entry (this repo)
@@ -67,8 +68,9 @@ SKILL_PIECES = {
 
 # Standalone Track-1 skills with no @import companion at all (design\\consumer_update.md): scaffolded
 # for every new consumer unconditionally, alongside (not through) the SKILL_PIECES protocol pieces
-# above. `update` is purely on-demand - nothing resume-time ever checks for it.
-STANDALONE_SKILLS = ['update']
+# above. `update` is purely on-demand - nothing resume-time ever checks for it. `commands`
+# (design\\optimize_ux.md) is the consumer-side discoverability menu, same on-demand shape.
+STANDALONE_SKILLS = ['update', 'commands']
 
 
 def write_utf8(path, content):

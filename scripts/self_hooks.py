@@ -10,6 +10,13 @@ for tracking OTHER projects (design discussion: project_progress.md, 2026-07-22 
 at templates\\optins\\<tool>.json - this script is the only piece that was actually missing: a
 personal, per-machine way to flip one on/off for THIS repo's own use.
 
+An opt-in snippet may carry a 'hooks' key (merged into .claude\\settings.local.json, as always) and/
+or a 'skills' key - a list of Track-1 skill names whose canonical templates\\skills\\<name>\\SKILL.md
+gets copied verbatim into this hub's own .claude\\skills\\<name>\\SKILL.md (design\\optimize_ux.md's
+hub_commands - the hub-operator side of the "commands" discoverability mechanism, distributed this
+way since the hub isn't a registered consumer of new_consumer.py's scaffolder). No {{IMPORT_BASE}}
+substitution for skills, unlike the consumer-side pattern - self-use always targets this one repo.
+
   --list              (default) show every available tool and whether it's currently on here.
   --enable <tool>     merge templates\\optins\\<tool>.json's hook(s) into .claude\\settings.local.json.
   --disable <tool>    remove them again.
@@ -37,9 +44,11 @@ SHARED_ROOT = Path(__file__).resolve().parent.parent
 # level above SHARED_ROOT (toolkit\), not inside it.
 PROJECT_ROOT = SHARED_ROOT.parent
 OPTINS_DIR = SHARED_ROOT / 'templates' / 'optins'
+SKILLS_DIR = SHARED_ROOT / 'templates' / 'skills'
 CLAUDE_DIR = PROJECT_ROOT / '.claude'
 SETTINGS_PATH = CLAUDE_DIR / 'settings.local.json'
 STATUS_PATH = CLAUDE_DIR / 'self_hooks_status.md'
+SKILLS_INSTALL_DIR = CLAUDE_DIR / 'skills'
 
 
 def write_utf8(path, content):
@@ -75,12 +84,7 @@ def _normalize(entry):
     return json.dumps(entry, separators=(',', ':')).replace('\\\\', '/')
 
 
-def tool_status(tool, settings, config):
-    """Returns 'on' / 'off' / 'n/a' (n/a = the opt-in snippet has no 'hooks' key - nothing here
-    to toggle via settings.json yet, e.g. a future subagent-only tool)."""
-    optin = get_expanded_optin(OPTINS_DIR / f"{tool}.json", config)
-    if 'hooks' not in optin:
-        return 'n/a'
+def _hooks_on(optin, settings):
     hooks = settings.get('hooks') if isinstance(settings, dict) else None
     for evt, groups in optin['hooks'].items():
         canon = [_normalize(g) for g in groups]
@@ -88,7 +92,35 @@ def tool_status(tool, settings, config):
         if isinstance(hooks, dict) and evt in hooks:
             have = [_normalize(e) for e in hooks[evt]]
         if any(entry not in have for entry in canon):
-            return 'off'
+            return False
+    return True
+
+
+def _skills_on(optin):
+    for name in optin['skills']:
+        canon_path = SKILLS_DIR / name / 'SKILL.md'
+        installed_path = SKILLS_INSTALL_DIR / name / 'SKILL.md'
+        if not installed_path.exists():
+            return False
+        if installed_path.read_text(encoding='utf-8') != canon_path.read_text(encoding='utf-8'):
+            return False
+    return True
+
+
+def tool_status(tool, settings, config):
+    """Returns 'on' / 'off' / 'n/a' (n/a = the opt-in snippet has neither a 'hooks' nor a 'skills'
+    key - nothing here to toggle yet). 'on' requires every declared hook AND every declared skill
+    (whichever keys are present) to already match; a mismatched/missing skill copy counts as 'off',
+    same as a missing hook entry."""
+    optin = get_expanded_optin(OPTINS_DIR / f"{tool}.json", config)
+    has_hooks = 'hooks' in optin
+    has_skills = 'skills' in optin
+    if not has_hooks and not has_skills:
+        return 'n/a'
+    if has_hooks and not _hooks_on(optin, settings):
+        return 'off'
+    if has_skills and not _skills_on(optin):
+        return 'off'
     return 'on'
 
 
@@ -133,30 +165,60 @@ def cmd_list(config):
     print("Toggle: python scripts\\self_hooks.py --enable <tool> / --disable <tool>")
 
 
+def _enable_skills(optin):
+    changed = False
+    for name in optin['skills']:
+        canon_path = SKILLS_DIR / name / 'SKILL.md'
+        if not canon_path.exists():
+            raise RuntimeError(f"Canonical skill stub missing for '{name}': {canon_path}")
+        installed_path = SKILLS_INSTALL_DIR / name / 'SKILL.md'
+        canon_content = canon_path.read_text(encoding='utf-8')
+        if not installed_path.exists() or installed_path.read_text(encoding='utf-8') != canon_content:
+            write_utf8(installed_path, canon_content)
+            changed = True
+    return changed
+
+
+def _disable_skills(optin):
+    changed = False
+    for name in optin['skills']:
+        installed_path = SKILLS_INSTALL_DIR / name / 'SKILL.md'
+        if installed_path.exists():
+            installed_path.unlink()
+            changed = True
+        skill_dir = installed_path.parent
+        if skill_dir.exists() and not any(skill_dir.iterdir()):
+            skill_dir.rmdir()
+    return changed
+
+
 def cmd_enable(tool, config):
     optin_path = OPTINS_DIR / f"{tool}.json"
     if not optin_path.exists():
         raise RuntimeError(f"Unknown tool '{tool}' - no opt-in snippet at {optin_path}. "
                             f"Available: {', '.join(available_tools()) or '(none)'}")
     optin = get_expanded_optin(optin_path, config)
-    if 'hooks' not in optin:
-        raise RuntimeError(f"'{tool}' has no hook to enable (no 'hooks' key in {optin_path}).")
+    if 'hooks' not in optin and 'skills' not in optin:
+        raise RuntimeError(f"'{tool}' has nothing to enable (no 'hooks' or 'skills' key in {optin_path}).")
 
-    settings = load_settings()
     changed = False
-    for evt, groups in optin['hooks'].items():
-        existing = settings['hooks'].setdefault(evt, [])
-        existing_norm = [_normalize(e) for e in existing]
-        for entry in groups:
-            if _normalize(entry) not in existing_norm:
-                existing.append(entry)
-                changed = True
-    save_settings(settings)
+    settings = load_settings()
+    if 'hooks' in optin:
+        for evt, groups in optin['hooks'].items():
+            existing = settings['hooks'].setdefault(evt, [])
+            existing_norm = [_normalize(e) for e in existing]
+            for entry in groups:
+                if _normalize(entry) not in existing_norm:
+                    existing.append(entry)
+                    changed = True
+        save_settings(settings)
+    if 'skills' in optin:
+        changed = _enable_skills(optin) or changed
     write_status(config, settings)
     if changed:
-        print(f"Enabled '{tool}' for this machine ({SETTINGS_PATH}).")
+        print(f"Enabled '{tool}' for this machine.")
     else:
-        print(f"'{tool}' was already enabled ({SETTINGS_PATH}) - no change.")
+        print(f"'{tool}' was already enabled - no change.")
 
 
 def cmd_disable(tool, config):
@@ -165,27 +227,30 @@ def cmd_disable(tool, config):
         raise RuntimeError(f"Unknown tool '{tool}' - no opt-in snippet at {optin_path}. "
                             f"Available: {', '.join(available_tools()) or '(none)'}")
     optin = get_expanded_optin(optin_path, config)
-    if 'hooks' not in optin:
-        raise RuntimeError(f"'{tool}' has no hook to disable (no 'hooks' key in {optin_path}).")
+    if 'hooks' not in optin and 'skills' not in optin:
+        raise RuntimeError(f"'{tool}' has nothing to disable (no 'hooks' or 'skills' key in {optin_path}).")
 
-    settings = load_settings()
     changed = False
-    for evt, groups in optin['hooks'].items():
-        canon = [_normalize(g) for g in groups]
-        have = settings['hooks'].get(evt, [])
-        kept = [e for e in have if _normalize(e) not in canon]
-        if len(kept) != len(have):
-            changed = True
-        if kept:
-            settings['hooks'][evt] = kept
-        else:
-            settings['hooks'].pop(evt, None)
-    save_settings(settings)
+    settings = load_settings()
+    if 'hooks' in optin:
+        for evt, groups in optin['hooks'].items():
+            canon = [_normalize(g) for g in groups]
+            have = settings['hooks'].get(evt, [])
+            kept = [e for e in have if _normalize(e) not in canon]
+            if len(kept) != len(have):
+                changed = True
+            if kept:
+                settings['hooks'][evt] = kept
+            else:
+                settings['hooks'].pop(evt, None)
+        save_settings(settings)
+    if 'skills' in optin:
+        changed = _disable_skills(optin) or changed
     write_status(config, settings)
     if changed:
-        print(f"Disabled '{tool}' for this machine ({SETTINGS_PATH}).")
+        print(f"Disabled '{tool}' for this machine.")
     else:
-        print(f"'{tool}' was not enabled ({SETTINGS_PATH}) - no change.")
+        print(f"'{tool}' was not enabled - no change.")
 
 
 def main():
