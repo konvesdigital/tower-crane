@@ -52,10 +52,11 @@ already loaded it earlier in the same session.
 
 ### "archive" (user-initiated only — never automatic, never during "checkpoint")
 
-1. List current Work Log entries — date + one-line title only, newest first.
-2. Ask the user where to draw the cutoff. Do not guess. Wait for an explicit answer.
-3. Move every entry at or before that cutoff into `project_progress_archive.md`, appended in
+1. Determine which work log entries are both fully completed and are not themselves a dependency for current or other work items. 
+2. List current Work Log entries — date + one-line title only, newest first, and indicate with a checkmark those which are fully complete and not dependencies of others based on the check in step 1.
+3. Ask the user where to draw the cutoff. Do not guess. Wait for an explicit answer.
+4. Move every entry at or before that cutoff into `project_progress_archive.md`, appended in
    chronological order (oldest first). Create the archive file if it doesn't exist yet.
-4. Remove those entries from `project_progress.md`. Confirm what was archived. Only the **Work
+5. Remove those entries from `project_progress.md`. Confirm what was archived. Only the **Work
    Log** is archived — Current Status/Focus, Next Up, Decisions, Phases, and To Reconcile are
    live state and stay in `project_progress.md`.
