@@ -86,7 +86,7 @@ below, volunteer the other side as the single next-best follow-up - don't wait t
 | `checkpoint` | `resume` (and vice versa) |
 | pulling in shared resources (search/browse/adopt) | `shared resources` `Save` - sharing something this project found, outward |
 | filing a bug/problem | the round-trip check ("check my ticket") is part of the same `filing` skill |
-| `update` (pulling in new hub features) | this project can't push upstream itself - that's a hub-operator-only action ("propose upstream"), only reachable by asking the hub operator |
+| `update` (pulling in new hub features this project hasn't adopted yet) | the hub-operator side of the same content is `update consumers` (same features, pushed instead of pulled); if what you want doesn't exist as hub functionality yet, that's a `filing` proposal ticket instead, not `update` - and note the hub has its own separate `update` (pulling the *public* toolkit repo in), a different boundary this project can't reach at all |
 
 ### Reaching the hub from here
 

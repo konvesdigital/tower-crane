@@ -74,12 +74,12 @@ below, volunteer the other side as the single next-best follow-up - don't wait t
 | If the query is about... | ...also mention |
 |---|---|
 | `checkpoint` | `resume` (and vice versa) |
-| `update` (pulling the public repo in) | `propose upstream` (pushing a local fix back out) |
+| `update` (pulling the public repo in) | `propose upstream` (pushing a local fix back out) - not `update consumers`, which is a different boundary (pushing already-adopted hub functionality out to registered projects, not pulling anything in) |
 | processing a filed ticket | the reverse is a consumer's own `filing` skill - "that's how a project gets a ticket to you in the first place" |
 | `self hooks` (what's turned on for this hub itself) | a consumer project has the same question about its own opted-in tools, asked from inside that project |
 | `curate shared resources` (this hub pushing an insight to every consumer) | a consumer can already pull the same thing on its own via its own `shared resources` search/browse - curation is an accelerant, not a requirement |
 | `new tool` | `modify tool` (sibling lifecycle actions - create vs. change) |
-| `update consumers` (this hub pushing functionality to every consumer) | a consumer can already pull the same thing on its own via its own `update` skill - bulk push here is an accelerant for when you just built something and know every local consumer wants it, not a requirement |
+| `update consumers` (this hub pushing functionality to every consumer) | a consumer can already pull the same thing on its own via its own `update` skill - bulk push here is an accelerant for when you just built something and know every local consumer wants it, not a requirement. Distinct from the hub's own `update` (pulls the public repo in - doesn't touch consumers at all) despite the shared name |
 
 ### A note on ground-reachability
 
