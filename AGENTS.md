@@ -155,9 +155,7 @@ back-and-forth lives in one file:
 - consumer:   `2026-07-19 — <slug> re-verified, still fails: <what>`   (ticket stays OPEN)
 - consumer:   `2026-07-20 — <slug> verified PASS`                       (this agent flips DONE next session)
 
-**Multi-user attribution:** if more than one person has commit access, name the acting person
-alongside the project in each line (e.g. `fix applied by <name> (commit <sha>)…`). A single-owner
-hub keeps the terser project-only form above.
+**Multi-user attribution:** if more than one person has commit access, name the acting person alongside the project in each line (e.g. `fix applied by <name> (commit <sha>)…`). A single-owner hub keeps the terser project-only form above.
 
 ### Scanning at session start (including on `resume` — see above) or when asked to process requests
 Scan `change_requests\` for `Status: OPEN`. A `register` ticket (`Type: registration`) is handled by
@@ -216,8 +214,7 @@ filer, file a one-line verify-request ticket in `change_requests\` for each othe
 consumer this step is a no-op.
 
 ### Reverts and regressions
-No version tags or changelog — the **commit SHA in the round-trip log is the version handle**. A
-revert or regression is just another ticket: `Status: OPEN`, `Regression of: <original ticket>`,
+No version tags or changelog — the **commit SHA in the round-trip log is the version handle**. A revert or regression is just another ticket: `Status: OPEN`, `Regression of: <original ticket>`,
 citing the bad SHA. This agent decides revert vs. forward-fix and re-runs the same pre-apply
 validation. Do NOT add per-consumer version pinning or `_vN` copies.
 
@@ -393,3 +390,11 @@ never the full entry content. User-initiated only, never automatic or triggered 
 4. **Land** — nothing further to do here. The resume-time compliance check surfaces the new
    `## Broadcast` content on its own; the consumer sees it and, if they want to, follows the
    ordinary search/browse/apply flow in `templates\shared_resources.md`.
+
+**"update consumers"** — push-side of `update`: same scope as a consumer's own pull-side `update`
+skill (hooks, Track-1 skills, mandatory pieces; never `shared_resources`). User-initiated only.
+1. `python scripts\update_consumers.py` (optionally `--consumer <slug>`) — indexed list across
+   every locally-reachable consumer (Federate: other hosts skip silently); show it, ask what to apply.
+2. `python scripts\update_consumers.py --apply <numbers-or-'all'>` — writes each touched project
+   plus its `consumers\<slug>.md` registry entry directly (no filing ticket needed), then run
+   `scripts\check_tower_crane.py` to confirm it validates clean.

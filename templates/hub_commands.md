@@ -44,6 +44,7 @@ Toolkit evolution:
 
 Fleet operations:
   connect project — register a new or existing consumer
+  update consumers — bulk-push new hub functionality to every registered consumer
   curate shared resources — push an insight to every consumer
   set up automation — wire up unattended ticket processing
 ```
@@ -78,12 +79,13 @@ below, volunteer the other side as the single next-best follow-up - don't wait t
 | `self hooks` (what's turned on for this hub itself) | a consumer project has the same question about its own opted-in tools, asked from inside that project |
 | `curate shared resources` (this hub pushing an insight to every consumer) | a consumer can already pull the same thing on its own via its own `shared resources` search/browse - curation is an accelerant, not a requirement |
 | `new tool` | `modify tool` (sibling lifecycle actions - create vs. change) |
+| `update consumers` (this hub pushing functionality to every consumer) | a consumer can already pull the same thing on its own via its own `update` skill - bulk push here is an accelerant for when you just built something and know every local consumer wants it, not a requirement |
 
 ### A note on ground-reachability
 
-Some of the above (scaffolding a brand-new project, `propose upstream`, `update`, `self hooks`,
-`curate shared resources`'s push side, `set up automation`, applying a ticket's fix) can only run
-from here - the hub itself. A consumer-project session can *ask about* any of these (it has its
+Some of the above (scaffolding a brand-new project, `propose upstream`, `update`, `update
+consumers`, `self hooks`, `curate shared resources`'s push side, `set up automation`, applying a
+ticket's fix) can only run from here - the hub itself. A consumer-project session can *ask about* any of these (it has its
 own `commands` skill, `templates\commands.md`) but can only *stage* the ones that queue for the
 hub's own next session (filing a ticket, `register.md`'s registration ticket) - never execute them
 directly. If an operator session gets a question that's actually about what a consumer project can
