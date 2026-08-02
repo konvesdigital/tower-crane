@@ -135,7 +135,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Regenerate every registered consumer's hook command(s) from config.local.json."
     )
-    parser.add_argument('--consumer', default=None, help="Slug of a single consumer to scope to (e.g. geo_rank_tracker). Default: all.")
+    parser.add_argument('--consumer', default=None, help="Slug of a single consumer to scope to (e.g. my_cool_project). Default: all.")
     parser.add_argument('--dry-run', action='store_true', help="Show what would change without writing anything.")
     args = parser.parse_args()
 

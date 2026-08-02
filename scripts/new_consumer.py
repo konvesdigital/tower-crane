@@ -8,7 +8,8 @@ session (consumer_platform design, decision 10):
   <target>/CLAUDE.md               - from templates/consumer_CLAUDE.md.tmpl, with @import lines
   <target>/.claude/skills/<name>/  - Track-1 skill stub(s) for toolkit-governed pieces in
                                      SKILL_PIECES (design\\directive_economy.md) - `filing`,
-                                     `checkpoint`, `archive` so far
+                                     `checkpoint`, `archive` so far - plus every STANDALONE_SKILLS
+                                     entry (design\\consumer_update.md) - `update` so far
   <target>/project_progress.md      - continuity skeleton (only when continuity is on)
   <target>/FIRST_RUN.md             - one-time checklist the new project runs then deletes
   consumers/<slug>.md               - registry entry (this repo)
@@ -64,6 +65,11 @@ SKILL_PIECES = {
     'continuity': {'companion': 'continuity_resume_check', 'skills': ['checkpoint', 'archive']},
 }
 
+# Standalone Track-1 skills with no @import companion at all (design\\consumer_update.md): scaffolded
+# for every new consumer unconditionally, alongside (not through) the SKILL_PIECES protocol pieces
+# above. `update` is purely on-demand - nothing resume-time ever checks for it.
+STANDALONE_SKILLS = ['update']
+
 
 def write_utf8(path, content):
     # Python's utf-8 encoding never writes a BOM (unlike PS 5.1's -Encoding utf8); newline='\n'
@@ -81,7 +87,7 @@ def get_slug(name):
 def main():
     parser = argparse.ArgumentParser(description="Scaffold a new tower_crane consumer project.")
     parser.add_argument('--target-path', required=True, help="Absolute path to the new consumer's project root.")
-    parser.add_argument('--project-name', required=True, help='Full title in Title Case (e.g. "Geo Rank Tracker").')
+    parser.add_argument('--project-name', required=True, help='Full title in Title Case (e.g. "My Cool Project").')
     parser.add_argument('--tools', nargs='*', default=['consistency_check'],
                          help="Tools to opt into (each needs templates/optins/<tool>.json). Pass --tools with no "
                               "values for a consumer with no hooks. Default: consistency_check.")
@@ -139,6 +145,11 @@ def main():
             piece_path = TEMPLATES_DIR / f"{p}.md"
             if not piece_path.exists():
                 raise RuntimeError(f"Protocol piece '{p}' missing: {piece_path}")
+
+    for skill_name in STANDALONE_SKILLS:
+        stub_src = TEMPLATES_DIR / 'skills' / skill_name / 'SKILL.md'
+        if not stub_src.exists():
+            raise RuntimeError(f"Canonical skill stub missing for standalone skill '{skill_name}': {stub_src}")
 
     # the piece names actually @imported into CLAUDE.md - a SKILL_PIECES entry substitutes its
     # companion (e.g. 'filing' -> 'filing_resume_check'); everything else imports itself directly.
@@ -220,6 +231,19 @@ def main():
             write_utf8(stub_path, stub_content)
             print(f"  wrote  {stub_path}")
 
+    # --- 3c. standalone Track-1 skills (no @import companion - always scaffolded) -------------
+    for skill_name in STANDALONE_SKILLS:
+        stub_src = TEMPLATES_DIR / 'skills' / skill_name / 'SKILL.md'
+        skill_dir = claude_dir / 'skills' / skill_name
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        stub_path = skill_dir / 'SKILL.md'
+        if stub_path.exists() and not args.force:
+            print(f"  skip   {stub_path} exists (use --force to overwrite)")
+            continue
+        stub_content = stub_src.read_text(encoding='utf-8').replace('{{IMPORT_BASE}}', import_base)
+        write_utf8(stub_path, stub_content)
+        print(f"  wrote  {stub_path}")
+
     # --- 4. project_progress.md skeleton (continuity only) -----------------------------------
     if not args.no_continuity:
         progress_path = target_path / 'project_progress.md'
@@ -289,7 +313,7 @@ registered: {scaffold_date}
 ```
 
 Notes: scaffolded by `scripts/new_consumer.py` on {scaffold_date}. Registry format is documented in
-`consumers/geo_rank_tracker.md` (the machine-readable block the scaffolder writes and
+`consumers/<slug>.md` (the machine-readable block the scaffolder writes and
 `check_tower_crane.py` reads).
 """
     write_utf8(registry_path, registry)

@@ -24,8 +24,9 @@ Two passes, plus an optional compliance-guidance writer:
       - mandatory-piece glance: filing + compliance not imported -> WARN (a SKILL_PIECES entry
         like 'filing' is also satisfied by its Track-1 skill-stub form - design\\directive_economy.md);
       - Track-1 skill stub drift (toolkit-governed only, design\\directive_economy.md): for each
-        skill name any SKILL_PIECES entry scaffolds, a consumer's project-local
-        .claude/skills/<name>/SKILL.md must still match the canonical
+        skill name any SKILL_PIECES entry scaffolds, plus every STANDALONE_SKILLS entry (design\\
+        consumer_update.md - a Track-1 skill with no @import companion, e.g. `update`), a
+        consumer's project-local .claude/skills/<name>/SKILL.md must still match the canonical
         templates/skills/<name>/SKILL.md (with {{IMPORT_BASE}} resolved).
 
   Compliance guidance (decision 11, the two-way channel, down direction):
@@ -83,6 +84,11 @@ SKILL_PIECES = {
     'filing': {'companion': 'filing_resume_check', 'skills': ['filing']},
     'continuity': {'companion': 'continuity_resume_check', 'skills': ['checkpoint', 'archive']},
 }
+
+# Standalone Track-1 skills with no @import companion (design\consumer_update.md): still
+# toolkit-governed, so a consumer's stub still gets the same drift check below. Mirrors
+# scripts\new_consumer.py's STANDALONE_SKILLS - keep in sync.
+STANDALONE_SKILLS = ['update']
 
 COUNTS = {'PASS': 0, 'WARN': 0, 'FAIL': 0}
 
@@ -403,7 +409,7 @@ def test_consumer(c, config):
     # match the canonical source (with {{IMPORT_BASE}} resolved), or its trigger/body has drifted.
     # One piece can scaffold more than one skill (e.g. 'continuity' -> checkpoint + archive), so
     # iterate the flattened skill-name list, not the piece names themselves.
-    skill_names = sorted({name for sp in SKILL_PIECES.values() for name in sp['skills']})
+    skill_names = sorted({name for sp in SKILL_PIECES.values() for name in sp['skills']} | set(STANDALONE_SKILLS))
     for name in skill_names:
         stub_path = cpath / '.claude' / 'skills' / name / 'SKILL.md'
         if not stub_path.exists():
