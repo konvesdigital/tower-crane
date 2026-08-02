@@ -5,6 +5,16 @@ opt-in mechanism (templates\optins\hub_commands.json's "skills" key) — off by 
 same as every other self-use tool. Float-on-HEAD: this file is the one canonical source the stub
 always re-reads live. This file describes THIS hub's own operator-facing capabilities — it never
 governs a consumer project's session (that's templates\commands.md instead).
+
+Fluent-tier track sourcing (design\capability_relationships.md, "partial conversion" decision,
+2026-08-02): only "Efficiency habits" below is catalog-derived - the only one of this file's three
+tracks with a real matching theme tag in the locked design (`efficiency-rationale`). "Toolkit
+evolution" and "Fleet operations" stay hand-authored - no matching theme tag exists for either yet,
+and inventing one just to force uniformity would violate the theme-tag test itself (two members
+from different structural clusters, nameable in one clause). No functional loss either way - the
+theme layer is additive to `capability_relationships`' own answers regardless. Revisit only if a
+real third theme naturally emerges - don't invent one for this. See templates\commands.md's own
+header for the consumer-side half of the same call.
 -->
 
 ## Answering "what can I do here" from a hub-operator session
@@ -27,13 +37,20 @@ Both tiers draw from the same underlying capability set below - only the renderi
 One reply, grouped by track header, each line a bare command/phrase plus a one-line action. No
 follow-up turn required.
 
+**"Efficiency habits" is rendered live, not from a fixed list below:** read this hub's own
+`capability_catalog.yaml` (`toolkit\capability_catalog.yaml`). Filter `nodes` to `context: hub` or
+`both`, carrying the `efficiency-rationale` theme tag, and render one line per node using its
+`description`.
+
 ```
 commands
 
 Efficiency habits:
+  <rendered from capability_catalog.yaml, theme "efficiency-rationale" — expect roughly:>
   checkpoint — save state and push
   resume — pull state, check for updates
   quick resume — thin resume right after a checkpoint
+  archive — move resolved Work Log entries into the archive file, once it's grown enough to need it
 
 Toolkit evolution:
   new tool — add a tool to the shared library
@@ -51,17 +68,23 @@ Fleet operations:
 
 ### Beginner tier - guided story
 
-Narrated as a sequential story pulled from the discovery-order track ("first do X, then Y, then
-Z"), not a topical listing - answers "what's first," not "here's everything."
+Narrated as a sequential walk through `capability_catalog.yaml`'s own `path` section, filtered to
+nodes where `context` is `hub` or `both`, in that order - answers "what's first," not "here's
+everything." Read the catalog fresh each time; don't render from the frozen example below. Note
+this reorders the hub-side beginner story from an earlier hand-authored draft: the Path puts
+`checkpoint`/`resume` immediately after `setup_machine`, ahead of `connect_project` (short, easy,
+low-risk - genuinely the first thing worth doing with any fresh hub state, before even hub-specific
+discovery steps), not after it.
 
 ```
 I'm new here, what do I do?
 
-First, get the hub running: say "set up tower crane" and I'll walk you through it.
-Once that's done, connect your first project: say "connect project" and tell me if it's new or
-already exists.
-After that, the two habits worth learning early are "checkpoint" (save your progress) and
-"resume" (pick back up next session).
+First, get the hub running: say "set up tower crane" and I'll walk you through it. Once that's
+done, "checkpoint" (save progress, push) and "resume" (pick back up next session) are worth
+learning right away - the same two habits every project built off this hub relies on.
+
+From here, "self hooks" shows what's turned on for this hub itself, and "connect project" brings
+in your first project (new or already existing).
 
 You can say "commands" any time to see everything else.
 ```
@@ -74,6 +97,7 @@ below, volunteer the other side as the single next-best follow-up - don't wait t
 | If the query is about... | ...also mention |
 |---|---|
 | `checkpoint` | `resume` (and vice versa) |
+| `archive` (work log) | `checkpoint` - only worth mentioning once the work log has actually grown large enough to need archiving, not on every checkpoint |
 | `update` (pulling the public repo in) | `propose upstream` (pushing a local fix back out) - not `update consumers`, which is a different boundary (pushing already-adopted hub functionality out to registered projects, not pulling anything in) |
 | processing a filed ticket | the reverse is a consumer's own `filing` skill - "that's how a project gets a ticket to you in the first place" |
 | `self hooks` (what's turned on for this hub itself) | a consumer project has the same question about its own opted-in tools, asked from inside that project |

@@ -1,0 +1,327 @@
+# capability_catalog.yaml — Tower Crane's capability relationship graph.
+#
+# Public, toolkit-governed data file. Read by the `capability_relationships` skill
+# (templates\capability_relationships.md) and by `commands`/`hub_commands`
+# (templates\commands.md / templates\hub_commands.md, for their theme-derived tracks and
+# path-rendered beginner tier). Source of truth for this data is
+# design\capability_relationships.md (outer repo, private design reasoning) — this file is the
+# built, public artifact that design doc's "Catalog file format" section specifies. Update this
+# file, not a hand-authored duplicate, whenever a capability's relationships change.
+#
+# Three sections:
+#   nodes — every capability: id, trigger phrase, context (hub | consumer | both), a one-line
+#           description, and any theme tags (broad cross-cluster purpose links — see themes below).
+#   edges — structural relationships between nodes. type is one of the four canonical kinds
+#           (reciprocal | parallel | lifecycle-sibling | accelerant), plus two non-graph
+#           annotations kept here for completeness rather than dropped: name-collision (two nodes
+#           share a word but have no real relationship — a caution, not an edge to traverse) and
+#           backs (a general primitive and its one current live application — doesn't fit the four
+#           canonical types). accelerant edges are directional (a accelerates b); all other types
+#           are symmetric, listed once.
+#   path   — one unified ordered sequence spanning both hub and consumer capabilities, answering
+#            "what's next" rather than "what's related." Not every node appears (e.g. `relocate`
+#            is auto-triggered, not a deliberate next step, so it's deliberately excluded).
+
+nodes:
+  - id: checkpoint
+    trigger: "checkpoint"
+    context: both
+    description: "Saves progress, commits, pushes — scoped to whichever project the session is in"
+    themes: [efficiency-rationale]
+
+  - id: resume
+    trigger: "resume / quick resume"
+    context: both
+    description: >-
+      Pulls latest, checks compliance/tickets, picks up where left off. "quick resume" is the
+      identical capability run in a faster mode right after a checkpoint, skipping sync checks —
+      not a separate capability, just a lighter mode of this same one.
+    themes: [efficiency-rationale]
+
+  - id: archive_worklog
+    trigger: "archive"
+    context: both
+    description: "Moves resolved Work Log entries into the archive file"
+    themes: [efficiency-rationale]
+
+  - id: update_hub
+    trigger: "update (hub session)"
+    context: hub
+    description: "Pulls the public toolkit repo's latest into the hub, trust-review gated"
+    themes: []
+
+  - id: propose_upstream
+    trigger: "propose upstream"
+    context: hub
+    description: "Sends a local toolkit fix to the public repo via fork+PR"
+    themes: [push-outward]
+
+  - id: update_consumer
+    trigger: "update (consumer session)"
+    context: consumer
+    description: "Pulls hub functionality this project hasn't adopted yet"
+    themes: []
+
+  - id: update_consumers
+    trigger: "update consumers"
+    context: hub
+    description: "Bulk-pushes hub functionality to every registered consumer"
+    themes: [push-outward]
+
+  - id: new_tool
+    trigger: "new tool"
+    context: hub
+    description: "Adds a new shared tool to the toolkit — reaches consumers via silent propagation"
+    themes: [push-outward]
+
+  - id: modify_tool
+    trigger: "modify tool"
+    context: hub
+    description: "Changes or removes an existing shared tool"
+    themes: [push-outward]
+
+  - id: self_hooks
+    trigger: "self hooks"
+    context: hub
+    description: >-
+      Toggles a tool on/off for this hub's own self-use. Asymmetric parallel: a consumer project
+      has the same "what's turned on for me" question, but it's answered by `commands`, not by a
+      dedicated consumer-side node of its own.
+    themes: []
+
+  - id: connect_project
+    trigger: "connect project"
+    context: hub
+    description: "Registers a new (scaffold) or existing (ticket) consumer"
+    themes: []
+
+  - id: process_ticket
+    trigger: "implicit, \"resume\" scan / \"process requests\""
+    context: hub
+    description: "Applies a fix for a filed change-request ticket"
+    themes: []
+
+  - id: filing
+    trigger: "model-recognized \"filing-shaped moment\""
+    context: consumer
+    description: "Reports a bug, proposes shared content, or checks a ticket — a proposal ticket is itself a push toward the hub"
+    themes: [push-outward]
+
+  - id: register
+    trigger: "read register.md and follow it"
+    context: consumer
+    description: "Stages a registration ticket to join the platform"
+    themes: []
+
+  - id: setup_machine
+    trigger: "read setup_machine.md and follow it"
+    context: hub
+    description: "One-time machine/location config bootstrap"
+    themes: []
+
+  - id: relocate
+    trigger: "(auto, after config.local.json changes)"
+    context: hub
+    description: "Regenerates consumer hook commands after the hub moves/renames"
+    themes: []
+
+  - id: setup_automation
+    trigger: "read setup_automation.md and follow it"
+    context: hub
+    description: "Wires up unattended ticket processing"
+    themes: []
+
+  - id: broadcast_guidance
+    trigger: "(no standalone trigger — reached only via curate_shared_resources step 3)"
+    context: hub
+    description: "General reusable primitive: pushes one hand-authored guidance file into every (or one) registered consumer's COMPLIANCE_GUIDANCE.md"
+    themes: [push-outward]
+
+  - id: curate_shared_resources
+    trigger: "curate shared resources"
+    context: hub
+    description: "Proactively pushes awareness of a catalog entry to consumers"
+    themes: [push-outward]
+
+  - id: save
+    trigger: "shared resources \"Save\""
+    context: consumer
+    description: "Publishes something this project found/built into the shared catalog"
+    themes: [push-outward, efficiency-rationale]
+
+  - id: browse
+    trigger: "shared resources search/browse"
+    context: consumer
+    description: "Finds existing catalog entries"
+    themes: [efficiency-rationale]
+
+  - id: apply
+    trigger: "shared resources \"Apply\""
+    context: consumer
+    description: "Adopts a discovered catalog entry into this project"
+    themes: [efficiency-rationale]
+
+  - id: forget
+    trigger: "shared resources \"Forget\""
+    context: consumer
+    description: "This project drops an adopted entry locally"
+    themes: [efficiency-rationale]
+
+  - id: archive_resource
+    trigger: "shared resources \"Archive\""
+    context: consumer
+    description: "Retires a catalog entry globally (consumer-triggered, global effect)"
+    themes: [efficiency-rationale]
+
+  - id: commands
+    trigger: "commands / new-user signals"
+    context: consumer
+    description: "Meta/index — the full flat cheat sheet, consumer side"
+    themes: []
+
+  - id: hub_commands
+    trigger: "commands / new-operator signals"
+    context: hub
+    description: "Meta/index — the full flat cheat sheet, hub side"
+    themes: []
+
+edges:
+  - type: reciprocal
+    a: checkpoint
+    b: resume
+    conditional: false
+    note: null
+
+  - type: lifecycle-sibling
+    a: checkpoint
+    b: archive_worklog
+    conditional: true
+    note: "only when the Work Log has grown large enough to need archiving"
+
+  - type: name-collision
+    a: archive_worklog
+    b: archive_resource
+    conditional: false
+    note: "shares the word 'archive' only — no real relationship, different objects (work log entries vs. a shared-resource catalog entry). Informational caution, not traversable like a real edge."
+
+  - type: reciprocal
+    a: update_hub
+    b: propose_upstream
+    conditional: false
+    note: null
+
+  - type: parallel
+    a: update_hub
+    b: update_consumer
+    conditional: false
+    note: null
+
+  - type: accelerant
+    a: update_consumers
+    b: update_consumer
+    conditional: false
+    note: "a consumer could always run its own `update`; bulk-push is a convenience, not a requirement"
+
+  - type: lifecycle-sibling
+    a: new_tool
+    b: modify_tool
+    conditional: false
+    note: null
+
+  - type: lifecycle-sibling
+    a: connect_project
+    b: process_ticket
+    conditional: false
+    note: null
+
+  - type: lifecycle-sibling
+    a: connect_project
+    b: register
+    conditional: false
+    note: "existing-project path only — register.md is the existing-hand-copied-project route into the same registration outcome connect_project reaches for a brand-new project"
+
+  - type: lifecycle-sibling
+    a: process_ticket
+    b: filing
+    conditional: false
+    note: null
+
+  - type: lifecycle-sibling
+    a: filing
+    b: save
+    conditional: false
+    note: "2-hop — a proposal ticket is an insight's graduation path, not the same stage as saving it"
+
+  - type: lifecycle-sibling
+    a: setup_machine
+    b: relocate
+    conditional: false
+    note: null
+
+  - type: backs
+    a: broadcast_guidance
+    b: curate_shared_resources
+    conditional: false
+    note: "a general reusable primitive and its one current live application — not mutual, mirrored, or a lifecycle stage. Informational only, not traversable like a real edge."
+
+  - type: accelerant
+    a: curate_shared_resources
+    b: browse
+    conditional: false
+    note: "browse already finds everything on its own; curation is a proactive nudge on top, not a requirement"
+
+  - type: reciprocal
+    a: save
+    b: apply
+    conditional: false
+    note: null
+
+  - type: lifecycle-sibling
+    a: save
+    b: archive_resource
+    conditional: false
+    note: null
+
+  - type: lifecycle-sibling
+    a: browse
+    b: apply
+    conditional: false
+    note: "browse → apply always run sequentially — one leads straight into the other"
+
+  - type: lifecycle-sibling
+    a: apply
+    b: forget
+    conditional: false
+    note: null
+
+  - type: parallel
+    a: commands
+    b: hub_commands
+    conditional: false
+    note: null
+
+path:
+  # 19 steps (some steps carry two ids run consecutively — new_tool/modify_tool at step 12,
+  # curate_shared_resources/broadcast_guidance at step 15 — see
+  # design\capability_relationships.md's "The Path" section for the full reordering rationale).
+  - setup_machine     # 1
+  - checkpoint         # 2
+  - resume             # 3 (full mode first; quick-resume mode follows naturally right after)
+  - hub_commands       # 4
+  - self_hooks         # 5
+  - setup_automation   # 6
+  - connect_project    # 7 (alternate route for an existing project: `register` instead — same destination, not a separate step)
+  - commands           # 8
+  - save               # 9
+  - browse             # 10
+  - apply              # 11
+  - new_tool           # 12a
+  - modify_tool        # 12b
+  - filing             # 13
+  - process_ticket     # 14
+  - curate_shared_resources  # 15a
+  - broadcast_guidance       # 15b
+  - update_consumer    # 16
+  - update_consumers   # 17
+  - update_hub         # 18
+  - propose_upstream   # 19

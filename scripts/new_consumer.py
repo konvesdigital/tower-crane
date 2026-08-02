@@ -71,7 +71,10 @@ SKILL_PIECES = {
 # for every new consumer unconditionally, alongside (not through) the SKILL_PIECES protocol pieces
 # above. `update` is purely on-demand - nothing resume-time ever checks for it. `commands`
 # (design\\optimize_ux.md) is the consumer-side discoverability menu, same on-demand shape.
-STANDALONE_SKILLS = ['update', 'commands']
+# `capability_relationships` (design\\capability_relationships.md) answers a specific
+# mechanism/concept question by reading capability_catalog.yaml - also fires from a hub session,
+# via self_hooks.py's separate "skills" opt-in mechanism (templates\\optins\\capability_relationships.json).
+STANDALONE_SKILLS = ['update', 'commands', 'capability_relationships']
 
 
 def write_utf8(path, content):

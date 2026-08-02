@@ -12,10 +12,15 @@ personal, per-machine way to flip one on/off for THIS repo's own use.
 
 An opt-in snippet may carry a 'hooks' key (merged into .claude\\settings.local.json, as always) and/
 or a 'skills' key - a list of Track-1 skill names whose canonical templates\\skills\\<name>\\SKILL.md
-gets copied verbatim into this hub's own .claude\\skills\\<name>\\SKILL.md (design\\optimize_ux.md's
+gets copied into this hub's own .claude\\skills\\<name>\\SKILL.md (design\\optimize_ux.md's
 hub_commands - the hub-operator side of the "commands" discoverability mechanism, distributed this
-way since the hub isn't a registered consumer of new_consumer.py's scaffolder). No {{IMPORT_BASE}}
-substitution for skills, unlike the consumer-side pattern - self-use always targets this one repo.
+way since the hub isn't a registered consumer of new_consumer.py's scaffolder). Any {{IMPORT_BASE}}
+placeholder in the canonical stub is resolved the same way new_consumer.py resolves it for a real
+consumer - using this same hub's own computed import_base - before the copy is written; a stub with
+no such placeholder (e.g. hub_commands) is unaffected, since the substitution is a no-op on it. This
+lets a single canonical stub serve both a consumer scaffold and this hub's own self-install (see
+design\\capability_relationships.md's capability_relationships skill for the first case that needed
+this - a skill that fires the same way from either a consumer or a hub session).
 
   --list              (default) show every available tool and whether it's currently on here.
   --enable <tool>     merge templates\\optins\\<tool>.json's hook(s) into .claude\\settings.local.json.
@@ -96,13 +101,14 @@ def _hooks_on(optin, settings):
     return True
 
 
-def _skills_on(optin):
+def _skills_on(optin, config):
     for name in optin['skills']:
         canon_path = SKILLS_DIR / name / 'SKILL.md'
         installed_path = SKILLS_INSTALL_DIR / name / 'SKILL.md'
         if not installed_path.exists():
             return False
-        if installed_path.read_text(encoding='utf-8') != canon_path.read_text(encoding='utf-8'):
+        expected = canon_path.read_text(encoding='utf-8').replace('{{IMPORT_BASE}}', str(config['import_base']))
+        if installed_path.read_text(encoding='utf-8') != expected:
             return False
     return True
 
@@ -119,7 +125,7 @@ def tool_status(tool, settings, config):
         return 'n/a'
     if has_hooks and not _hooks_on(optin, settings):
         return 'off'
-    if has_skills and not _skills_on(optin):
+    if has_skills and not _skills_on(optin, config):
         return 'off'
     return 'on'
 
@@ -165,14 +171,14 @@ def cmd_list(config):
     print("Toggle: python scripts\\self_hooks.py --enable <tool> / --disable <tool>")
 
 
-def _enable_skills(optin):
+def _enable_skills(optin, config):
     changed = False
     for name in optin['skills']:
         canon_path = SKILLS_DIR / name / 'SKILL.md'
         if not canon_path.exists():
             raise RuntimeError(f"Canonical skill stub missing for '{name}': {canon_path}")
         installed_path = SKILLS_INSTALL_DIR / name / 'SKILL.md'
-        canon_content = canon_path.read_text(encoding='utf-8')
+        canon_content = canon_path.read_text(encoding='utf-8').replace('{{IMPORT_BASE}}', str(config['import_base']))
         if not installed_path.exists() or installed_path.read_text(encoding='utf-8') != canon_content:
             write_utf8(installed_path, canon_content)
             changed = True
@@ -213,7 +219,7 @@ def cmd_enable(tool, config):
                     changed = True
         save_settings(settings)
     if 'skills' in optin:
-        changed = _enable_skills(optin) or changed
+        changed = _enable_skills(optin, config) or changed
     write_status(config, settings)
     if changed:
         print(f"Enabled '{tool}' for this machine.")

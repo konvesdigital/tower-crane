@@ -55,7 +55,7 @@ MANDATORY_OR_DEFAULT_PIECES = ['filing', 'compliance', 'shared_resources', 'cont
 # templates\skills\* entries a fresh scaffold ever gets; anything else under that folder (e.g.
 # hub_commands, which is hub-operator self-use only, distributed via self_hooks.py) must never be
 # offered here even though it physically lives alongside these in the same directory.
-STANDALONE_SKILLS = ['update', 'commands']
+STANDALONE_SKILLS = ['update', 'commands', 'capability_relationships']
 
 
 def read_consumer_state(project_root):

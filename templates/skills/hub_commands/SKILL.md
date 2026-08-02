@@ -6,11 +6,12 @@ Unlike every other Track-1 skill (filing/checkpoint/archive/update/commands), th
 scaffolded into consumer projects by new_consumer.py — the hub is not a registered consumer of
 its own scaffolder. It reaches THIS hub's own .claude\skills\hub_commands\SKILL.md purely through
 self_hooks.py's per-tool opt-in mechanism (`self_hooks.py --enable hub_commands`), off by default,
-per-machine — see templates\optins\hub_commands.json. Because self-use only ever targets this one
-repo (never a floating consumer path), the copy is byte-for-byte verbatim — no {{IMPORT_BASE}}
-substitution, unlike the consumer-side pattern. Drift check: check_tower_crane.py's hub self-use
-skill check compares the installed copy against this file verbatim and FAILs on any mismatch —
-re-run `self_hooks.py --enable hub_commands` to refresh it.
+per-machine — see templates\optins\hub_commands.json. This body carries no substitution
+placeholder at all (unlike, e.g., capability_relationships's stub) — self-use only ever targets
+this one repo, so the target path below is written as a plain literal. Drift check:
+check_tower_crane.py's hub self-use skill check compares the installed copy against this file
+(with any substitution placeholder resolved, a no-op here since there isn't one) and FAILs on any
+mismatch — re-run `self_hooks.py --enable hub_commands` to refresh it.
 -->
 ---
 name: hub_commands

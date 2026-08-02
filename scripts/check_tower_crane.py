@@ -93,9 +93,10 @@ SKILL_PIECES = {
 }
 
 # Standalone Track-1 skills with no @import companion (design\consumer_update.md, design\
-# optimize_ux.md): still toolkit-governed, so a consumer's stub still gets the same drift check
-# below. Mirrors scripts\new_consumer.py's STANDALONE_SKILLS - keep in sync.
-STANDALONE_SKILLS = ['update', 'commands']
+# optimize_ux.md, design\capability_relationships.md): still toolkit-governed, so a consumer's
+# stub still gets the same drift check below. Mirrors scripts\new_consumer.py's
+# STANDALONE_SKILLS - keep in sync.
+STANDALONE_SKILLS = ['update', 'commands', 'capability_relationships']
 
 COUNTS = {'PASS': 0, 'WARN': 0, 'FAIL': 0}
 
@@ -514,15 +515,16 @@ def invoke_reference_scan(config, this_host, consumer_filter, write_guidance_fla
             write_guidance(c, devs, head_sha, today)
 
 
-def check_hub_self_use_skills():
+def check_hub_self_use_skills(config):
     """Hub self-use skill drift (design\\optimize_ux.md): the hub isn't a registered consumer of
     its own scaffolder, so a skill installed via self_hooks.py's "skills" opt-in key (e.g.
-    hub_commands) never passes through the per-consumer loop above. Scans every
-    templates/optins/*.json for a "skills" list and, for each name that's actually installed on
-    this machine (.claude/skills/<name>/SKILL.md exists - not installed is a valid off state, not
-    a drift), compares it verbatim against the canonical templates/skills/<name>/SKILL.md (no
-    {{IMPORT_BASE}} substitution - self-use always targets this one repo, never a floating
-    consumer path)."""
+    hub_commands, capability_relationships) never passes through the per-consumer loop above.
+    Scans every templates/optins/*.json for a "skills" list and, for each name that's actually
+    installed on this machine (.claude/skills/<name>/SKILL.md exists - not installed is a valid
+    off state, not a drift), compares it against the canonical templates/skills/<name>/SKILL.md
+    with {{IMPORT_BASE}} resolved the same way self_hooks.py resolves it before writing the
+    installed copy (same substitution the per-consumer loop above already applies at line ~430) -
+    a no-op for a stub with no such placeholder, like hub_commands."""
     print()
     print("--- Hub self-use skill drift ---")
     found_any = False
@@ -539,7 +541,7 @@ def check_hub_self_use_skills():
                 report('FAIL', f"Hub self-use skill '{name}' is installed but tower_crane has no "
                                 f"canonical source at templates/skills/{name}/SKILL.md.")
                 continue
-            expected = canon_path.read_text(encoding='utf-8')
+            expected = canon_path.read_text(encoding='utf-8').replace('{{IMPORT_BASE}}', str(config['import_base']))
             actual = stub_path.read_text(encoding='utf-8')
             if actual != expected:
                 report('FAIL', f"Hub self-use skill '{name}' (.claude/skills/{name}/SKILL.md) has drifted "
@@ -590,7 +592,7 @@ def main():
         invoke_golden_suite(config)
     if not args.skip_reference:
         invoke_reference_scan(config, this_host, args.consumer, args.write_guidance, head_sha, today)
-        check_hub_self_use_skills()
+        check_hub_self_use_skills(config)
 
     print()
     print(f"=== Summary: {COUNTS['PASS']} passed, {COUNTS['WARN']} warning(s), {COUNTS['FAIL']} failure(s) ===")
