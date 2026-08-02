@@ -23,12 +23,13 @@ skills' style.
 -->
 ---
 name: shared_resources
-description: Use ONLY when the user says the exact phrase "shared resources" as the substance of
-  their message (e.g. leading the message, or immediately followed by the actual request in the
-  same breath) - never when the words merely appear in passing, and never just because the current
-  topic seems related to something that might be in the catalog. This is a deliberate context-switch
-  trigger to the cross-project search/browse/select/apply/save/forget/archive command, not
-  autonomous relevance-matching.
+description: Use ONLY when the user says the exact phrase "shared resources" as this message's own
+  deliberate point - leading it, trailing it (e.g. "make a note of this in shared resources"), or
+  standing alone - never when the words merely surface in passing while the message is actually
+  about something else, and never just because the current topic seems related to something that
+  might be in the catalog. Position in the sentence doesn't matter; whether the message is *about*
+  invoking this mechanism does. This is a deliberate context-switch trigger to the cross-project
+  search/browse/select/apply/save/forget/archive command, not autonomous relevance-matching.
 ---
 Read `{{IMPORT_BASE}}/shared_resources.md` in full and follow it exactly - entering the context,
 search/browse, select, apply, save, forget, and archive are all covered there. Do not paraphrase or

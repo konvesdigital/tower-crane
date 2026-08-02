@@ -42,12 +42,18 @@ deliberately switching to thinking across every project — a real gear-switch, 
 so it needs an unmistakable trigger rather than something inferred from a keyword that happened to
 appear somewhere in a sentence.
 
-**The trigger is the exact phrase "shared resources," said as the substance of the message** —
-the same bar the hub's own `checkpoint`/`resume` triggers already use: mentioned in passing
-mid-conversation about something else, it does nothing; said as the message's lead content, it
-fires. It can be followed immediately by the actual request in the same breath (*"shared
-resources — save this as an insight"*) or stand alone, in which case ask what's wanted (search,
-browse, save, apply, forget, archive).
+**The trigger is the exact phrase "shared resources," used as the message's own deliberate point —
+not its position in the sentence.** The test is never "does it lead the message" — natural phrasing
+routinely puts the object at the end (*"make a note about this in shared resources"*, *"save this
+as a shared resource"*) and that's just as much a deliberate invocation as leading with the phrase.
+The real test: is the whole message *about* invoking this mechanism (whether announcing it upfront,
+trailing it after describing the request, or standing alone), or does the phrase merely surface in
+passing while the message is actually about something else (*"that reminds me, shared resources
+probably has something on this — anyway, back to the bug"*)? The former fires; the latter does not.
+When genuinely ambiguous, ask rather than guess either way. It can be followed immediately by the
+actual request in the same breath (*"shared resources — save this as an insight"*), precede it
+(*"everything we've figured out about X, make a note of this in shared resources"*), or stand
+alone, in which case ask what's wanted (search, browse, save, apply, forget, archive).
 
 On firing, say so out loud before doing anything else — e.g. *"Switching to shared resources —
 thinking across projects now, not just this one."* — so the context-switch is visible, not just

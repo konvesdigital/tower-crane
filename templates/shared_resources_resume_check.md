@@ -14,17 +14,29 @@ pointing at templates\shared_resources.md), loaded only on the exact trigger phr
 resources." Keep this file terse and project-agnostic.
 -->
 
-## Checking adopted shared_resources references (resume)
+## Checking adopted shared_resources references
 
 Only relevant if this project has actually adopted a `reference`/`tool` entry (or an `insight`
 applied via the Track-1 skill-stub destination that still needed one - see the `shared_resources`
 skill's own Apply procedure, most insight destinations don't carry a live reference at all) -
-otherwise skip this. At `resume`, run `python <hub root>\toolkit\scripts\check_shared_resource_refs.py
---project-root <this project's root>` (the `<hub root>` prefix is whatever this file's own `@import`
-line resolves to, one level above its `toolkit\`). It's a deterministic file-existence check, not an
-LLM judgment call - zero tokens either way, and it catches 100% of the case it checks rather than
-relying on this session noticing on its own. It covers two adopted forms: a literal `@import` line
-pointing into `shared_resources\`, and a `~/...`-form path referenced inside a project-local
+otherwise skip this entirely, both procedures below.
+
+**This is pure maintenance, not awareness.** Whether the agent knows an adopted resource exists and
+should use it is controlled entirely by that resource's own Claude Code Skill stub - its
+name+description are always resident in every session's context automatically, regardless of
+`resume` vs `quick resume` and regardless of anything below. Skipping the checks below under `quick
+resume` never risks the agent overlooking something it's supposed to use; it only defers noticing a
+*broken* or *stale* reference, the same class of thing `quick resume` already defers for the hub
+update-check and compliance guidance (`continuity_resume_check.md`).
+
+### At `resume`
+
+Run `python <hub root>\toolkit\scripts\check_shared_resource_refs.py --project-root <this project's
+root>` (the `<hub root>` prefix is whatever this file's own `@import` line resolves to, one level
+above its `toolkit\`). It's a deterministic file-existence check, not an LLM judgment call - zero
+tokens either way, and it catches 100% of the case it checks rather than relying on this session
+noticing on its own. It covers two adopted forms: a literal `@import` line pointing into
+`shared_resources\`, and a `~/...`-form path referenced inside a project-local
 `.claude\skills\<name>\SKILL.md` stub (the Track-1 form "Apply" produces - see the `shared_resources`
 skill). Either form gets a `[FAIL]` if its target no longer exists; report any `[FAIL]` to the user
 plainly (per "Shared resources folder maintenance" in `shared_resources.md` - a broken reference must
@@ -36,15 +48,25 @@ verify. Separately, a skill stub's **trigger description** going stale relative 
 current topic footprint is a different, non-existence concern - see `design\directive_economy.md`'s
 "Drift mechanics" for why that's notify-only and not covered by this existence check.
 
-Same `resume`, also run `python <hub root>\toolkit\scripts\check_shared_resource_drift.py
---project-root <this project's root>` - the notify-only counterpart just named above. It compares the
-sha256 stamped into a Track-1 stub's adoption marker at Apply time against the source entry file's
-current content; a mismatch prints `[DRIFT]` but the script always exits 0, so it never blocks
-`resume` the way a `[FAIL]` from `check_shared_resource_refs.py` does. On a `[DRIFT]` line: re-read
-the named source file, compare its current topic footprint against the flagged stub's existing
-trigger description, and - only if it's genuinely grown a topic the trigger doesn't cover - redraft
-the trigger and confirm with the user before overwriting the stub (same confirm-before-write pattern
+Also run `python <hub root>\toolkit\scripts\check_shared_resource_drift.py --project-root <this
+project's root>` - the notify-only counterpart just named above. It compares the sha256 stamped into
+a Track-1 stub's adoption marker at Apply time against the source entry file's current content; a
+mismatch prints `[DRIFT]` but the script always exits 0, so it never blocks `resume` the way a
+`[FAIL]` from `check_shared_resource_refs.py` does. On a `[DRIFT]` line: re-read the named source
+file, compare its current topic footprint against the flagged stub's existing trigger description,
+and - only if it's genuinely grown a topic the trigger doesn't cover - redraft the trigger and
+confirm with the user before overwriting the stub (same confirm-before-write pattern
 `shared_resources.md` requires for every write), then re-run the script so the marker's hash reflects
 the new current content. A stub with no `index-sha256` in its marker (an `insight` adoption, a
 pre-existing stub predating this check, or a free-text `tool` adoption) prints `[N/A]` - out of scope,
 not a gap.
+
+### At `quick resume`
+
+**Skip both scripts entirely.** They're maintenance, not awareness (see above) - the same reasoning
+`continuity_resume_check.md` already uses to skip its own hub-sync steps under `quick resume`: a
+session reopened seconds after its own `checkpoint` has nothing new to find, and `quick resume`
+exists specifically to get back to work without paying any verification cost. No tag or disclaimer
+noting the skip, matching `continuity_resume_check.md`'s own stance - use plain `resume` instead at
+the start of a day or after any gap long enough that a reference could actually have broken or a
+source file could actually have drifted.
