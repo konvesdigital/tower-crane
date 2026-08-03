@@ -53,66 +53,26 @@ it's about to do.
 
 ## How to get it
 
-**New here, with just this repo's URL and no session open yet?** This section is written to be
-followed by whichever AI you paste it into, not just a human reading it alone. If you're the AI:
-gauge how familiar the person seems with git/GitHub/command lines from how they're asking, and
-expand or compress the explanations below accordingly — nothing here assumes prior knowledge, but
-don't over-explain to someone who clearly doesn't need it.
-
-**Are you in Claude Code right now** — a session that can run commands and edit files on your own
-machine — **or a browser chat like claude.ai?**
-- **Browser chat, or unsure:** Tower Crane needs Claude Code specifically — it clones a repo, runs
-  local scripts, and edits files on disk, none of which a browser chat can do on its own. Get it
-  running first: [Claude Code's docs](https://code.claude.com/docs/en/overview). Once it's open in
-  a folder on your machine, come back and paste this repo's URL into that session instead.
-- **Claude Code:** keep reading.
-
-**Brand new to Tower Crane, or already running a hub somewhere else and connecting this machine to
-it?** Pick the matching section below.
-
-### Fresh setup
-
 Two steps, both of which Claude Code walks you through — you never need to type raw git commands
 yourself:
 
 1. **Clone or download `konvesdigital/tower-crane`.** What you get is `toolkit\` itself, with no
-   private wrapper around it yet. Not familiar with git? Ask whatever AI you're using to walk you
-   through installing it and cloning this URL — that's an ordinary git question, not anything
-   Tower-Crane-specific, and it can adapt to exactly how much explaining you need. A GitHub account
-   isn't required just to clone or download this public repo.
+   private wrapper around it yet.
 2. **Open it in Claude Code and say:** *"read `templates\setup_machine.md` and follow it."* It
    detects a fresh public clone and wraps it in a new, private outer folder — the "hub" described
    above — checking live for Python/git/`gh` rather than assuming any of them are installed.
-   **Claude Code itself is the only assumed prerequisite** — the setup checks everything else and
-   tells you plainly, with install pointers, if something's missing.
+   **Claude Code itself is the only assumed prerequisite.**
 
 Handing Claude Code a freshly downloaded repo and asking it to read and follow instructions inside
 it is a reasonable thing to be cautious about — see [**Why you can trust it**](#why-you-can-trust-it)
 below for exactly what `setup_machine.md` (and every other file like it) can and can't do, and what
 review exists before anything from outside your own machine ever reaches you.
 
-A GitHub account of your own becomes useful once you want your hub's own continuity data
-(`project_progress.md`, your connected-project registry) backed up and synced across your own
-machines — `setup_machine.md` offers to set that up as an optional step, never a prerequisite to
-trying Tower Crane out.
-
-### Second machine
-
-Connecting an additional machine to a hub you already run elsewhere is **two clones, not one** —
-your own outer hub folder and this public repo are separate git repos:
-
-1. **Clone your own outer hub repo** (the private one behind `project_progress.md`/`consumers\`/
-   `change_requests\`) onto this machine, the same way you'd clone any other private repo of yours.
-2. **Clone this public repo into a `toolkit\` subfolder inside it** —
-   `git clone https://github.com/konvesdigital/tower-crane.git toolkit`, run from inside that outer
-   folder. Your outer repo doesn't track `toolkit\` at all (it's gitignored on purpose), so this
-   step doesn't happen automatically just from cloning your outer repo.
-3. **Open it in Claude Code and say:** *"read `toolkit\templates\setup_machine.md` and follow it."*
-   It detects your outer folder is already set up and skips straight to configuring this machine —
-   checking live for Python/git/`gh` rather than assuming any of them are installed.
-
-The only real constraint either way: the folder needs to live somewhere under your home directory
-(`~`) — everything else is computed live from wherever it ends up, never typed in by hand.
+If you're setting up a second machine for a hub you already run, or you already have an outer folder
+from a previous setup, the same instruction detects that case instead and skips straight to
+configuring this machine. The only real constraint is that the folder lives somewhere under your
+home directory (`~`) — everything else is computed live from wherever it ends up, never typed in by
+hand.
 
 ---
 
@@ -230,8 +190,8 @@ nothing leaving your machine:**
   registry, and notes are never part of it; there's no git history shared between the two, so
   there's no channel for them to leak in either direction.
 
-Setting up another of your own machines is covered in [How to get it's "Second
-machine"](#second-machine) section above — same courier as a fresh setup, one extra clone step.
+Setting up another of your own machines is covered in [How to get it](#how-to-get-it) above — same
+courier, same steps, just run once more on the new machine.
 
 ---
 
