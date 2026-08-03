@@ -53,7 +53,7 @@ probably has something on this — anyway, back to the bug"*)? The former fires;
 When genuinely ambiguous, ask rather than guess either way. It can be followed immediately by the
 actual request in the same breath (*"shared resources — save this as an insight"*), precede it
 (*"everything we've figured out about X, make a note of this in shared resources"*), or stand
-alone, in which case ask what's wanted (search, browse, save, apply, forget, archive).
+alone, in which case ask what's wanted (save, search, browse, apply, forget, archive).
 
 On firing, say so out loud before doing anything else — e.g. *"Switching to shared resources —
 thinking across projects now, not just this one."* — so the context-switch is visible, not just
@@ -62,9 +62,43 @@ trigger: the mode is scoped to completing the one action (a search, a save, etc.
 conversation returns to ordinary project-local framing once it resolves — unlike `checkpoint`/
 `resume`, there's no separate repo or session to deliberately zoom back out of.
 
+### Saving — the narrow write exception
+
+A project's session may write **directly into `shared_resources\`** — one new entry file plus one
+new line in `CATALOG.md` — with no ticket, no round-trip, no separate hub session. This is the
+**only** write a consuming project may make outside its own project folder; everything else at the
+hub root (`toolkit\`, `consumers\`, `change_requests\`, `project_progress.md`) stays off-limits per
+`templates\filing.md`.
+
+Before saving, classify what's being saved — this classification is the actual safeguard, not a
+formality:
+
+- **Names a private project or client** (check it against the hub's own `consumers\*.md`
+  registry, or it's plainly project-specific either way) → save it into `shared_resources\`. It
+  structurally cannot go anywhere else — never offer to route it into `toolkit\`.
+- **Requests a change to Claude's own deterministic behavior** — a hook, a script, a workflow
+  convention that should apply generically, not domain knowledge — → this is **not**
+  `shared_resources\` content. Don't save it here; point at the ticket system instead
+  (`templates\filing.md`'s `Type: proposal` ticket, or an ordinary bug ticket). If this same
+  content already lives in `shared_resources\` and has proven itself broadly, see filing.md's
+  graduation path instead of re-filing from scratch.
+- **Neither is obvious** → ask before saving.
+
+Then, before writing anything, state what's about to happen and get an explicit go-ahead: the
+entry's name, its `kind`, a one-line description, and that it's about to be written into
+`shared_resources\` plus a new `CATALOG.md` row. Only write after confirmation — this is the one
+disk-writing action in the whole mechanism and the one carrying the classification call above, so
+it gets its own explicit checkpoint even though entering the mode already got one.
+
+When saving a `reference` or `tool` entry: create one new file in `shared_resources\`, then append
+one row to `shared_resources\CATALOG.md` (`Status` column left blank — active by default). For
+`insight`, see "Insights are different" below — its save flow is a negotiation, not a fixed
+write.
+
 ### Discovery: search or browse, then select, then apply
 
-Three explicit steps — never collapsed into one, since a query can turn up more than one genuinely
+Once something exists to find — either saved here just now, or by someone else in another session
+— three explicit steps — never collapsed into one, since a query can turn up more than one genuinely
 distinct match.
 
 1. **Search or browse** the catalog:
@@ -116,7 +150,7 @@ distinct match.
         file's content at adoption time> -->
         ```
      4. **Show the draft — trigger description and stub body — to the user and confirm before
-        writing anything.** Same checkpoint this file already requires for Saving, below.
+        writing anything.** Same checkpoint this file already requires for Saving, above.
      5. On confirmation, write the skill stub to this project's own
         `.claude\skills\<name>\SKILL.md` only — never into `toolkit\`. This content is
         private-only by construction (see "Two homes within Track 1" in
@@ -137,39 +171,6 @@ Use it when a resource was adopted for a one-off task and is now just `CLAUDE.md
 reset this project's behavior back to before adoption. If Claude's advice in some domain seems
 off, checking whether a relevant resource was ever adopted (via browse's in-use indicator) — and
 forgetting it if it's stale — is a reasonable first move.
-
-### Saving — the narrow write exception
-
-A project's session may write **directly into `shared_resources\`** — one new entry file plus one
-new line in `CATALOG.md` — with no ticket, no round-trip, no separate hub session. This is the
-**only** write a consuming project may make outside its own project folder; everything else at the
-hub root (`toolkit\`, `consumers\`, `change_requests\`, `project_progress.md`) stays off-limits per
-`templates\filing.md`.
-
-Before saving, classify what's being saved — this classification is the actual safeguard, not a
-formality:
-
-- **Names a private project or client** (check it against the hub's own `consumers\*.md`
-  registry, or it's plainly project-specific either way) → save it into `shared_resources\`. It
-  structurally cannot go anywhere else — never offer to route it into `toolkit\`.
-- **Requests a change to Claude's own deterministic behavior** — a hook, a script, a workflow
-  convention that should apply generically, not domain knowledge — → this is **not**
-  `shared_resources\` content. Don't save it here; point at the ticket system instead
-  (`templates\filing.md`'s `Type: proposal` ticket, or an ordinary bug ticket). If this same
-  content already lives in `shared_resources\` and has proven itself broadly, see filing.md's
-  graduation path instead of re-filing from scratch.
-- **Neither is obvious** → ask before saving.
-
-Then, before writing anything, state what's about to happen and get an explicit go-ahead: the
-entry's name, its `kind`, a one-line description, and that it's about to be written into
-`shared_resources\` plus a new `CATALOG.md` row. Only write after confirmation — this is the one
-disk-writing action in the whole mechanism and the one carrying the classification call above, so
-it gets its own explicit checkpoint even though entering the mode already got one.
-
-When saving a `reference` or `tool` entry: create one new file in `shared_resources\`, then append
-one row to `shared_resources\CATALOG.md` (`Status` column left blank — active by default). For
-`insight`, see "Insights are different" below — its save flow is a negotiation, not a fixed
-write.
 
 ### Insights are different
 

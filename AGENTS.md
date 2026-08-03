@@ -178,7 +178,10 @@ distinguish them from live-session lines. It never flips `Status` to DONE itself
 always does that on GitHub.
 
 ### Registration tickets (this agent's turn — no round-trip)
-An OPEN `register` ticket is an existing project asking to join the platform (filed by
+A `register` ticket has two distinct shapes — check for a fenced `yaml` block first, since that's
+what tells them apart:
+
+**New project joining** (has a fenced `yaml` block: name / path / opted_in / imported — filed by
 `templates\register.md`, since the consumer can't edit shared files itself). Action it immediately:
 1. Read its fenced `yaml` block (name / path / opted_in / imported).
 2. **Validate before trusting the block:** confirm `path` exists on disk; for each `opted_in` tool,
@@ -192,6 +195,18 @@ An OPEN `register` ticket is an existing project asking to join the platform (fi
 4. Run `scripts\check_tower_crane.py --consumer <slug>` to confirm the new entry validates clean.
 5. Flip `Status` to **DONE** (registration has no consumer-verify round-trip — the registry entry
    existing *is* the completion). Log it in `project_progress.md`, commit, and push.
+
+**Existing consumer reporting a standalone-skill/tool adoption** (no `yaml` block — filename shape
+`register_<consumer>_<slug>.md`; e.g. after the consumer runs its own `update` skill and applies a
+`STANDALONE_SKILLS` item). The ticket body itself states the requested action in prose — **read and
+action that request before flipping DONE; "no round-trip" does not mean "nothing to do."** In
+practice this means appending a short documentary note to the existing `consumers\<slug>.md` entry
+(same pattern as its prior such notes — see e.g. the `commands` adoption note in
+`consumers\geo_rank_tracker.md`) recording what was adopted and when. `check_tower_crane.py` will
+NOT catch a skipped note — this convention isn't mechanically checked, so don't rely on a clean
+checker run as confirmation the ticket's request was actually done. Then run
+`scripts\check_tower_crane.py --consumer <slug>` (confirms no unrelated drift), flip `Status` to
+**DONE**, log it in `project_progress.md`, commit, and push.
 
 ### Applying a fix (this agent's turn)
 1. Read the symptom/repro, root cause, and Proposed fix (a suggestion, not a mandate).

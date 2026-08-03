@@ -180,6 +180,16 @@ def main():
         settings = {}
     settings.setdefault('hooks', {})
 
+    # Every consumer reads canonical Track-1 skill/resume-check content straight out of
+    # toolkit\templates (e.g. "Read {{IMPORT_BASE}}/filing.md in full") - that's outside the
+    # project root, so without an allow rule every such read prompts. templates\ is read-only
+    # content by convention (templates\filing.md: "never edit any existing file inside toolkit\"),
+    # so blanket-allowing Read there carries no write risk.
+    allow_list = settings.setdefault('permissions', {}).setdefault('allow', [])
+    read_rule = f"Read({import_base}/**)"
+    if read_rule not in allow_list:
+        allow_list.append(read_rule)
+
     for t in tools:
         # Expand config placeholders ({{PYTHON_LAUNCHER}}, {{SHARED_ROOT}}) into the concrete command.
         optin = get_expanded_optin(OPTINS_DIR / f"{t}.json", config)

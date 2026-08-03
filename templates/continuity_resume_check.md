@@ -76,6 +76,13 @@ model reaches for them) read whatever is present.
      what that write touches to consumers registered on this machine). This runs against whatever
      version of the checker is already present — no pull required. Pure Python, zero AI cost,
      using whichever of `python3`/`python` this machine has.
+   - The check above is about the **hub's own toolkit source** (whether it's fallen behind its
+     public upstream) — a different question from whether **this project** has adopted everything
+     the hub already has to offer. That second question is this project's own on-demand `update`
+     skill (if adopted): say "update" any time to pull in a new hook, toolkit skill, or
+     mandatory/default-on piece this project hasn't picked up yet. This step never runs that scan
+     — by design, `update` has no resume-time staleness nagging (see `design\consumer_update.md`) —
+     this is only a pointer so the capability isn't easy to forget exists.
 3. **Check for shared-tools compliance guidance** — see the compliance protocol: if
    `COMPLIANCE_GUIDANCE.md` exists in the project root, surface it now (this is also where
    anything step 2's `--write-guidance` run just produced would show up).

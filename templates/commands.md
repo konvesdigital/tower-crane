@@ -58,11 +58,13 @@ Efficiency habits:
   resume — pull latest, check for hub compliance guidance, pick up where you left off
   quick resume — thin resume right after a checkpoint
   archive — move resolved Work Log entries into the archive file, once it's grown enough to need it
-  shared resources — search/browse/adopt reusable knowledge, tools, or insights (Save/Browse/Apply/
-    Forget/Archive, all one theme: doing this instead of redoing the work elsewhere)
+  shared resources — save something this project found, or search/browse/adopt what another
+    project already has (Save/Browse/Apply/Forget/Archive, all one theme: doing this instead of
+    redoing the work elsewhere)
 
 Cross-project knowledge:
-  shared resources — same as above; also Save (share something this project found), Forget, Archive
+  shared resources — same capability as above, listed here too since it's fundamentally
+    cross-project (save/search/browse/apply/forget/archive)
   update — pull in new hub features this project hasn't adopted yet
 
 Sharing outward:
@@ -98,8 +100,8 @@ right away: "checkpoint" saves your progress here and pushes it, and "resume" pi
 back up next time - say "quick resume" instead if you're just reopening seconds after a
 checkpoint.
 
-If you ever want to see what another project has already figured out (or share something this one
-found), say "shared resources".
+If you ever want to share something this project found (or see what another project has already
+figured out), say "shared resources".
 
 If you hit a bug in a shared tool, or want to request one, say something like "I found a bug" or
 "can we get X" and I'll file it.
