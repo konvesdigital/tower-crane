@@ -51,10 +51,28 @@ actually being asked.
      that comes after narrowing — and ask what they're actually trying to do, specific enough to
      distinguish between the candidates. Once they narrow it down, answer that one node normally via
      steps 2-5 below.
-2. **Answer directly** from that node's `description`. If its `context` doesn't match the session
-   you're in right now (e.g. the matched node is `context: hub` but this is a consumer session),
-   say so plainly — this can be *asked about* from here, but not executed here.
-3. **Surface its nearest family, never the whole graph:**
+2. **Check whether the matched node's own answer branches** — not which node to match (step 1 already
+   resolved that), but whether the matched node itself has more than one genuinely valid way to go
+   once you're inside it (its `description` names more than one valid option, or its `context` plus a
+   `partial_reach` note together describe more than one place the work could genuinely happen). If it
+   branches, state every valid branch plainly, including whatever actually distinguishes them, before
+   recommending or assuming any one — never silently collapse real branches into a single answer just
+   because they reach a similar outcome. Ask a short clarifying question if the distinguishing factor
+   isn't already clear from the query; otherwise answer the branch the query already specifies.
+3. **Answer directly** from that node's `description` (or the branch narrowed in step 2). Check
+   `context` against the session you're actually in:
+   - Matches, or no `partial_reach` note exists: answer plainly.
+   - Doesn't match, but a `partial_reach` note names this session's side: say plainly what can
+     genuinely start here per that note, and what still needs the other location to finish — don't
+     default to "ask about it, can't execute it here" when real partial work is actually possible.
+   - Doesn't match, and no `partial_reach` note exists: say so plainly — this can be *asked about*
+     from here, but not executed here.
+   - The query is specifically about *which location* is the better place to do this, and more than
+     one location is genuinely reachable: reason it live rather than defaulting to whichever location
+     this session happens to be in — a tie in effort goes to the consuming project; a location wins
+     outright only by taking fewer steps, or by offering a consolidated/bulk equivalent the other side
+     lacks (design doc methodology principle 4).
+4. **Surface its nearest family, never the whole graph:**
    - **Structural neighbors** — every `edges` entry naming this node as `a` or `b`. State the
      relationship type plainly (reciprocal / parallel / lifecycle-sibling / accelerant), and
      mention a `note`/`conditional` field if present. Skip `name-collision` and `backs` edges
@@ -64,9 +82,9 @@ actually being asked.
    - **Thematic neighbors** — other nodes sharing a `themes` tag with this one, mentioned more
      loosely ("also related by purpose: ...") since a theme link is deliberately broad, not a close
      match.
-4. **Path position is supporting color only** — you may mention where this node sits in `path`
+5. **Path position is supporting color only** — you may mention where this node sits in `path`
    ("this typically comes right after X") if it's genuinely useful context, but never let that
    become the reply's main content, and never trigger this skill on its own for "what's next"-shaped
    phrasing (see "When this fires" above).
-5. **Never dump the whole picture.** One direct answer, its nearest family, done — same discipline
+6. **Never dump the whole picture.** One direct answer, its nearest family, done — same discipline
    `commands.md`/`hub_commands.md` already follow.

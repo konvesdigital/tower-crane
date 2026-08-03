@@ -127,10 +127,24 @@ below, volunteer the other side as the single next-best follow-up - don't wait t
 
 ### Reaching the hub from here
 
-Some things genuinely need a human sitting in the hub itself (scaffolding a brand-new project,
-`propose upstream`, `update` the toolkit, `self hooks`, `curate shared resources`'s push side,
-`set up automation`, applying a ticket's fix) - this project's own session can't execute those,
-only ask about them. Never answer with silence: say plainly that it needs a hub-operator session,
-and if it's something this project can *stage* instead (filing a ticket, `register.md` for
-connecting another existing project), say that too - staging it here still completes on the hub's
-own next session, no synchronous hub visit required.
+Rendered live from `capability_catalog.yaml`, not a fixed list - three tiers, always in this order:
+
+1. **Fully reachable from here, no hub session ever needed** - every node with `context: consumer`.
+   Lead with these regardless of what else the question touches on; they're unconditionally
+   available on their own terms, not contingent on anything else already existing.
+2. **Partially reachable from here** - a `context: hub` node that also carries a `partial_reach`
+   note naming `consumer`: state plainly what its note says can start here, and what still needs a
+   hub session to finish.
+3. **Hub-only** - every remaining `context: hub` node with no `partial_reach` note. This project's
+   own session can only ask about these, or *stage* the ones with a real staging path - never answer
+   with silence; say plainly it needs a hub-operator session, and if this project can stage it
+   instead, say that too (staging still completes on the hub's own next session, no synchronous hub
+   visit required).
+
+Within whichever tier(s) the actual question calls for, frame anything that depends on some other
+artifact already existing elsewhere in the system as conditional on that artifact - never as a
+parallel, unconditionally-available option sitting next to the things that need nothing (see design
+doc's "state-aware framing" section). This matters most when the question itself is shaped like a
+first-encounter question about what's possible at all - answer from the assumption that nothing has
+happened yet unless the conversation gives real evidence otherwise, not from the assumption of an
+already-populated ecosystem.

@@ -107,10 +107,12 @@ below, volunteer the other side as the single next-best follow-up - don't wait t
 
 ### A note on ground-reachability
 
-Some of the above (scaffolding a brand-new project, `propose upstream`, `update`, `update
-consumers`, `self hooks`, `curate shared resources`'s push side, `set up automation`, applying a
-ticket's fix) can only run from here - the hub itself. A consumer-project session can *ask about* any of these (it has its
-own `commands` skill, `templates\commands.md`) but can only *stage* the ones that queue for the
-hub's own next session (filing a ticket, `register.md`'s registration ticket) - never execute them
-directly. If an operator session gets a question that's actually about what a consumer project can
-reach, answer from that framing, not this one.
+If an operator session gets a question that's actually about what a *consumer* project can reach -
+not what this hub session itself can do - answer from that framing instead of this one.
+`templates\commands.md`'s "Reaching the hub from here" section owns that logic and renders it live
+from `capability_catalog.yaml`'s `context`/`partial_reach` fields (fully consumer-reachable first,
+then partially-reachable-here-with-the-rest-needing-a-hub-session, then hub-only). Don't hand-answer
+it differently from here - the two should never drift into disagreeing about the same underlying
+facts, and per methodology principle 4 (design doc), the default answer to "where's the best place
+to do this" favors the consuming project whenever it's genuinely reachable there, even when the
+question was asked from inside the hub.

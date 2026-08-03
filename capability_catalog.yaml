@@ -10,7 +10,13 @@
 #
 # Three sections:
 #   nodes — every capability: id, trigger phrase, context (hub | consumer | both), a one-line
-#           description, and any theme tags (broad cross-cluster purpose links — see themes below).
+#           description, any theme tags (broad cross-cluster purpose links — see themes below), and
+#           an optional partial_reach note (design\capability_relationships.md's "Partial reach"
+#           section) for the smaller set of nodes where `context` alone undersells where meaningful
+#           work toward the capability can actually start — e.g. a node declared context: hub whose
+#           own procedure genuinely permits an early phase from a consumer session, with only a later
+#           phase requiring the hub. Not populated on most nodes; add only where the underlying
+#           procedure actually supports it.
 #   edges — structural relationships between nodes. type is one of the four canonical kinds
 #           (reciprocal | parallel | lifecycle-sibling | accelerant), plus two non-graph
 #           annotations kept here for completeness rather than dropped: name-collision (two nodes
@@ -71,14 +77,20 @@ nodes:
   - id: new_tool
     trigger: "new tool"
     context: hub
-    description: "Adds a new tool, public (toolkit\\, world-readable) or private (toolkit_private\\, never leaves this machine) — asks which, or jump straight to private via \"new private tool\". Either way it sits available until a consumer opts in via `update`/`update consumers`, not automatic"
+    description: "Adds a new tool, public (toolkit\\, world-readable) or private (toolkit_private\\, never leaves this machine) — asks which, or jump straight to private via \"new private tool\". Both branches reach every connected consumer the identical automatic way once opted in via `update`/`update consumers` — the public/private choice only decides who else can see the code, never how many of this operator's own projects it can reach"
     themes: [push-outward]
+    partial_reach:
+      from: consumer
+      note: "Initial build-and-test of the tool's own logic can start in whichever project prompted the need. Actually landing it — placing the file, adding the registry row and opt-in snippet, and checkpointing — still requires a hub session."
 
   - id: modify_tool
     trigger: "modify tool"
     context: hub
     description: "Changes or removes an existing shared tool"
     themes: [push-outward]
+    partial_reach:
+      from: consumer
+      note: "Diagnosing the problem and prototyping a fix can start in whichever project hit it. Actually landing the change still requires a hub session."
 
   - id: self_hooks
     trigger: "self hooks"
