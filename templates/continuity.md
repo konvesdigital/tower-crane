@@ -21,14 +21,17 @@ already loaded it earlier in the same session.
 
 1. Update `project_progress.md`:
    - Refresh **Current Status** (base) and/or **Current Focus** (expanded) and **Next Up** so they
-     describe only the PRESENT — where things stand now and what is still open. When something is
-     finished, remove it from these sections; its detail belongs solely in the dated Work Log entry
-     you add below. **Never let completed work accumulate here** — no "landed so far" recap, no
-     growing list of done/`[x]` items. These sections load into context every session, so restating
-     finished work is a recurring token cost, and it defeats archiving (moving Work Log entries out
-     can't shrink the file while the same done-detail is duplicated up top). Done work has one home:
-     its dated Work Log entry. (Ticking a **Phases** checkbox is terse status, not a recap — that
-     stays.)
+     describe only the PRESENT — where things stand now and what is still open. **Edit the existing
+     text in place** (update or delete a stale fact) — never append a new bullet narrating what this
+     session did; that's the dated Work Log entry's job, even for something still true right now. A
+     session that changed nothing about present-tense reality needs no edit to these sections at all
+     (a Work Log entry still always gets added). **Never let completed work accumulate here** — no
+     "landed so far" recap, no growing list of done/`[x]` items, no per-session bullet that just
+     restates what the new Work Log entry already says. These sections load into context every
+     session, so restating finished work is a recurring token cost, and it defeats archiving (moving
+     Work Log entries out can't shrink the file while the same done-detail is duplicated up top).
+     Done work has one home: its dated Work Log entry. (Ticking a **Phases** checkbox is terse
+     status, not a recap — that stays.)
    - If the project uses **Phases**: update the phase checklist — tick completed stages, mark
      which phase is now active.
    - Move any settled decisions from Open → Locked: flip the status column (base) **or** move the
