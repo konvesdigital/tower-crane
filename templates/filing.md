@@ -44,6 +44,27 @@ a request* — you do not fix it here. Filing and fixing happen in two different
 different sessions, which keeps each repo's git history honest. The tower_crane hub is the single
 place a shared tool actually changes.
 
+Shipping a fix doesn't automatically put it in every consumer's hands. A fix to something this
+project **already has** — an already-`@import`ed piece, an already-opted-into tool, an
+already-adopted skill — reaches this project automatically the next time it's read or run, since
+it's the same live file. Brand-new functionality (a new opt-in tool, a new Track-1 skill, a newly
+mandatory piece) just becomes **available** in `toolkit\` — this project still needs its own
+`update` (or the hub needs to run `update consumers`) to actually adopt it.
+
+Tower Crane's default shape is one person operating both this project and the hub itself — the
+same you who files a ticket here is also the one who'd later process it in a hub session, unless
+this hub has automation wired up (`templates\setup_automation.md`), in which case an unattended
+pass picks up the ticket on its own hourly cadence and applies it directly — a `Type: proposal`
+ticket included, since it goes through the same "Applying a fix" procedure as any other ticket —
+genuinely fire-and-forget, no manual hub session required. Either way, filing exists because this
+rule is about *where* the edit happens (never from this project's session, regardless of who's
+asking or whether it's applied by hand or unattended), not *who*/*what* does it — so if you'd
+rather skip the ticket and round-trip entirely, you can prototype the change here as ordinary
+project work, then carry it into your own next hub session and build it directly there
+(`AGENTS.md`'s "Adding a new tool" / "Changing or removing an existing tool"). Filing is still the
+right call when you want the request captured now without switching sessions yourself, or on the
+rare chance someone else operates this hub for you.
+
 ### How to file
 
 1. Create a markdown file in **the hub root's** `change_requests\` folder — **not** inside
@@ -69,9 +90,10 @@ place a shared tool actually changes.
    Symptom/repro concrete enough to reproduce, and make the Suggested test something the shared
    agent (and later you) can actually run.
 
-   **Proposing new shared content** (a template or reference doc that doesn't exist yet, rather
-   than a bug/improvement in something that already exists) doesn't fit the shape above — use
-   `Type: proposal` instead:
+   **Proposing new shared content** — anything that doesn't exist in `toolkit\` yet, rather than a
+   bug/improvement in something that already exists: a new hook or script, a new opt-in tool, a new
+   Track-1 skill, a protocol convention/piece, or a template/reference doc — doesn't fit the shape
+   above; use `Type: proposal` instead:
    ```
    Status: OPEN
    Filed by: <this project's full name> — <YYYY-MM-DD>
@@ -127,7 +149,11 @@ bottom).
 **Finding which tickets need your attention at resume is handled by the always-resident
 `filing_resume_check.md` piece** (imported alongside this skill, mandatory for every consumer) —
 it scans the hub root's `change_requests\` folder on every `resume` and identifies anything
-awaiting this project. This section covers what to do once it's found one: re-run its Suggested
+awaiting this project. This section covers what to do once it's found one.
+
+If the ticket shipped brand-new functionality this project hasn't adopted yet (a new opt-in tool,
+a new Track-1 skill) rather than a fix to something already in use, run `update` first — the
+Suggested test can't pass on something this project doesn't have yet. Then re-run its Suggested
 test on your side:
 
 - If it works: append `YYYY-MM-DD — <this project> verified PASS`. **Leave `Status: OPEN`** —

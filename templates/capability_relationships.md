@@ -37,8 +37,20 @@ actually being asked.
 
 ### How to answer
 
-1. **Match the query to one `nodes` entry** — by `trigger`, or by matching a described need against
-   each node's `description` until one clearly fits.
+1. **Match the query to the `nodes` it plausibly fits** — by `trigger`, or by matching a described
+   need against each node's `description`.
+   - **One node clearly fits, or several fit but are already linked to each other** (an `edges`
+     entry, or a shared `themes` tag — so the normal answer in steps 2-3 below will surface them
+     together anyway): treat the best match as the anchor and continue to step 2.
+   - **Two or more nodes fit comparably well and are NOT already linked to each other**: this is a
+     genuinely ambiguous query, not one with a clear right answer sitting under loose context — a
+     query can fit two nodes equally well while those nodes share no edge and no theme tag, so the
+     normal single-anchor flow would silently pick one and make the other invisible. Don't silently
+     pick one. Instead, ask a short clarifying question: list the plausible candidates by `trigger`
+     plus one terse gloss each — shorter than a normal answer, no neighbors or context notes yet,
+     that comes after narrowing — and ask what they're actually trying to do, specific enough to
+     distinguish between the candidates. Once they narrow it down, answer that one node normally via
+     steps 2-5 below.
 2. **Answer directly** from that node's `description`. If its `context` doesn't match the session
    you're in right now (e.g. the matched node is `context: hub` but this is a consumer session),
    say so plainly — this can be *asked about* from here, but not executed here.
