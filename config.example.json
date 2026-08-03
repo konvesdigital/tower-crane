@@ -10,6 +10,10 @@
     "later moved or renamed (config_lib.py notices the mismatch and tells you to run relocate.py so",
     "already-registered consumers catch up). The one requirement: this repo must live somewhere",
     "under your home directory, since Claude Code's @import only resolves home-relative '~/...' paths.",
+    "private_root: leave this as an empty string too. Same self-locating/self-correcting behavior as",
+    "shared_root, but points at toolkit_private\\ (design\\private_tools.md) — a sibling of toolkit\\",
+    "in the outer repo that may not exist yet on a fresh clone or before the first private tool is",
+    "added. Never shipped, never leaves this machine's outer repo.",
     "python_launcher: the command that runs Python 3 on THIS machine. 'python' on Windows;",
     "on macOS/Linux it is usually 'python3' (bare 'python' is often Python 2 or absent) - set it to",
     "whatever `<launcher> --version` reports as Python 3.x here.",
@@ -27,6 +31,7 @@
     "identity.git_remote above."
   ],
   "shared_root": "",
+  "private_root": "",
   "python_launcher": "python",
   "host_id": "<this machine's hostname, e.g. the value of %COMPUTERNAME%>",
   "identity": {

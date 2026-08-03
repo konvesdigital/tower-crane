@@ -80,6 +80,11 @@ OPTINS_DIR = TEMPLATES_DIR / 'optins'
 SKILLS_DIR = TEMPLATES_DIR / 'skills'
 CONSUMERS_DIR = PROJECT_ROOT / 'consumers'
 TESTS_DIR = SHARED_ROOT / 'tests'
+# design\private_tools.md - the private, automatic analog to toolkit\ itself. Lives at the outer
+# root as a sibling of toolkit\, same level as consumers\; may not exist yet on a fresh clone.
+PRIVATE_ROOT = PROJECT_ROOT / 'toolkit_private'
+PRIVATE_OPTINS_DIR = PRIVATE_ROOT / 'templates' / 'optins'
+PRIVATE_SKILLS_DIR = PRIVATE_ROOT / 'templates' / 'skills'
 
 # Toolkit-governed Track-1 skill pieces (design\directive_economy.md): piece name -> the Track-2
 # "resume check" companion a consumer imports instead of a flat @import <name>.md, plus the list
@@ -152,7 +157,7 @@ def parse_registry(path):
 
     obj = {
         'name': None, 'path': None, 'host': None, 'owner': None, 'registered': None,
-        'opted_in': [], 'imported': [], 'file': str(path),
+        'opted_in': [], 'imported': [], 'private_opted_in': [], 'file': str(path),
     }
     section = None
     for line in lines:
@@ -191,11 +196,18 @@ def parse_registry(path):
             obj['imported'] = []
             section = None
             continue
+        if re.match(r'^private_opted_in:\s*\[\s*\]\s*$', line):
+            obj['private_opted_in'] = []
+            section = None
+            continue
         if re.match(r'^opted_in:\s*$', line):
             section = 'opted_in'
             continue
         if re.match(r'^imported:\s*$', line):
             section = 'imported'
+            continue
+        if re.match(r'^private_opted_in:\s*$', line):
+            section = 'private_opted_in'
             continue
         if section == 'opted_in':
             m1 = re.match(r'^\s*-\s*tool:\s*(.+?)\s*$', line)
@@ -207,12 +219,19 @@ def parse_registry(path):
             if m1:
                 obj['imported'].append({'name': m1.group(1), 'since': None})
                 continue
+        if section == 'private_opted_in':
+            m1 = re.match(r'^\s*-\s*tool:\s*(.+?)\s*$', line)
+            if m1:
+                obj['private_opted_in'].append({'name': m1.group(1), 'since': None})
+                continue
         m1 = re.match(r'^\s*since:\s*(.+?)\s*$', line)
         if m1:
             if section == 'opted_in' and obj['opted_in']:
                 obj['opted_in'][-1]['since'] = m1.group(1)
             elif section == 'imported' and obj['imported']:
                 obj['imported'][-1]['since'] = m1.group(1)
+            elif section == 'private_opted_in' and obj['private_opted_in']:
+                obj['private_opted_in'][-1]['since'] = m1.group(1)
             continue
     return obj
 
@@ -436,6 +455,67 @@ def test_consumer(c, config):
                              f"canonical source.",
                              f"Re-copy {canon_path} into .claude/skills/{name}/SKILL.md, replacing "
                              f"{{{{IMPORT_BASE}}}} with '{config['import_base']}'."))
+
+    # --- private_opted_in: (design\private_tools.md, decision 4) ----------------------------
+    # Each entry is either a private hook (has a canonical snippet in PRIVATE_OPTINS_DIR) or a
+    # private Track-1 skill (has a canonical stub in PRIVATE_SKILLS_DIR) - inferred by which
+    # exists, since private tool names are unique within toolkit_private\. Unlike the public
+    # STANDALONE_SKILLS loop above (which only checks whatever's physically present, since public
+    # skills aren't individually registry-tracked), an entry here IS an explicit registry
+    # declaration - same "declared but missing = drift" semantics as the public opted_in: hook
+    # loop, so a missing private skill stub is a FAIL, not a silent skip.
+    for ti in c['private_opted_in']:
+        tool = ti['name']
+        priv_optin_path = PRIVATE_OPTINS_DIR / f"{tool}.json"
+        priv_skill_path = PRIVATE_SKILLS_DIR / tool / 'SKILL.md'
+
+        if priv_optin_path.exists():
+            optin = get_expanded_optin(priv_optin_path, config)
+            if 'hooks' in optin:
+                for evt, groups in optin['hooks'].items():
+                    for grp in groups:
+                        for h in grp.get('hooks', []):
+                            m = re.search(r'"([^"]+)"', h.get('command', ''))
+                            if m and not Path(m.group(1)).exists():
+                                devs.append(Dev('FAIL', 'shared',
+                                                 f"private opt-in '{tool}' references a missing hook file: {m.group(1)}",
+                                                 None))
+            if consumer_settings is not None and 'hooks' in optin:
+                missing = False
+                for evt, groups in optin['hooks'].items():
+                    canon = [json.dumps(g, separators=(',', ':')).replace('\\\\', '/') for g in groups]
+                    have = []
+                    consumer_hooks = consumer_settings.get('hooks') if isinstance(consumer_settings, dict) else None
+                    if isinstance(consumer_hooks, dict) and evt in consumer_hooks:
+                        have = [json.dumps(g, separators=(',', ':')).replace('\\\\', '/')
+                                for g in consumer_hooks[evt]]
+                    for entry in canon:
+                        if entry not in have:
+                            missing = True
+                if missing:
+                    devs.append(Dev('FAIL', 'consumer',
+                                     f"settings.json no longer contains the canonical private opt-in snippet for '{tool}'.",
+                                     f"Re-merge toolkit_private/templates/optins/{tool}.json into .claude/settings.json."))
+        elif priv_skill_path.exists():
+            stub_path = cpath / '.claude' / 'skills' / tool / 'SKILL.md'
+            if not stub_path.exists():
+                devs.append(Dev('FAIL', 'consumer',
+                                 f"Registry lists private tool '{tool}' as opted-in but its skill stub "
+                                 f"(.claude/skills/{tool}/SKILL.md) is missing.",
+                                 f"Copy {priv_skill_path} into .claude/skills/{tool}/SKILL.md."))
+            else:
+                expected = priv_skill_path.read_text(encoding='utf-8')
+                actual = stub_path.read_text(encoding='utf-8')
+                if actual != expected:
+                    devs.append(Dev('FAIL', 'consumer',
+                                     f"'{tool}' private skill stub (.claude/skills/{tool}/SKILL.md) has "
+                                     f"drifted from the canonical source.",
+                                     f"Re-copy {priv_skill_path} into .claude/skills/{tool}/SKILL.md."))
+        else:
+            devs.append(Dev('FAIL', 'shared',
+                             f"Registered private tool '{tool}' has no canonical source in toolkit_private\\ "
+                             f"(checked templates/optins/{tool}.json and templates/skills/{tool}/SKILL.md).",
+                             None))
 
     return devs
 

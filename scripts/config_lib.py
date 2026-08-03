@@ -124,6 +124,31 @@ def get_shared_config(shared_root=None):
         )
     cfg['import_base'] = '~/' + str(rel).replace('\\', '/') + '/templates'
 
+    # private_root: design\private_tools.md - the private, automatic analog to shared_root, always
+    # recomputed live the same way (never trusted from the file) so a move/rename can't leave it
+    # stale either. Points at toolkit_private\, a sibling of this toolkit\ folder in the outer repo
+    # - it may not exist yet on a fresh clone or before the first private tool is added, which is
+    # fine, since it's just a path string until an opt-in snippet's {{PRIVATE_ROOT}} placeholder is
+    # actually expanded against it.
+    live_private_root = str(shared_root.resolve().parent / 'toolkit_private').replace('\\', '/')
+    raw_private_marker = cfg.get('private_root')
+    private_marker = (str(raw_private_marker).rstrip('\\/').replace('\\', '/')
+                       if raw_private_marker and not str(raw_private_marker).startswith('<') else None)
+    if private_marker and private_marker != live_private_root:
+        print(f"[NOTICE] toolkit_private\\'s location moved along with this tower_crane folder "
+              f"(was '{private_marker}', now '{live_private_root}'). Any consumer opted into a "
+              "private tool needs scripts\\relocate.py to catch up, same as a public-tool move.")
+    if private_marker != live_private_root:
+        cfg['private_root'] = live_private_root
+        try:
+            with open(local_path, 'w', encoding='utf-8') as f:
+                json.dump(cfg, f, indent=2)
+                f.write('\n')
+        except OSError:
+            pass  # best-effort - a read-only config just means the marker won't self-correct
+    else:
+        cfg['private_root'] = live_private_root
+
     return cfg
 
 
@@ -131,10 +156,12 @@ def expand_optin_command(command, config):
     """Substitute config placeholders in a single command string.
       {{PYTHON_LAUNCHER}} -> config.python_launcher
       {{SHARED_ROOT}}     -> config.shared_root
+      {{PRIVATE_ROOT}}    -> config.private_root (design\\private_tools.md)
     """
     return (command
             .replace('{{PYTHON_LAUNCHER}}', str(config.get('python_launcher', '')))
-            .replace('{{SHARED_ROOT}}', str(config.get('shared_root', ''))))
+            .replace('{{SHARED_ROOT}}', str(config.get('shared_root', '')))
+            .replace('{{PRIVATE_ROOT}}', str(config.get('private_root', ''))))
 
 
 def get_expanded_optin(optin_path, config):

@@ -37,8 +37,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config_lib import get_shared_config
 from check_tower_crane import parse_registry, CONSUMERS_DIR
 from scan_consumer_update import (
-    SKILL_PIECES, read_consumer_state, scan_hooks, scan_skills, scan_pieces,
-    apply_hook, apply_skill, apply_piece, resolve_selection,
+    SKILL_PIECES, read_consumer_state, scan_hooks, scan_skills, scan_pieces, scan_private,
+    apply_hook, apply_skill, apply_piece, apply_private, resolve_selection,
 )
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent  # toolkit\
@@ -72,7 +72,7 @@ def scan_all(cfg, consumers):
             print(f"  [skip] {c['name']}: no CLAUDE.md at {c['path']} - path stale or moved?")
             continue
         state = read_consumer_state(project_root)
-        items = scan_hooks(cfg, state) + scan_skills(state) + scan_pieces(state)
+        items = scan_hooks(cfg, state) + scan_skills(state) + scan_pieces(state) + scan_private(cfg, state)
         if items:
             slug = Path(c['file']).stem
             result.append((slug, {'consumer': c, 'project_root': project_root, 'items': items}))
@@ -86,7 +86,8 @@ def print_all(scanned):
         print("Nothing available - every locally-reachable consumer already has everything the "
               "hub currently offers.")
         return []
-    labels = {'hook': 'Hook opt-ins', 'skill': 'Toolkit skills', 'piece': 'Protocol pieces'}
+    labels = {'hook': 'Hook opt-ins', 'skill': 'Toolkit skills', 'piece': 'Protocol pieces',
+              'private': 'Private tools (toolkit_private)'}
     global_index = []
     n = 0
     print(f"=== AVAILABLE across {len(scanned)} consumer(s) ===")
@@ -155,6 +156,7 @@ def update_registry_entry(registry_path, entries, today):
     hook_names = [name for cat, name in entries if cat == 'hook']
     piece_names = [name for cat, name in entries if cat == 'piece']
     skill_names = [name for cat, name in entries if cat == 'skill']
+    private_names = [name for cat, name in entries if cat == 'private']
 
     for tool in hook_names:
         if f"tool: {tool}" in yaml_text:
@@ -168,9 +170,18 @@ def update_registry_entry(registry_path, entries, today):
             continue
         yaml_text = _yaml_add_list_item(yaml_text, 'imported', [f'  - piece: {piece_field}', f'    since: {today}'])
 
+    # design\private_tools.md decision 6: both hook- and skill-kind private items get a row here
+    # (unlike public STANDALONE_SKILLS, there's no separate discovery-filter list on the private
+    # side - this row is what the extended check_tower_crane.py needs to know to check the name
+    # against toolkit_private\).
+    for tool in private_names:
+        if f"tool: {tool}" in yaml_text:
+            continue
+        yaml_text = _yaml_add_list_item(yaml_text, 'private_opted_in', [f'  - tool: {tool}', f'    since: {today}'])
+
     new_raw = raw[:m.start(2)] + yaml_text + raw[m.end(2):]
 
-    note_items = hook_names + piece_names + skill_names
+    note_items = hook_names + piece_names + skill_names + private_names
     if note_items:
         note = (f"\n**`update consumers` applied {', '.join(note_items)} — {today}, pushed "
                 f"directly from the hub (no filing ticket needed; the hub owns this file).**\n")
@@ -202,6 +213,9 @@ def do_apply(cfg, scanned, global_index, spec, today):
         elif item['category'] == 'piece':
             if apply_piece(project_root, cfg, item):
                 per_consumer_writeback.setdefault(slug, []).append(('piece', item['name']))
+        elif item['category'] == 'private':
+            if apply_private(project_root, cfg, item):
+                per_consumer_writeback.setdefault(slug, []).append(('private', item['name']))
 
     for slug, entries in per_consumer_writeback.items():
         c = scanned_by_slug[slug]['consumer']

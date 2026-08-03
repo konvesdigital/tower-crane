@@ -71,7 +71,7 @@ nodes:
   - id: new_tool
     trigger: "new tool"
     context: hub
-    description: "Adds a new shared tool to the toolkit — sits available until a consumer opts in via `update`/`update consumers`, not automatic"
+    description: "Adds a new tool, public (toolkit\\, world-readable) or private (toolkit_private\\, never leaves this machine) — asks which, or jump straight to private via \"new private tool\". Either way it sits available until a consumer opts in via `update`/`update consumers`, not automatic"
     themes: [push-outward]
 
   - id: modify_tool

@@ -48,6 +48,10 @@ TEMPLATES_DIR = SHARED_ROOT / 'templates'
 OPTINS_DIR = TEMPLATES_DIR / 'optins'
 CONSUMERS_DIR = PROJECT_ROOT / 'consumers'
 TMPL_PATH = TEMPLATES_DIR / 'consumer_CLAUDE.md.tmpl'
+# design\private_tools.md - private, automatic tools living outside toolkit\, never shipped.
+PRIVATE_ROOT = PROJECT_ROOT / 'toolkit_private'
+PRIVATE_OPTINS_DIR = PRIVATE_ROOT / 'templates' / 'optins'
+PRIVATE_SKILLS_DIR = PRIVATE_ROOT / 'templates' / 'skills'
 
 # short human blurb per known tool for the "Tower Crane In Use" list (falls back to the name)
 TOOL_BLURBS = {
@@ -97,6 +101,10 @@ def main():
     parser.add_argument('--tools', nargs='*', default=['consistency_check'],
                          help="Tools to opt into (each needs templates/optins/<tool>.json). Pass --tools with no "
                               "values for a consumer with no hooks. Default: consistency_check.")
+    parser.add_argument('--private-tools', nargs='*', default=[],
+                         help="Private tools to opt into (design\\private_tools.md) - each needs either "
+                              "toolkit_private/templates/optins/<name>.json (hook) or "
+                              "toolkit_private/templates/skills/<name>/SKILL.md (Track-1 skill). Default: none.")
     parser.add_argument('--no-continuity', action='store_true',
                          help="Opt out of the (default-on) continuity protocol piece. filing + compliance + "
                               "shared_resources are always imported.")
@@ -108,6 +116,7 @@ def main():
     target_path = Path(args.target_path)
     project_name = args.project_name
     tools = args.tools
+    private_tools = args.private_tools
     scaffold_date = args.date or date.today().isoformat()
 
     config = get_shared_config(SHARED_ROOT)
@@ -127,6 +136,17 @@ def main():
         optin_path = OPTINS_DIR / f"{t}.json"
         if not optin_path.exists():
             raise RuntimeError(f"Unknown tool '{t}' - no opt-in snippet at {optin_path}")
+
+    private_tool_kinds = {}  # name -> 'hook' | 'skill'
+    for t in private_tools:
+        if (PRIVATE_OPTINS_DIR / f"{t}.json").exists():
+            private_tool_kinds[t] = 'hook'
+        elif (PRIVATE_SKILLS_DIR / t / 'SKILL.md').exists():
+            private_tool_kinds[t] = 'skill'
+        else:
+            raise RuntimeError(f"Unknown private tool '{t}' - no opt-in snippet at "
+                                f"{PRIVATE_OPTINS_DIR / (t + '.json')} and no skill stub at "
+                                f"{PRIVATE_SKILLS_DIR / t / 'SKILL.md'}")
 
     registry_path = CONSUMERS_DIR / f"{slug}.md"
     if registry_path.exists() and not args.force:
@@ -164,6 +184,8 @@ def main():
     print(f"Scaffolding consumer '{project_name}' (slug: {slug})")
     print(f"  target : {target_path}")
     print(f"  tools  : {', '.join(tools)}")
+    if private_tools:
+        print(f"  private: {', '.join(private_tools)}")
     print(f"  pieces : {', '.join(pieces)}")
 
     # --- 1. ensure <target>/.claude/ --------------------------------------------------------
@@ -199,6 +221,20 @@ def main():
                 # dedupe so re-running the scaffolder (--force) doesn't append the same hook twice;
                 # existing_json is computed once (not updated per append) to mirror the original
                 # PowerShell's static comparison snapshot.
+                existing_json = [json.dumps(e, separators=(',', ':')) for e in existing]
+                for entry in groups:
+                    entry_json = json.dumps(entry, separators=(',', ':'))
+                    if entry_json not in existing_json:
+                        existing.append(entry)
+
+    for t, kind in private_tool_kinds.items():
+        if kind != 'hook':
+            continue
+        # {{PRIVATE_ROOT}} expands the same way {{SHARED_ROOT}} does above.
+        optin = get_expanded_optin(PRIVATE_OPTINS_DIR / f"{t}.json", config)
+        if 'hooks' in optin:
+            for evt, groups in optin['hooks'].items():
+                existing = settings['hooks'].setdefault(evt, [])
                 existing_json = [json.dumps(e, separators=(',', ':')) for e in existing]
                 for entry in groups:
                     entry_json = json.dumps(entry, separators=(',', ':'))
@@ -260,6 +296,20 @@ def main():
         write_utf8(stub_path, stub_content)
         print(f"  wrote  {stub_path}")
 
+    # --- 3d. private skill stubs (design\private_tools.md - copy-only, no {{IMPORT_BASE}}) ----
+    for t, kind in private_tool_kinds.items():
+        if kind != 'skill':
+            continue
+        stub_src = PRIVATE_SKILLS_DIR / t / 'SKILL.md'
+        skill_dir = claude_dir / 'skills' / t
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        stub_path = skill_dir / 'SKILL.md'
+        if stub_path.exists() and not args.force:
+            print(f"  skip   {stub_path} exists (use --force to overwrite)")
+            continue
+        write_utf8(stub_path, stub_src.read_text(encoding='utf-8'))
+        print(f"  wrote  {stub_path}")
+
     # --- 4. project_progress.md skeleton (continuity only) -----------------------------------
     if not args.no_continuity:
         progress_path = target_path / 'project_progress.md'
@@ -314,6 +364,11 @@ Scaffolded from tower_crane on {scaffold_date}. Do these once, then delete this 
     else:
         opted_in_yaml = 'opted_in:\n' + '\n'.join(f"  - tool: {t}\n    since: {scaffold_date}" for t in tools)
     imported_yaml = 'imported:\n' + '\n'.join(f"  - piece: {p}\n    since: {scaffold_date}" for p in import_pieces)
+    if not private_tools:
+        private_opted_in_yaml = 'private_opted_in: []'
+    else:
+        private_opted_in_yaml = 'private_opted_in:\n' + '\n'.join(
+            f"  - tool: {t}\n    since: {scaffold_date}" for t in private_tools)
 
     registry_path_forward_slash = str(target_path).replace('\\', '/')
     registry = f"""# {project_name}
@@ -326,6 +381,7 @@ owner: {config['identity']['git_user_name']}
 registered: {scaffold_date}
 {opted_in_yaml}
 {imported_yaml}
+{private_opted_in_yaml}
 ```
 
 Notes: scaffolded by `scripts/new_consumer.py` on {scaffold_date}. Registry format is documented in

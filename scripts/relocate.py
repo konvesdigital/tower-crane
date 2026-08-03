@@ -40,6 +40,9 @@ SHARED_ROOT = Path(__file__).resolve().parent.parent
 PROJECT_ROOT = SHARED_ROOT.parent
 OPTINS_DIR = SHARED_ROOT / 'templates' / 'optins'
 CONSUMERS_DIR = PROJECT_ROOT / 'consumers'
+# design\private_tools.md - a moved/renamed hub needs its consumers' private hook commands
+# regenerated too, same as public ones.
+PRIVATE_OPTINS_DIR = PROJECT_ROOT / 'toolkit_private' / 'templates' / 'optins'
 
 COUNTS = {'changed': 0, 'noop': 0, 'skipped': 0, 'warn': 0}
 
@@ -57,7 +60,7 @@ def read_registry_entry(path):
     m = re.search(r'```yaml\s*\r?\n(.*?)\r?\n```', raw, re.DOTALL)
     if not m:
         return None
-    obj = {'name': None, 'path': None, 'host': None, 'tools': [], 'imports': []}
+    obj = {'name': None, 'path': None, 'host': None, 'tools': [], 'imports': [], 'private_tools': []}
     section = None
     for line in re.split(r'\r?\n', m.group(1)):
         m1 = re.match(r'^name:\s*(.+?)\s*$', line)
@@ -87,6 +90,12 @@ def read_registry_entry(path):
         if re.match(r'^imported:\s*$', line):
             section = 'imported'
             continue
+        if re.match(r'^private_opted_in:\s*\[\s*\]\s*$', line):
+            section = None
+            continue
+        if re.match(r'^private_opted_in:\s*$', line):
+            section = 'private_opted_in'
+            continue
         if re.match(r'^(registered|owner):', line):
             section = None
             continue
@@ -99,6 +108,11 @@ def read_registry_entry(path):
             m1 = re.match(r'^\s*-\s*piece:\s*(.+?)\s*$', line)
             if m1:
                 obj['imports'].append(m1.group(1))
+                continue
+        if section == 'private_opted_in':
+            m1 = re.match(r'^\s*-\s*tool:\s*(.+?)\s*$', line)
+            if m1:
+                obj['private_tools'].append(m1.group(1))
                 continue
     return obj
 
@@ -180,7 +194,8 @@ def main():
 
         imports_changed = fix_imports(c['path'], c['imports'], config['import_base'], args.dry_run)
 
-        if not c['tools']:
+        all_tools = c['tools'] + c['private_tools']
+        if not all_tools:
             if imports_changed:
                 COUNTS['changed'] += 1
             else:
@@ -201,7 +216,9 @@ def main():
             COUNTS['warn'] += 1
             continue
 
-        # Build tool -> new concrete command map from the canonical opt-ins.
+        # Build tool -> new concrete command map from the canonical opt-ins (public + private -
+        # design\private_tools.md; a private command's path already contains 'hooks/<tool>.py'
+        # same as a public one, so the rewrite loop below needs no separate pattern per source).
         new_cmd = {}
         for t in c['tools']:
             optin_path = OPTINS_DIR / f"{t}.json"
@@ -209,6 +226,16 @@ def main():
                 print(f"  [warn] no canonical opt-in for '{t}' - skipping that tool.")
                 COUNTS['warn'] += 1
                 continue
+            optin = get_expanded_optin(optin_path, config)
+            for evt, groups in optin.get('hooks', {}).items():
+                for grp in groups:
+                    for h in grp.get('hooks', []):
+                        if 'command' in h:
+                            new_cmd[t] = h['command']
+        for t in c['private_tools']:
+            optin_path = PRIVATE_OPTINS_DIR / f"{t}.json"
+            if not optin_path.exists():
+                continue  # a private "tool" may be a Track-1 skill instead of a hook - nothing to relocate
             optin = get_expanded_optin(optin_path, config)
             for evt, groups in optin.get('hooks', {}).items():
                 for grp in groups:
@@ -225,7 +252,7 @@ def main():
                 for h in grp.get('hooks', []):
                     if 'command' not in h:
                         continue
-                    for t in c['tools']:
+                    for t in all_tools:
                         if t not in new_cmd:
                             continue
                         pattern = r'hooks[\\/]' + re.escape(t) + r'\.(ps1|py)'

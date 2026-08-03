@@ -72,7 +72,13 @@ field, a MENU cell) still use full Title Case (e.g. `consumers\<slug>.md` carrie
 `name: <Full Title>`).
 
 ## Adding a new tool
-**Trigger: "new tool".**
+**Trigger: "new tool" — ask public or private first** (or jump straight in via `"new private
+tool"`). Public reaches every consumer via the shared, world-readable `toolkit\` repo; private
+(`design\private_tools.md`) reaches every consumer the same automatic way but stays in this
+machine's own outer repo, never touching `toolkit\`'s public GitHub origin — pick it for anything
+that shouldn't leave this machine, or that isn't worth the effort of generalizing.
+
+**Public branch:**
 1. Build and test it like normal project work (in whichever project prompted the need).
 2. Strip anything project-specific — no hardcoded paths, project names, or assumptions about a
    particular repo's structure. It must work unmodified if any future project points at it.
@@ -85,6 +91,27 @@ field, a MENU cell) still use full Title Case (e.g. `consumers\<slug>.md` carrie
    opt-in snippet a consuming project needs. Use a literal absolute path matching the working
    style already in MENU.md; don't introduce env-var indirection without testing it first.
 5. Checkpoint (below): commit and push like any other project.
+
+**Private branch** (`toolkit_private\`, outer repo, sibling of `toolkit\`):
+1. Build and test it like normal project work — same as the public branch.
+2. Skip the generalize/strip-project-specifics step — a private tool may embed real paths or
+   project names. It never leaves this machine and `check_file_surface.py`'s leak-scan gate
+   structurally doesn't apply (it only ever runs on a push to `toolkit\`'s public origin, and this
+   content never enters that repo). 2a's exit-2/stderr hook contract still applies as-is.
+3. Place it in `toolkit_private\hooks\` / `scripts\`, or `toolkit_private\templates\skills\<name>\
+   SKILL.md` for a Track-1 skill.
+4. Add a row to `toolkit_private\MENU.md` and write the opt-in snippet at
+   `toolkit_private\templates\optins\<name>.json`, using `{{PRIVATE_ROOT}}` in place of
+   `{{SHARED_ROOT}}`. A consuming project opts in via `update`/`update consumers`, same as a public
+   tool — never by hand-editing that project's `.claude\settings.json`.
+5. Checkpoint (below): the ordinary outer-repo commit+push already covers `toolkit_private\` — no
+   inner-repo push, so no leak-scan gate involved at all.
+
+**Migrating a private tool to public:** re-run the public branch above with the content copied
+over — the human still does the generalize/strip-project-specifics pass there, same judgment call
+any new public tool requires. Once the public version is confirmed working, default is to delete
+the `toolkit_private\` copy (avoids a lingering duplicate that could silently drift); "copy, keep
+both" is a per-tool choice when that's genuinely wanted, not the default.
 
 ## Self-use (dogfooding)
 **Trigger: "self hooks".**

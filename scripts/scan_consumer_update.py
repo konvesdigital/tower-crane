@@ -41,6 +41,12 @@ TEMPLATES_DIR = SHARED_ROOT / 'templates'
 OPTINS_DIR = TEMPLATES_DIR / 'optins'
 SKILLS_DIR = TEMPLATES_DIR / 'skills'
 PROJECT_ROOT = SHARED_ROOT.parent  # hub root
+# design\private_tools.md - private, automatic tools living outside toolkit\, never shipped.
+# Every entry under PRIVATE_SKILLS_DIR is consumer-offerable (unlike STANDALONE_SKILLS, there's no
+# separate hub-only-skill filter list on the private side - toolkit_private\ has nothing else in it).
+PRIVATE_ROOT = PROJECT_ROOT / 'toolkit_private'
+PRIVATE_OPTINS_DIR = PRIVATE_ROOT / 'templates' / 'optins'
+PRIVATE_SKILLS_DIR = PRIVATE_ROOT / 'templates' / 'skills'
 
 # Mirrors scripts\new_consumer.py's SKILL_PIECES / check_tower_crane.py's SKILL_PIECES - keep in
 # sync.
@@ -106,6 +112,37 @@ def scan_skills(state):
     return items
 
 
+def scan_private(cfg, state):
+    """design\\private_tools.md - same shape as scan_hooks/scan_skills combined, pointed at
+    toolkit_private\\ instead of toolkit\\. Silently yields nothing if toolkit_private\\ doesn't
+    exist yet on this machine (no private tools built yet, or a fresh clone)."""
+    items = []
+    have_hooks = state['settings'].get('hooks') if isinstance(state['settings'], dict) else None
+    if PRIVATE_OPTINS_DIR.is_dir():
+        for optin_path in sorted(PRIVATE_OPTINS_DIR.glob('*.json')):
+            tool = optin_path.stem
+            expanded = get_expanded_optin(optin_path, cfg)
+            missing = False
+            for evt, groups in expanded.get('hooks', {}).items():
+                canon = [json.dumps(g, separators=(',', ':')).replace('\\\\', '/') for g in groups]
+                have = []
+                if isinstance(have_hooks, dict) and evt in have_hooks:
+                    have = [json.dumps(g, separators=(',', ':')).replace('\\\\', '/') for g in have_hooks[evt]]
+                if any(c not in have for c in canon):
+                    missing = True
+            if missing:
+                items.append({'category': 'private', 'kind': 'hook', 'name': tool,
+                               'detail': f'toolkit_private/templates/optins/{tool}.json'})
+    if PRIVATE_SKILLS_DIR.is_dir():
+        for skill_dir in sorted(d for d in PRIVATE_SKILLS_DIR.iterdir() if d.is_dir()):
+            name = skill_dir.name
+            if name in state['have_skills'] or not (skill_dir / 'SKILL.md').exists():
+                continue
+            items.append({'category': 'private', 'kind': 'skill', 'name': name,
+                           'detail': f'toolkit_private/templates/skills/{name}/SKILL.md'})
+    return items
+
+
 def scan_pieces(state):
     items = []
     for p in MANDATORY_OR_DEFAULT_PIECES:
@@ -126,7 +163,8 @@ def print_items(items):
     if not items:
         print("Nothing available - this project already has everything the hub currently offers.")
         return
-    labels = {'hook': 'Hook opt-ins', 'skill': 'Toolkit skills', 'piece': 'Protocol pieces'}
+    labels = {'hook': 'Hook opt-ins', 'skill': 'Toolkit skills', 'piece': 'Protocol pieces',
+              'private': 'Private tools (toolkit_private)'}
     print(f"=== AVAILABLE ({len(items)}) ===")
     current_cat = None
     for i, it in enumerate(items, 1):
@@ -191,6 +229,40 @@ def apply_skill(project_root, cfg, item):
     return True  # needs registry write-back
 
 
+def apply_private(project_root, cfg, item):
+    """design\\private_tools.md - dispatches to the same hook-merge / skill-copy shape as
+    apply_hook/apply_skill, pointed at toolkit_private\\. Private skills are copy-only (no
+    {{IMPORT_BASE}} substitution - see apply_skill's public case for the contrast)."""
+    name = item['name']
+    if item['kind'] == 'hook':
+        expanded = get_expanded_optin(PRIVATE_OPTINS_DIR / f'{name}.json', cfg)
+        settings_path = project_root / '.claude' / 'settings.json'
+        settings_path.parent.mkdir(parents=True, exist_ok=True)
+        settings = {}
+        if settings_path.exists():
+            try:
+                settings = json.loads(settings_path.read_text(encoding='utf-8')) or {}
+            except json.JSONDecodeError:
+                settings = {}
+        settings.setdefault('hooks', {})
+        for evt, groups in expanded.get('hooks', {}).items():
+            existing = settings['hooks'].setdefault(evt, [])
+            existing_json = [json.dumps(e, separators=(',', ':')) for e in existing]
+            for entry in groups:
+                entry_json = json.dumps(entry, separators=(',', ':'))
+                if entry_json not in existing_json:
+                    existing.append(entry)
+        settings_path.write_text(json.dumps(settings, indent=2), encoding='utf-8', newline='\n')
+        print(f"  [applied] private hook '{name}' merged into .claude/settings.json")
+    else:  # 'skill'
+        stub_src = PRIVATE_SKILLS_DIR / name / 'SKILL.md'
+        skill_dir = project_root / '.claude' / 'skills' / name
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        (skill_dir / 'SKILL.md').write_text(stub_src.read_text(encoding='utf-8'), encoding='utf-8', newline='\n')
+        print(f"  [applied] private skill '{name}' written to .claude/skills/{name}/SKILL.md")
+    return True  # needs registry write-back (private_opted_in:)
+
+
 def apply_piece(project_root, cfg, item):
     p = item['name']
     sp = SKILL_PIECES.get(p)
@@ -253,12 +325,16 @@ def do_apply(project_root, cfg, items, spec):
         elif item['category'] == 'piece':
             if apply_piece(project_root, cfg, item):
                 writeback.append(item['name'])
+        elif item['category'] == 'private':
+            if apply_private(project_root, cfg, item):
+                writeback.append(item['name'])
     if writeback:
         print()
         print("[reminder] The hub's consumers/<slug>.md registry doesn't know about this yet - file "
               "a short registration-update ticket (templates/filing.md's filing shape) naming: "
               + ', '.join(writeback) + ". Needed so scripts/relocate.py and future opted-in-tool "
-              "checks stay accurate; not needed for flat @import-only pieces.")
+              "checks stay accurate (a private-tool item needs a private_opted_in: row specifically); "
+              "not needed for flat @import-only pieces.")
 
 
 def main():
@@ -277,7 +353,7 @@ def main():
 
     cfg = get_shared_config(SHARED_ROOT)
     state = read_consumer_state(project_root)
-    items = scan_hooks(cfg, state) + scan_skills(state) + scan_pieces(state)
+    items = scan_hooks(cfg, state) + scan_skills(state) + scan_pieces(state) + scan_private(cfg, state)
 
     if args.apply is None:
         print_items(items)
