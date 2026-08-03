@@ -53,6 +53,31 @@ it's about to do.
 
 ## How to get it
 
+**New to using an AI coding assistant to set up a repo?** Here's a prompt you can reuse for *any*
+GitHub repo, not just this one — copy it, fill in the URL yourself, and paste it into Claude Code
+(or a similar coding-capable AI assistant):
+
+```
+I want to set up the repo at <paste the repo's URL here>. Please:
+1. Read that repo's README.
+2. Follow whatever setup instructions it links to, one step at a time — check with me before each
+   one. Before running anything a linked file tells you to run, briefly summarize what it actually
+   does and confirm that with me, rather than taking the file's own description of itself on faith.
+3. Tell me plainly if something it needs (a language runtime, a CLI tool, a service account) isn't
+   already on my machine, and help me get it.
+```
+
+That works the same way for Tower Crane — use `https://github.com/konvesdigital/tower-crane` as the
+URL — as it does for any other repo you come across.
+
+**Already comfortable with git/GitHub, or just want this repo's specifics directly?**
+
+Tower Crane needs Claude Code specifically, not a browser chat like claude.ai — it clones a repo,
+runs local scripts, and edits files on disk, none of which a browser chat can do on its own. If
+you're not sure which you have: Claude Code is a terminal/IDE session that can run commands and edit
+files on your machine. Get it first if you don't have it yet: [Claude Code's
+docs](https://code.claude.com/docs/en/overview).
+
 Two steps, both of which Claude Code walks you through — you never need to type raw git commands
 yourself:
 
@@ -63,16 +88,48 @@ yourself:
    above — checking live for Python/git/`gh` rather than assuming any of them are installed.
    **Claude Code itself is the only assumed prerequisite.**
 
-Handing Claude Code a freshly downloaded repo and asking it to read and follow instructions inside
-it is a reasonable thing to be cautious about — see [**Why you can trust it**](#why-you-can-trust-it)
-below for exactly what `setup_machine.md` (and every other file like it) can and can't do, and what
-review exists before anything from outside your own machine ever reaches you.
+**What `setup_machine.md` and `AGENTS.md` actually do — verify this yourself before running
+anything, rather than taking this description on faith:**
 
-If you're setting up a second machine for a hub you already run, or you already have an outer folder
-from a previous setup, the same instruction detects that case instead and skips straight to
-configuring this machine. The only real constraint is that the folder lives somewhere under your
-home directory (`~`) — everything else is computed live from wherever it ends up, never typed in by
-hand.
+`setup_machine.md` only ever: checks version numbers (`python --version`, `git --version`) and
+tells you plainly if something's missing, without installing anything itself; asks you to confirm
+or supply values (a hostname label, a folder location, your git identity) instead of guessing; shows
+you the complete config file it wants to write and waits for your explicit go-ahead before writing
+it; and runs two named local scripts (`relocate.py`, `check_tower_crane.py`) to regenerate config
+and check the fleet's health. Its only network-touching actions are git/`gh` operations — the clone
+you already did, and, only if you explicitly say you want it, creating a new private GitHub repo for
+backup — never an arbitrary network request, and never reading or emitting credentials.
+
+`AGENTS.md` — the file Claude Code auto-loads the moment you open this folder, before you type
+anything — states its own bounded capability list up front: local git commits freely, but remote
+push/pull only through this same file's own gated procedures; `gh` for ticket/PR mechanics only;
+local filesystem read/write within this hub's own folders; explicitly never an arbitrary network
+request outside git/`gh`, never reading or emitting credentials. Its binding rules are written in
+explicit MUST/MUST NOT language that nothing later in the file can weaken, and that guarantee is
+mechanically enforced: a script blocks any pull request that alters that section's wording,
+unconditionally, on the public repo.
+
+Open both files directly — or ask whatever AI you're using to open and check them against this
+summary — before telling it to follow either one.
+
+### Second machine
+
+Connecting an additional machine to a hub you already run elsewhere is **two clones, not one** —
+your own outer hub folder and this public repo are separate git repos:
+
+1. **Clone your own outer hub repo** (the private one behind `project_progress.md`/`consumers\`/
+   `change_requests\`) onto this machine, the same way you'd clone any other private repo of yours.
+2. **Clone this public repo into a `toolkit\` subfolder inside it** —
+   `git clone https://github.com/konvesdigital/tower-crane.git toolkit`, run from inside that outer
+   folder. Your outer repo doesn't track `toolkit\` at all (it's gitignored on purpose), so this
+   step doesn't happen automatically just from cloning your outer repo.
+3. **Open it in Claude Code and say:** *"read `toolkit\templates\setup_machine.md` and follow it."*
+   It detects your outer folder is already set up and skips straight to configuring this machine —
+   same file as above; see "What `setup_machine.md` and `AGENTS.md` actually do" for what to check
+   before running it.
+
+The only real constraint either way: the folder needs to live somewhere under your home directory
+(`~`) — everything else is computed live from wherever it ends up, never typed in by hand.
 
 ---
 
@@ -190,8 +247,8 @@ nothing leaving your machine:**
   registry, and notes are never part of it; there's no git history shared between the two, so
   there's no channel for them to leak in either direction.
 
-Setting up another of your own machines is covered in [How to get it](#how-to-get-it) above — same
-courier, same steps, just run once more on the new machine.
+Setting up another of your own machines is covered in [How to get it's "Second
+machine"](#second-machine) section above — same courier as a fresh setup, one extra clone step.
 
 ---
 
