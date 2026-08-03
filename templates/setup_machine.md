@@ -2,8 +2,8 @@
 Home: toolkit\templates\setup_machine.md  (part of the tower_crane pattern — floats on HEAD)
 This is the CANONICAL per-machine setup courier: fills config.local.json for THIS machine/clone by
 checking and asking, never assuming. Referenced (never copied/duplicated) from:
-  - README.md's "Setup (fresh clone / new machine)" section — Federate: joining or re-setting up a
-    clone of an existing hub.
+  - README.md's "How to get it" section (Fresh setup / Second machine) — Federate: joining or
+    re-setting up a clone of an existing hub.
   - This file's own Step 0 scenario B ("Bootstrapping the outer hub") — Replicate: standing up a
     brand-new independent hub from a fresh public clone of `toolkit\`. Retired 2026-07-27:
     `scripts\seed_hub.py`, `scripts\publish_release.py`, and the strip-in-place courier
@@ -34,6 +34,9 @@ Work through this **with the user in the loop**: narrate each check as you run i
 final `config.local.json` for explicit confirmation before writing it (Step 7).
 
 ## Step 0 — Detect what you're starting from
+*(If you're reading this on GitHub or somewhere else before cloning anything — go to `README.md`'s
+"How to get it" section first; this file assumes `toolkit\` is already on your machine.)*
+
 The hub is two nested git repos in one folder: an outer, private repo (holds `project_progress.md`,
 `consumers\`, `change_requests\` — the user's own continuity data) and an inner `toolkit\` repo
 (holds `hooks\`, `scripts\`, `templates\`, `AGENTS.md`, `config.example.json` — this file included).
