@@ -3,12 +3,10 @@ Shared protocol piece: compliance.md (MANDATORY for every consumer).
 Home: ~\Documents\Claude\tower_crane\templates\compliance.md
 Imported by a consumer's CLAUDE.md via:
   @~/Documents/Claude/tower_crane/templates/compliance.md
-This is the RECEIVE side of the two-way compliance channel. Two independent shared-side writers
-share one file, COMPLIANCE_GUIDANCE.md, dropped into this project's root: check_tower_crane.py
-(derived deviations, under '## Checker deviations') and broadcast_guidance.py (hand-authored
-one-off guidance, under '## Broadcast'). Neither ever edits the consumer's live files. This piece
-tells the consumer's own agent how to act on that file. Mandatory so even a project that opts out
-of continuity still receives guidance. Keep project-agnostic.
+RECEIVE side of the two-way compliance channel: check_tower_crane.py writes '## Checker
+deviations', broadcast_guidance.py writes '## Broadcast', both into this project's
+COMPLIANCE_GUIDANCE.md. Neither ever edits this project's live files directly. Mandatory so even a
+project that opts out of continuity still receives guidance. Keep project-agnostic.
 
 This file explains how to use the mechanism it covers. `capability_relationships` explains how
 this mechanism works and how it relates to other mechanisms.
@@ -31,20 +29,17 @@ unless *both* sections are gone.
 **At session start (and whenever you run `resume`):** check whether `COMPLIANCE_GUIDANCE.md`
 exists in the project root. If it does, for **each section present**:
 
-1. Read it and, for each proposed change, show the **literal proposed text verbatim** (the exact
-   import line, hook command, config block, etc., exactly as written in the guidance file)
-   **alongside** a plain-language explanation of what it does and why. Show both together, always —
-   never a paraphrase alone (hides what's actually being proposed) and never the raw text alone
-   (unreadable without the explanation for a non-engineer).
+1. Read it and, for each proposed change, show the **literal proposed text verbatim** (exact
+   import line, hook command, config block) **alongside** a plain-language explanation of what it
+   does and why. Show both together, always — never a paraphrase alone, never the raw text alone.
 2. **Ask the user whether to apply them.** Do not apply silently — this is a human-in-the-loop
    gate, and you have full context on this project that the shared side does not.
 3. On **yes**: apply the changes, confirm what you did, then **delete just that section**
    (its `## Heading` line and body) from `COMPLIANCE_GUIDANCE.md`. If that was the only section
-   left in the file, delete the file entirely.
-4. On **no**: leave that section in place; it'll resurface next session. Re-running the
-   originating shared-side tool overwrites only its own section with the current content, and a
-   now-resolved section simply stops being written (a stale one is removed) — the other section,
-   if any, is untouched either way.
+   left, delete the file entirely.
+4. On **no**: leave that section in place; it'll resurface next session (re-running the
+   originating tool overwrites only its own section, and a now-resolved one simply stops being
+   written — the other section, if any, is untouched either way).
 
 If the guidance flags a *rogue override* — a local instruction in this project that deliberately
 contradicts shared prose — it is surfaced for the user to judge, never auto-changed. Removing an
