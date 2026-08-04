@@ -158,7 +158,7 @@ nodes:
   - id: save
     trigger: "shared resources \"Save\""
     context: consumer
-    description: "Publishes something this project found/built into the shared catalog"
+    description: "Publishes something this project found/built into the shared catalog as one of three kinds: reference (passive, read-on-demand domain knowledge), tool (a pointer to a proprietary or personal script/tool that lives elsewhere on disk, invoked on demand rather than auto-run), or insight (a workflow habit, code fragment, decision, or diagnosis consumed into the project, not pointed at externally)"
     themes: [push-outward, efficiency-rationale]
 
   - id: browse
