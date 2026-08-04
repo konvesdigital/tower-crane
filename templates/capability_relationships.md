@@ -59,8 +59,10 @@ actually being asked.
    recommending or assuming any one — never silently collapse real branches into a single answer just
    because they reach a similar outcome. Ask a short clarifying question if the distinguishing factor
    isn't already clear from the query; otherwise answer the branch the query already specifies.
-3. **Answer directly** from that node's `description` (or the branch narrowed in step 2). Check
-   `context` against the session you're actually in:
+3. **Answer directly** from that node's `description` (or the branch narrowed in step 2), naming
+   its exact `trigger` phrase — several nodes now fire autonomously only on that literal word
+   (`checkpoint`, `archive`, `update`), so surfacing it is the actionable takeaway, not decoration.
+   Check `context` against the session you're actually in:
    - Matches, or no `partial_reach` note exists: answer plainly.
    - Doesn't match, but a `partial_reach` note names this session's side: say plainly what can
      genuinely start here per that note, and what still needs the other location to finish — don't
@@ -84,7 +86,6 @@ actually being asked.
      match.
 5. **Path position is supporting color only** — you may mention where this node sits in `path`
    ("this typically comes right after X") if it's genuinely useful context, but never let that
-   become the reply's main content, and never trigger this skill on its own for "what's next"-shaped
-   phrasing (see "When this fires" above).
+   become the reply's main content.
 6. **Never dump the whole picture.** One direct answer, its nearest family, done — same discipline
    `commands.md`/`hub_commands.md` already follow.

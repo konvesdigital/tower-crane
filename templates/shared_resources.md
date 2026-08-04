@@ -77,11 +77,14 @@ formality:
   registry, or it's plainly project-specific either way) → save it into `shared_resources\`. It
   structurally cannot go anywhere else — never offer to route it into `toolkit\`.
 - **Requests a change to Claude's own deterministic behavior** — a hook, a script, a workflow
-  convention that should apply generically, not domain knowledge — → this is **not**
-  `shared_resources\` content. Don't save it here; point at the ticket system instead
-  (`templates\filing.md`'s `Type: proposal` ticket, or an ordinary bug ticket). If this same
-  content already lives in `shared_resources\` and has proven itself broadly, see filing.md's
-  graduation path instead of re-filing from scratch.
+  convention, not domain knowledge — → this is **not** `shared_resources\` content either way, but
+  where it actually goes depends on whether it's generic: content that should apply the same way
+  for anyone points at the ticket system instead (`templates\filing.md`'s `Type: proposal` ticket,
+  or an ordinary bug ticket); content that's genuinely project/client-specific goes to
+  `toolkit_private\` instead, built directly in a hub session (`AGENTS.md`'s "new private tool") —
+  no ticket, no genericity requirement, since it never leaves that machine. If this same content
+  already lives in `shared_resources\` and has proven itself broadly, see filing.md's graduation
+  path instead of re-filing from scratch.
 - **Neither is obvious** → ask before saving.
 
 Then, before writing anything, state what's about to happen and get an explicit go-ahead: the

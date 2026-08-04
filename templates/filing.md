@@ -51,19 +51,21 @@ it's the same live file. Brand-new functionality (a new opt-in tool, a new Track
 mandatory piece) just becomes **available** in `toolkit\` — this project still needs its own
 `update` (or the hub needs to run `update consumers`) to actually adopt it.
 
-Tower Crane's default shape is one person operating both this project and the hub itself — the
-same you who files a ticket here is also the one who'd later process it in a hub session, unless
-this hub has automation wired up (`templates\setup_automation.md`), in which case an unattended
-pass picks up the ticket on its own hourly cadence and applies it directly — a `Type: proposal`
-ticket included, since it goes through the same "Applying a fix" procedure as any other ticket —
-genuinely fire-and-forget, no manual hub session required. Either way, filing exists because this
-rule is about *where* the edit happens (never from this project's session, regardless of who's
-asking or whether it's applied by hand or unattended), not *who*/*what* does it — so if you'd
-rather skip the ticket and round-trip entirely, you can prototype the change here as ordinary
-project work, then carry it into your own next hub session and build it directly there
-(`AGENTS.md`'s "Adding a new tool" / "Changing or removing an existing tool"). Filing is still the
-right call when you want the request captured now without switching sessions yourself, or on the
-rare chance someone else operates this hub for you.
+Tower Crane's default shape is one person operating both this project and the hub itself, so for
+**brand-new tooling that doesn't exist yet**, the fastest path is usually to skip the ticket
+entirely: prototype the idea here as ordinary project work if you want, then carry it into your
+own next hub session and build it directly there (`AGENTS.md`'s "Adding a new tool" — the same
+procedure whether it ends up public in `toolkit\` or private in `toolkit_private\`). Filing a
+`Type: proposal` ticket instead is the right call when you want the idea captured now without
+switching sessions yourself, when it's a **bug or improvement to something that already
+exists** (the more common case this file is really about — see the ticket template below), on the
+rare chance someone else operates this hub for you, or when this hub has automation wired up
+(`templates\setup_automation.md`), in which case an unattended pass picks up the ticket on its own
+hourly cadence and applies it directly — a `Type: proposal` ticket included, since it goes through
+the same "Applying a fix" procedure as any other ticket — genuinely fire-and-forget, no manual hub
+session required. Either way, filing exists because this rule is about *where* the edit happens
+(never from this project's session, regardless of who's asking or whether it's applied by hand or
+unattended), not *who*/*what* does it.
 
 ### How to file
 
@@ -112,18 +114,27 @@ rare chance someone else operates this hub for you.
 
    **Before filing a proposal whose content would live in `toolkit\`:** confirm it contains no
    real absolute paths, machine-specific detail, or client/project names — `toolkit\` tracks the
-   public `konvesdigital/tower-crane` repo. If it does carry any of that, it isn't a `toolkit\`
-   proposal at all: private reference material, a proprietary tool pointer, or a reusable insight
-   belongs in `shared_resources\` instead (see `templates\shared_resources.md`, if this project has
-   opted in) — written directly, no ticket, no round-trip. Only file a `Type: proposal` ticket here
-   for content that's genuinely generic and public.
+   public `konvesdigital/tower-crane` repo, so genericity is a requirement there specifically, not
+   a general limit on what tooling can get built. If what you're picturing carries real
+   project/client detail and is **active tooling** (a hook, script, or skill — something that
+   runs), it isn't a `toolkit\` proposal, but it's also not blocked: it belongs in
+   `toolkit_private\` instead, built the same direct way in a hub session (`AGENTS.md`'s "new
+   private tool") — no genericity requirement, since it never leaves this machine, and no ticket
+   needed either, since it's built the same skip-the-ticket way any hub-session build is. If it's
+   **passive content** instead (reference material, a proprietary tool pointer, a reusable
+   insight), it belongs in `shared_resources\` instead (see `templates\shared_resources.md`, if
+   this project has opted in) — written directly, no ticket, no round-trip. Only file a
+   `Type: proposal` ticket here for content that's genuinely generic and meant to be public.
 
    **Graduating a `shared_resources\` entry into a `toolkit\` default:** a personal setting (a
    `reference`/`tool` entry, or an `insight` that's proven itself broadly enough it's now adopted
    the same way everywhere) can graduate into an actual shared default — but only through this same
    `Type: proposal` shape, never by editing `toolkit\` directly (`shared_resources\` writes stay
    settings-space; only the shared repo's own session decides what becomes a default — see
-   `design\resource_sharing_model.md`'s "Settings vs. defaults"). File it exactly as above, with one
+   `design\resource_sharing_model.md`'s "Settings vs. defaults"). If the proven setting still
+   carries real project/client detail rather than having genuinely become generic, this isn't the
+   right path at all — that's a `toolkit_private\` build instead (`AGENTS.md`'s "new private tool"),
+   skipping the ticket entirely, same as any other private tool. File it exactly as above, with one
    added citation line right after `Type: proposal`:
    ```
    Originated from: shared_resources\<entry name>

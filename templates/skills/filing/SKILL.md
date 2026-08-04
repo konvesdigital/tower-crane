@@ -11,9 +11,9 @@ check: check_tower_crane.py's Pass B compares each consumer's stub against this 
 -->
 ---
 name: filing
-description: Use when the user wants to report a bug or request an improvement in a shared
-  tower_crane tool, propose new shared content for the hub, or check the status of a
-  change-request ticket this project has filed.
+description: Use when the user wants to report a bug or modify a shared tower_crane tool, is
+  ready to file a proposal ticket for new toolkit tooling (a hook, script, skill, or protocol
+  convention), or wants to check a filed ticket's status.
 ---
 Read `{{IMPORT_BASE}}/filing.md` in full and follow it exactly — filing a new ticket,
 responding to one the resume-time scan surfaced, and the round-trip verify mechanics are all

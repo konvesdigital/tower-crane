@@ -17,6 +17,13 @@ violate the theme-tag test itself (two members from different structural cluster
 clause - design\capability_relationships.md's theme layer section). No functional loss either way:
 the theme layer is additive to `capability_relationships`' own answers regardless of whether a track
 here reflects it. Revisit only if a real third theme naturally emerges - don't invent one for this.
+
+"Reciprocal pairs to volunteer" below is separately catalog-derived as of 2026-08-03 (rendered live
+from `edges`, not a hand-authored table) — it predated `capability_relationships`/the catalog build
+and had drifted into a redundant, staler duplicate of the same structural-neighbor data
+`capability_relationships`' own step 4 already surfaces on demand; converted rather than trimmed
+outright since proactively volunteering a follow-up during a `commands` render is a genuinely
+different moment than answering a direct graph query.
 -->
 
 ## Answering "what can I do here" from this project's own session
@@ -114,16 +121,26 @@ You can say "commands" any time to see everything else.
 
 ### Reciprocal pairs to volunteer
 
-Per the reciprocal-tracks rule (design\optimize_ux.md): when a query lands on one side of a pair
-below, volunteer the other side as the single next-best follow-up - don't wait to be asked.
+Per the reciprocal-tracks rule (design\optimize_ux.md): when a query lands on one node, volunteer
+its nearest structural neighbor as the single next-best follow-up - don't wait to be asked. Not a
+fixed list below - read this project's own `capability_catalog.yaml` fresh (same file the tracks
+above and `capability_relationships` both resolve from the `toolkit\` root). For the node the
+query actually landed on, check `edges` for every entry naming it as `a` or `b` (skip
+`name-collision` and `backs` - informational only, not real neighbors, same discipline
+`capability_relationships.md` step 4 uses): reciprocal/parallel → mention the other side plainly;
+lifecycle-sibling → mention it, using the edge's own `note` if present (often a condition, e.g.
+archiving only worth mentioning once the Work Log has actually grown); accelerant → mention the
+accelerated side as the thing this project can already do on its own, the accelerant being a
+convenience, not a requirement. If the neighbor's own `context` is `hub`-only, say plainly it
+exists but isn't reachable from this session rather than omitting it silently.
 
-| If the query is about... | ...also mention |
-|---|---|
-| `checkpoint` | `resume` (and vice versa) |
-| `archive` (work log) | `checkpoint` - only worth mentioning once the work log has actually grown large enough to need archiving, not on every checkpoint |
-| pulling in shared resources (search/browse/adopt) | `shared resources` `Save` - sharing something this project found, outward |
-| filing a bug/problem | the round-trip check ("check my ticket") is part of the same `filing` skill |
-| `update` (pulling in new hub features this project hasn't adopted yet) | the hub-operator side of the same content is `update consumers` (same features, pushed instead of pulled); if what you want doesn't exist as hub functionality yet, that's a `filing` proposal ticket instead, not `update` - and note the hub has its own separate `update` (pulling the *public* toolkit repo in), a different boundary this project can't reach at all |
+```
+checkpoint → also mention: resume (reciprocal)
+archive (work log) → also mention: checkpoint (lifecycle-sibling, only once the Work Log has
+  actually grown large enough to need archiving)
+update → also mention: update consumers, the hub-operator side of the same content pushed
+  instead of pulled (accelerant)
+```
 
 ### Reaching the hub from here
 

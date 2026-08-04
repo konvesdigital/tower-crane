@@ -15,6 +15,11 @@ from different structural clusters, nameable in one clause). No functional loss 
 theme layer is additive to `capability_relationships`' own answers regardless. Revisit only if a
 real third theme naturally emerges - don't invent one for this. See templates\commands.md's own
 header for the consumer-side half of the same call.
+
+"Reciprocal pairs to volunteer" below is separately catalog-derived as of 2026-08-03, mirroring
+templates\commands.md's own conversion the same day — see that file's header for the full
+reasoning (predated the catalog build, had drifted into a redundant hand-maintained duplicate of
+`edges` data).
 -->
 
 ## Answering "what can I do here" from a hub-operator session
@@ -91,19 +96,25 @@ You can say "commands" any time to see everything else.
 
 ### Reciprocal pairs to volunteer
 
-Per the reciprocal-tracks rule (design\optimize_ux.md): when a query lands on one side of a pair
-below, volunteer the other side as the single next-best follow-up - don't wait to be asked.
+Per the reciprocal-tracks rule (design\optimize_ux.md): when a query lands on one node, volunteer
+its nearest structural neighbor as the single next-best follow-up - don't wait to be asked. Not a
+fixed list below - read this hub's own `capability_catalog.yaml` fresh (`toolkit\capability_catalog.yaml`,
+same file the "Efficiency habits" track above and `capability_relationships` both resolve from).
+For the node the query actually landed on, check `edges` for every entry naming it as `a` or `b`
+(skip `name-collision` and `backs` - informational only, not real neighbors, same discipline
+`capability_relationships.md` step 4 uses): reciprocal/parallel → mention the other side plainly;
+lifecycle-sibling → mention it, using the edge's own `note` if present; accelerant → mention the
+accelerated side as the thing that's already possible without this hub-side convenience.
 
-| If the query is about... | ...also mention |
-|---|---|
-| `checkpoint` | `resume` (and vice versa) |
-| `archive` (work log) | `checkpoint` - only worth mentioning once the work log has actually grown large enough to need archiving, not on every checkpoint |
-| `update` (pulling the public repo in) | `propose upstream` (pushing a local fix back out) - not `update consumers`, which is a different boundary (pushing already-adopted hub functionality out to registered projects, not pulling anything in) |
-| processing a filed ticket | the reverse is a consumer's own `filing` skill - "that's how a project gets a ticket to you in the first place" |
-| `self hooks` (what's turned on for this hub itself) | a consumer project has the same question about its own opted-in tools, asked from inside that project |
-| `curate shared resources` (this hub pushing an insight to every consumer) | a consumer can already pull the same thing on its own via its own `shared resources` search/browse - curation is an accelerant, not a requirement |
-| `new tool` | `modify tool` (sibling lifecycle actions - create vs. change) |
-| `update consumers` (this hub pushing functionality to every consumer) | a consumer can already pull the same thing on its own via its own `update` skill - bulk push here is an accelerant for when you just built something and know every local consumer wants it, not a requirement. Distinct from the hub's own `update` (pulls the public repo in - doesn't touch consumers at all) despite the shared name |
+```
+checkpoint → also mention: resume (reciprocal)
+archive (work log) → also mention: checkpoint (lifecycle-sibling, only once the Work Log has
+  actually grown large enough to need archiving)
+update (pulling the public repo in) → also mention: propose upstream (reciprocal)
+new tool → also mention: modify tool (lifecycle-sibling)
+update consumers → also mention: update, the consumer-side pull equivalent (accelerant - a
+  consumer could already run its own)
+```
 
 ### A note on ground-reachability
 

@@ -20,11 +20,8 @@ want to check, never automatically, and never at `resume` (no staleness nagging 
 
 **Scope is functionality, not data.** `update` exists to bring this project to *functionality
 parity with a project scaffolded fresh today* - the same hooks, toolkit skills, and protocol
-pieces `new_consumer.py` would wire in right now. It never touches `shared_resources\` content:
-that's data, not functionality, and adopting an individual entry from it is entirely the "shared
-resources" command's own job (search/browse/select/apply), once that optional mechanism has been
-adopted some other way. See `design\consumer_update.md`'s "Functionality, not data" correction
-(2026-08-01) if you're wondering why a shared_resources item never shows up here.
+pieces `new_consumer.py` would wire in right now. It never touches `shared_resources\` content,
+which is data, not functionality.
 
 You reached this file via a skill stub whose own path resolved somewhere under a `toolkit\`
 folder. That `toolkit\` folder's parent is **the hub root** (where `shared_resources\` lives); the

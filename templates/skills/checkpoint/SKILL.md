@@ -12,8 +12,8 @@ re-copy this file to clear it.
 -->
 ---
 name: checkpoint
-description: Use when the user says "checkpoint" or otherwise asks to save progress, commit,
-  and push — the end-of-session state save for this project.
+description: Use ONLY when the user says the exact word "checkpoint" — the end-of-session
+  save/commit/push habit for this project. Not autonomous/fuzzy-matched.
 ---
 Read `{{IMPORT_BASE}}/continuity.md` in full and follow its "checkpoint" procedure exactly. Do
 not paraphrase or act from memory of a previous read; the file floats on HEAD and may have
