@@ -9,6 +9,9 @@ model to notice a filing-shaped moment, so it stays a plain always-resident impo
 else — how to file a new ticket, the round-trip verify-append mechanics — lives in the `filing`
 skill (project-local `.claude\skills\filing\SKILL.md`, pointing at templates\filing.md), loaded
 only when actually needed. Keep this file terse and project-agnostic.
+
+This file explains how to use the mechanism it covers. `capability_relationships` explains how
+this mechanism works and how it relates to other mechanisms.
 -->
 
 ## Change-request ticket scan (resume)

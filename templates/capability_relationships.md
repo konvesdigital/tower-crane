@@ -1,4 +1,4 @@
-<!--
+1. <!--
 Shared protocol piece: capability_relationships.md (OPTIONAL / self-scaffolding, Track 1,
 on-demand, no always-resident companion - design\capability_relationships.md). Unlike every other
 Track-1 piece so far, this one fires from BOTH a consumer session and a hub session under the same

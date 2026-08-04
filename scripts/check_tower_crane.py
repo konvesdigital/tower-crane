@@ -28,7 +28,8 @@ Two passes, plus an optional compliance-guidance writer:
         skill name any SKILL_PIECES entry scaffolds, plus every STANDALONE_SKILLS entry (design\\
         consumer_update.md / design\\optimize_ux.md - a Track-1 skill with no @import companion,
         e.g. `update`, `commands`), a consumer's project-local .claude/skills/<name>/SKILL.md must
-        still match the canonical templates/skills/<name>/SKILL.md (with {{IMPORT_BASE}} resolved).
+        still match the canonical templates/skills/<name>/SKILL.md (with {{IMPORT_BASE}} resolved and
+        the leading maintainer-comment header stripped - config_lib.materialize_skill_stub).
 
   Hub self-use skill drift (design\\optimize_ux.md, addendum to Pass B): the hub is not a
     registered consumer of its own scaffolder, so `hub_commands` (installed only via
@@ -67,7 +68,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from config_lib import get_shared_config, get_expanded_optin
+from config_lib import get_shared_config, get_expanded_optin, materialize_skill_stub
 from guidance_lib import read_sections, write_section, SECTION_CHECKER
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
@@ -447,7 +448,7 @@ def test_consumer(c, config):
                              f"Consumer has a '{name}' skill stub but tower_crane has no canonical source "
                              f"at templates/skills/{name}/SKILL.md.", None))
             continue
-        expected = canon_path.read_text(encoding='utf-8').replace('{{IMPORT_BASE}}', str(config['import_base']))
+        expected = materialize_skill_stub(canon_path, config['import_base'])
         actual = stub_path.read_text(encoding='utf-8')
         if actual != expected:
             devs.append(Dev('FAIL', 'consumer',
@@ -504,7 +505,7 @@ def test_consumer(c, config):
                                  f"(.claude/skills/{tool}/SKILL.md) is missing.",
                                  f"Copy {priv_skill_path} into .claude/skills/{tool}/SKILL.md."))
             else:
-                expected = priv_skill_path.read_text(encoding='utf-8')
+                expected = materialize_skill_stub(priv_skill_path)
                 actual = stub_path.read_text(encoding='utf-8')
                 if actual != expected:
                     devs.append(Dev('FAIL', 'consumer',
@@ -621,7 +622,7 @@ def check_hub_self_use_skills(config):
                 report('FAIL', f"Hub self-use skill '{name}' is installed but tower_crane has no "
                                 f"canonical source at templates/skills/{name}/SKILL.md.")
                 continue
-            expected = canon_path.read_text(encoding='utf-8').replace('{{IMPORT_BASE}}', str(config['import_base']))
+            expected = materialize_skill_stub(canon_path, config['import_base'])
             actual = stub_path.read_text(encoding='utf-8')
             if actual != expected:
                 report('FAIL', f"Hub self-use skill '{name}' (.claude/skills/{name}/SKILL.md) has drifted "

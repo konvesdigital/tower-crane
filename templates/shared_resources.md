@@ -12,6 +12,9 @@ HEAD: this file is the one canonical source the stub always re-reads live. Keep 
 project-agnostic — it must read correctly reached from ANY consumer. Refer to "this project", never
 a specific consumer name, and never a real path/client name (this file lives in `toolkit\`, the
 public repo).
+
+This file explains how to use the mechanism it covers. `capability_relationships` explains how
+this mechanism works and how it relates to other mechanisms.
 -->
 
 ## Using shared resources and insights

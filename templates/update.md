@@ -7,6 +7,9 @@ toolkit\templates\skills\update\SKILL.md), same copy-and-substitute pattern as f
 archive. Float-on-HEAD: this file is the one canonical source the stub always re-reads live. Keep
 this file project-agnostic - it must read correctly from ANY consumer. Refer to "this project",
 never a specific consumer name.
+
+This file explains how to use the mechanism it covers. `capability_relationships` explains how
+this mechanism works and how it relates to other mechanisms.
 -->
 
 ## Pulling in new hub features this project hasn't adopted yet

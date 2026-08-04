@@ -9,6 +9,9 @@ share one file, COMPLIANCE_GUIDANCE.md, dropped into this project's root: check_
 one-off guidance, under '## Broadcast'). Neither ever edits the consumer's live files. This piece
 tells the consumer's own agent how to act on that file. Mandatory so even a project that opts out
 of continuity still receives guidance. Keep project-agnostic.
+
+This file explains how to use the mechanism it covers. `capability_relationships` explains how
+this mechanism works and how it relates to other mechanisms.
 -->
 
 ## Shared-tools compliance guidance

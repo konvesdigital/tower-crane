@@ -34,7 +34,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from config_lib import get_shared_config, get_expanded_optin
+from config_lib import get_shared_config, get_expanded_optin, materialize_skill_stub
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent  # toolkit\
 TEMPLATES_DIR = SHARED_ROOT / 'templates'
@@ -221,7 +221,7 @@ def apply_hook(project_root, cfg, item):
 def apply_skill(project_root, cfg, item):
     name = item['name']
     stub_src = SKILLS_DIR / name / 'SKILL.md'
-    stub_content = stub_src.read_text(encoding='utf-8').replace('{{IMPORT_BASE}}', str(cfg['import_base']))
+    stub_content = materialize_skill_stub(stub_src, cfg['import_base'])
     skill_dir = project_root / '.claude' / 'skills' / name
     skill_dir.mkdir(parents=True, exist_ok=True)
     (skill_dir / 'SKILL.md').write_text(stub_content, encoding='utf-8', newline='\n')
@@ -258,7 +258,7 @@ def apply_private(project_root, cfg, item):
         stub_src = PRIVATE_SKILLS_DIR / name / 'SKILL.md'
         skill_dir = project_root / '.claude' / 'skills' / name
         skill_dir.mkdir(parents=True, exist_ok=True)
-        (skill_dir / 'SKILL.md').write_text(stub_src.read_text(encoding='utf-8'), encoding='utf-8', newline='\n')
+        (skill_dir / 'SKILL.md').write_text(materialize_skill_stub(stub_src), encoding='utf-8', newline='\n')
         print(f"  [applied] private skill '{name}' written to .claude/skills/{name}/SKILL.md")
     return True  # needs registry write-back (private_opted_in:)
 
@@ -272,7 +272,7 @@ def apply_piece(project_root, cfg, item):
             if stub_path.exists():
                 continue
             stub_src = SKILLS_DIR / skill_name / 'SKILL.md'
-            stub_content = stub_src.read_text(encoding='utf-8').replace('{{IMPORT_BASE}}', str(cfg['import_base']))
+            stub_content = materialize_skill_stub(stub_src, cfg['import_base'])
             stub_path.parent.mkdir(parents=True, exist_ok=True)
             stub_path.write_text(stub_content, encoding='utf-8', newline='\n')
             print(f"  [applied] skill '{skill_name}' written to .claude/skills/{skill_name}/SKILL.md")

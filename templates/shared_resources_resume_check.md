@@ -12,6 +12,9 @@ trigger the mechanism again. Everything else - search, browse, select, apply, sa
 lives in the `shared_resources` skill (project-local `.claude\skills\shared_resources\SKILL.md`,
 pointing at templates\shared_resources.md), loaded only on the exact trigger phrase "shared
 resources." Keep this file terse and project-agnostic.
+
+This file explains how to use the mechanism it covers. `capability_relationships` explains how
+this mechanism works and how it relates to other mechanisms.
 -->
 
 ## Checking adopted shared_resources references

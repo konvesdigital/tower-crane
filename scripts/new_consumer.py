@@ -38,7 +38,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from config_lib import get_shared_config, get_expanded_optin
+from config_lib import get_shared_config, get_expanded_optin, materialize_skill_stub
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
 # consumers\ is private hub state, not shipped toolkit content - it lives at the outer root
@@ -279,7 +279,7 @@ def main():
             if stub_path.exists() and not args.force:
                 print(f"  skip   {stub_path} exists (use --force to overwrite)")
                 continue
-            stub_content = stub_src.read_text(encoding='utf-8').replace('{{IMPORT_BASE}}', import_base)
+            stub_content = materialize_skill_stub(stub_src, import_base)
             write_utf8(stub_path, stub_content)
             print(f"  wrote  {stub_path}")
 
@@ -292,7 +292,7 @@ def main():
         if stub_path.exists() and not args.force:
             print(f"  skip   {stub_path} exists (use --force to overwrite)")
             continue
-        stub_content = stub_src.read_text(encoding='utf-8').replace('{{IMPORT_BASE}}', import_base)
+        stub_content = materialize_skill_stub(stub_src, import_base)
         write_utf8(stub_path, stub_content)
         print(f"  wrote  {stub_path}")
 
@@ -307,7 +307,7 @@ def main():
         if stub_path.exists() and not args.force:
             print(f"  skip   {stub_path} exists (use --force to overwrite)")
             continue
-        write_utf8(stub_path, stub_src.read_text(encoding='utf-8'))
+        write_utf8(stub_path, materialize_skill_stub(stub_src))
         print(f"  wrote  {stub_path}")
 
     # --- 4. project_progress.md skeleton (continuity only) -----------------------------------

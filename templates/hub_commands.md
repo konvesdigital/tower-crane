@@ -20,6 +20,9 @@ header for the consumer-side half of the same call.
 templates\commands.md's own conversion the same day — see that file's header for the full
 reasoning (predated the catalog build, had drifted into a redundant hand-maintained duplicate of
 `edges` data).
+
+This file explains how to use the mechanism it covers. `capability_relationships` explains how
+this mechanism works and how it relates to other mechanisms.
 -->
 
 ## Answering "what can I do here" from a hub-operator session

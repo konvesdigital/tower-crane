@@ -13,6 +13,9 @@ artifact.
 The one part of the old filing.md that must stay always-resident (a resume-time
 change_requests\ scan can't wait for the model to notice a filing-shaped moment) now lives in
 the separate, still-@imported templates\filing_resume_check.md — see that file.
+
+This file explains how to use the mechanism it covers. `capability_relationships` explains how
+this mechanism works and how it relates to other mechanisms.
 -->
 
 ## Reporting bugs & improvements in shared tools

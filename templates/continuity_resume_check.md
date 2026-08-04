@@ -13,6 +13,9 @@ checkpoint, archive — lives in Track-1 skills (project-local .claude\skills\ch
 .claude\skills\archive\SKILL.md, each pointing at the still-canonical templates\continuity.md).
 Keep this file terse and project-agnostic — refer to "this project", never a specific consumer
 name.
+
+This file explains how to use the mechanism it covers. `capability_relationships` explains how
+this mechanism works and how it relates to other mechanisms.
 -->
 
 ## Session continuity

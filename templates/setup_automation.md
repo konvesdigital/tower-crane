@@ -11,6 +11,9 @@ setup_machine.md: check first, confirm with the user, never silently guess a con
 scheduler setting.
 
 Keep this file project/OS-agnostic. Edits here are canonical.
+
+This file explains how to use the mechanism it covers. `capability_relationships` explains how
+this mechanism works and how it relates to other mechanisms.
 -->
 
 # Turn on unattended ticket processing (automation)

@@ -24,6 +24,9 @@ and had drifted into a redundant, staler duplicate of the same structural-neighb
 `capability_relationships`' own step 4 already surfaces on demand; converted rather than trimmed
 outright since proactively volunteering a follow-up during a `commands` render is a genuinely
 different moment than answering a direct graph query.
+
+This file explains how to use the mechanism it covers. `capability_relationships` explains how
+this mechanism works and how it relates to other mechanisms.
 -->
 
 ## Answering "what can I do here" from this project's own session

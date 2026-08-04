@@ -21,6 +21,9 @@ yourself for "the agent," run the same commands, answer the same questions.
 
 Keep this file project/OS-agnostic. Edits here are canonical — the three consumers above only ever
 point at it, never copy its content, so a change here reaches all three automatically.
+
+This file explains how to use the mechanism it covers. `capability_relationships` explains how
+this mechanism works and how it relates to other mechanisms.
 -->
 
 # Set up this machine (config.local.json)

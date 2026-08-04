@@ -15,6 +15,9 @@ cost with none of the benefit — now lives in the separate, still-@imported
 templates\continuity_resume_check.md. That file also carries the "Two tiers" (base/expanded)
 explanation the "checkpoint" procedure below refers to; by the time checkpoint fires, resume has
 already loaded it earlier in the same session.
+
+This file explains how to use the mechanism it covers. `capability_relationships` explains how
+this mechanism works and how it relates to other mechanisms.
 -->
 
 ### "checkpoint"

@@ -24,11 +24,14 @@ gets substituted too, corrupting the comment. Only the one instruction line belo
 -->
 ---
 name: capability_relationships
-description: Use when the question is about a specific Tower Crane mechanism or concept — a named
-  capability ("what does `update` do", "what is `curate shared resources`") or a described need
-  that names none ("how do I get the newest version of what I build in the hub into this
-  project"). Not for broad "what can I do here"/"what's next"/"I'm new here" language — that's
-  `commands`/`hub_commands`' job instead.
+description: A structured map of every Tower Crane capability and how they relate to each other —
+  not a flat list, a graph. Use when a question is about what a specific mechanism does, how
+  mechanisms compare or differ, or how to accomplish something whose name the user doesn't know —
+  a named capability ("what does `update` do", "what is `curate shared resources`") or a described
+  need that names none ("how do I get the newest version of what I build in the hub into this
+  project", "can I build stuff that applies to all my projects connected to tower crane"). Not for
+  broad "what can I do here"/"what's next"/"I'm new here" language — that's `commands`/
+  `hub_commands`' job instead.
 ---
 Read `{{IMPORT_BASE}}/capability_relationships.md` in full and follow it exactly — matching the
 query to the capability graph, answering directly, and surfacing its nearest structural/thematic

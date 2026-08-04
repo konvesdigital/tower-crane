@@ -30,6 +30,7 @@ order for the parity-check approach used to verify this against the original.
 import json
 import os
 import platform
+import re
 from pathlib import Path
 
 
@@ -180,3 +181,25 @@ def get_expanded_optin(optin_path, config):
                         if 'command' in h:
                             h['command'] = expand_optin_command(h['command'], config)
     return optin
+
+
+_LEADING_COMMENT_RE = re.compile(r'^\s*<!--.*?-->\s*', re.DOTALL)
+
+
+def materialize_skill_stub(canon_path, import_base=None):
+    """Read a canonical templates\\skills\\<name>\\SKILL.md source and return the content that
+    should actually be installed (scaffolded to a consumer, self-hooked into the hub, or applied
+    by update_consumers.py): the leading maintainer HTML-comment header stripped, and
+    {{IMPORT_BASE}} substituted if import_base is given (omit for a private, copy-only stub).
+
+    The header strip matters, not just tidiness: every canonical stub carries that comment BEFORE
+    the YAML frontmatter, which breaks the harness's name/description parsing on the installed
+    copy - the skill listing shows the raw comment text instead of the real description. Mirrors
+    the header strip new_consumer.py already does for CLAUDE.md's own template header; this is
+    the same fix extended to skill stubs, which never got it (found 2026-08-04).
+    """
+    text = Path(canon_path).read_text(encoding='utf-8')
+    text = _LEADING_COMMENT_RE.sub('', text, count=1)
+    if import_base is not None:
+        text = text.replace('{{IMPORT_BASE}}', str(import_base))
+    return text

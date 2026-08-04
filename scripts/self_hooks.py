@@ -41,7 +41,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from config_lib import get_shared_config, get_expanded_optin
+from config_lib import get_shared_config, get_expanded_optin, materialize_skill_stub
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
 # Self-use only ever targets THIS hub's own repo, whose layout is always outer-root/toolkit\ post-
@@ -107,7 +107,7 @@ def _skills_on(optin, config):
         installed_path = SKILLS_INSTALL_DIR / name / 'SKILL.md'
         if not installed_path.exists():
             return False
-        expected = canon_path.read_text(encoding='utf-8').replace('{{IMPORT_BASE}}', str(config['import_base']))
+        expected = materialize_skill_stub(canon_path, config['import_base'])
         if installed_path.read_text(encoding='utf-8') != expected:
             return False
     return True
@@ -178,7 +178,7 @@ def _enable_skills(optin, config):
         if not canon_path.exists():
             raise RuntimeError(f"Canonical skill stub missing for '{name}': {canon_path}")
         installed_path = SKILLS_INSTALL_DIR / name / 'SKILL.md'
-        canon_content = canon_path.read_text(encoding='utf-8').replace('{{IMPORT_BASE}}', str(config['import_base']))
+        canon_content = materialize_skill_stub(canon_path, config['import_base'])
         if not installed_path.exists() or installed_path.read_text(encoding='utf-8') != canon_content:
             write_utf8(installed_path, canon_content)
             changed = True
