@@ -3,10 +3,9 @@
 # .github\CODEOWNERS (requires operator review on AGENTS.md) and branch protection on `main`
 # requiring both this check and that review before merge.
 #
-# NOTE: branch protection itself can't be enabled yet - GitHub's Free tier doesn't support branch
-# protection on private repos at all (only Pro/Team+, or public repos, which get it free). This
-# workflow runs and reports either way, but isn't wired as a *required* status check until this
-# repo goes public or the plan changes (project_progress.md Next Up tracks this).
+# Branch protection is live on `main` as of the 2026-07-27 public flip: this check and
+# general-gate are both required status checks, CODEOWNERS review is required, admin bypass is
+# preserved (see README.md "Every safety mechanism, in full").
 #
 # Security note: the PR body is untrusted, attacker-controlled text. It is passed to the script
 # via `env:`, never interpolated directly into a `run:` shell block - interpolating

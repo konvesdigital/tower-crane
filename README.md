@@ -148,6 +148,25 @@ hub folder at all.**
 The rest of this section covers each of those in more detail, plus — at the end — what it looks like
 to work on Tower Crane itself.
 
+### Not sure what to say next?
+
+You never need to memorize a command list. Two things answer "what can I do" for you, live, at any
+point — inside the hub itself or inside any connected project:
+
+- **Say `"commands"`** for a terse cheat sheet of everything available right now, grouped by
+  category — or **`"I'm new here, what do I do"`** for the same information told as a guided,
+  first-things-first story instead. Same underlying inventory either way; the phrasing you use picks
+  the rendering.
+- **Ask about anything by name or by what you're trying to do** — `"what does update do"`, or "how
+  do I get something I built in the hub into this project" — and a shared capability map
+  (`capability_catalog.yaml`, at this repo's root) answers directly, including how that thing relates
+  to whatever you'd naturally want next.
+
+Neither is something you have to remember to invoke — both are on-demand skills that fire on the
+phrasing itself, the same way `"checkpoint"`/`"resume"` already do. Canonical source, if you want to
+read the actual content instead of asking a session for it: `templates\commands.md` (consumer
+projects), `templates\hub_commands.md` (the hub operator side).
+
 ### Connecting a project
 
 A project you point at the hub becomes a **consumer** — it references the shared tools and
@@ -189,6 +208,10 @@ Roughly in order of how often you'll reach for them:
 6. **Receiving guidance** — if a project has drifted, or you've broadcast a notice, you'll find a
    `COMPLIANCE_GUIDANCE.md` in that project's root. The project's own agent shows you the literal
    proposed change alongside a plain-language summary and asks before applying it.
+7. **"update"** — pull, on your own schedule, never nagged: lists hub functionality (hooks, Track-1
+   skills, protocol pieces) this project hasn't adopted yet and lets you choose what to bring in.
+   Purely on-demand — a project that never runs it just stays as it was connected, no staleness
+   warning ever fires.
 
 Full mechanics: `templates\continuity.md`.
 
@@ -204,6 +227,9 @@ A few commands keep every connected project honest without visiting each one ind
 - **Push a fix or a notice.** `check_tower_crane.py --write-guidance` targets one drifted project;
   `scripts\broadcast_guidance.py --broadcast <file>` sends a one-off, hand-authored notice to all of
   them.
+- **Push new hub functionality to everyone at once.** `scripts\update_consumers.py` is the hub-side
+  mirror of each project's own `"update"` — lists what's available across every registered consumer
+  and applies your choices in one pass, instead of pulling per project.
 - **Turn on unattended automation.** An hourly, unattended tick that processes open tickets and
   refreshes compliance guidance without you opening an interactive session here. It never touches
   the public repo unattended and never adopts anything unreviewed on its own — it only surfaces
@@ -263,6 +289,14 @@ and the outside world:
 | **Update** | You pull changes from the public repo into your own `toolkit\` | A regression suite runs, then the literal diff is shown to you verbatim alongside a plain-language read — nothing merges without your approval. |
 | **Merge** | Any proposed change tries to land on the public repo's `main` | Required owner review plus a battery of automated checks must all pass before it can merge. |
 | **Upstream** | You propose a change from your own hub back to the public repo | An authoring assistant checks it before it's even opened as a PR, so it doesn't arrive at Merge already broken. |
+
+One nuance worth stating plainly, not just implying: the Update gate's regression suite has to
+actually *run* the incoming, not-yet-reviewed code to check it — in a disposable temp worktree,
+before you ever see the diff — because there's no way to test whether new code behaves correctly
+without running it. That's different from *merging* it, which still waits on your explicit approval
+either way. The honest claim is "nothing merges without your approval," not "nothing executes before
+your approval" — worth knowing if you're deciding how much to trust this on your own read, not just
+this description of it.
 
 You stay in control throughout: your outer (private) repo never touches the public repo at all, your
 own tickets against your own toolkit process automatically because there's no one else who needs to
@@ -347,10 +381,11 @@ unconsidered one.
 (rationale docs), `project_progress.md` (working state), `CLAUDE.md` (a one-line `@import` pointer
 at `toolkit\AGENTS.md`), `toolkit\` (gitignored by this repo entirely).
 
-**Inner `toolkit\` repo (public, `konvesdigital/tower-crane`):** `MENU.md` (catalog), `templates\`
-(shared prose + couriers), `scripts\` (maintainer tooling), `hooks\`/`agents\` (the executable
-tools), `CHANGELOG.md`, `config.example.json`/`config.local.json` (per-machine config, `.local`
-gitignored), `AGENTS.md` (the canonical operating instructions).
+**Inner `toolkit\` repo (public, `konvesdigital/tower-crane`):** `MENU.md` (catalog),
+`capability_catalog.yaml` (the relationship map `"commands"`/`capability_relationships` draw from),
+`templates\` (shared prose + couriers), `scripts\` (maintainer tooling), `hooks\`/`agents\` (the
+executable tools), `CHANGELOG.md`, `config.example.json`/`config.local.json` (per-machine config,
+`.local` gitignored), `AGENTS.md` (the canonical operating instructions).
 
 ### Quick-start cheat sheet
 | I want to... | Do this |
@@ -359,11 +394,19 @@ gitignored), `AGENTS.md` (the canonical operating instructions).
 | Set up another of my own machines | `templates\setup_machine.md` |
 | Connect a project | `scripts\new_consumer.py` (new) or `templates\register.md` (existing) |
 | Save/resume progress in a project | say `"checkpoint"` / `"resume"` |
+| Not sure what to do next | say `"commands"` or `"I'm new here, what do I do"` |
 | Keep everything running itself | `templates\setup_automation.md` |
 | Confirm the fleet is healthy | `scripts\check_tower_crane.py` |
 | Push a fix to one project | checker with `--write-guidance` |
 | Push a notice to all my projects | `scripts\broadcast_guidance.py --broadcast <file>` |
+| Pull new hub functionality into one project | say `"update"` inside that project |
+| Push new hub functionality to every project | `scripts\update_consumers.py` |
 | Add or fix a shareable tool | see "Working within Tower Crane itself" above |
-| Pull a reviewed toolkit update | the `update` action — see `AGENTS.md` |
+| Pull a reviewed toolkit update (the hub's own `toolkit\`, from the public repo) | the `update` action — see `AGENTS.md` |
 | Propose a fix upstream | `"propose upstream"` — see `AGENTS.md` |
 | Turn on this hub's own tools | `scripts\self_hooks.py --enable <tool>` |
+
+### License
+
+MIT — see `LICENSE`. Applies to this `toolkit\` repo only; nothing here governs your own outer hub
+repo or the projects you connect to it, which stay entirely yours.

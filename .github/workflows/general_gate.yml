@@ -11,9 +11,8 @@
 #   - check_scripts_gate.py: consistency_check.py static analysis over every changed script under
 #     hooks\/scripts\/agents\.
 #
-# Same branch-protection caveat as agents_md_gate.yml: not wired as a *required* status check yet -
-# GitHub Free tier doesn't support branch protection on a private repo, and this repo is still
-# private. Runs and reports either way.
+# Branch protection is live on `main` as of the 2026-07-27 public flip: this check and
+# agents-md-gate are both required status checks (see agents_md_gate.yml's header for detail).
 #
 # Third-party Actions below are pinned to a full commit SHA, not a mutable version tag - same
 # tj-actions/changed-files (CVE-2025-30066) rationale as agents_md_gate.yml; see that file's header.
