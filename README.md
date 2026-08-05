@@ -1,20 +1,18 @@
 # Tower Crane
 
-A shared library of reusable Claude Code **tools** (hooks, subagents, scripts) *and* shared
-**workflow conventions**, built so one person running several Claude Code projects can keep them
-organized without re-inventing the same conventions in every one. It is not a product or a client
-deliverable — it's infrastructure you run for yourself.
+Shared library infrastructure for Claude Code. This is the machinery for creating your own shared hooks and knowledge once for all your connected projects, instead of re-inventing the same conventions for each one. It ships with `consistency_check.py`, which catches mistakes in Python scripts as Claude builds them.
 
 ---
 
 ## What it is
 
-Tower Crane is a local hub for running Claude Code across several of your own projects — one shared
-set of tools and conventions, with each project pointing at it instead of carrying its own copy.
+Tower Crane runs locally, and each project **points at** it instead of carrying its own copy of
+anything. It breaks into two pieces:
 
 - **Shared tools** — Claude Code hooks, scripts, and (eventually) subagents. See `MENU.md`.
-- **Shared workflow conventions** — how a session saves progress, how a fix reaches every project
-  that uses it. See `templates\`.
+- **Shared workflow conventions** — `checkpoint`/`resume` keep a session's context window short
+  instead of reloading a growing history every time, and a fix to one convention reaches every
+  project that uses it. See `templates\`.
 
 **Structurally, it's two nested git repos in one folder:**
 
@@ -25,25 +23,104 @@ set of tools and conventions, with each project pointing at it instead of carryi
 
 ---
 
+## Why is it called Tower Crane?
+
+### Cranes in general:
+- **Efficiency**: Build things from a central location that would be inefficient from the ground.
+- **Power**: Move bigger things than the ground operators could.
+- **Safety considerations**: Operate within specific weight constraints.
+- **Support role**: The crane moves resources. It doesn't construct the actual project.
+
+### Tower Cranes specifically
+- **Vantage point**: Tower cranes are tall and see the entire job site.
+- **Self erecting**: Tower cranes build themselves or climb.
+- **Remote operation**: Support individual projects from the ground.
+- **Cab operation**: Support the entire jobsite from a central vantage point.
+
+### Tower Crane with Claude Code
+- **Efficiency**: Build things from a central location that would be inefficient from individual
+  projects.
+- **Token economy**: Conventions around commands reduce context window.
+- **Bundled .py hook**: Operate within specific python reference constraints.
+- **Self erecting**: New machine set up and project connect instructions let Tower Crane build
+  itself.
+- **Support role**: Tower Crane organizes resources and makes Claude Code more efficient. It
+  doesn't build the actual project.
+- **Remote operation**: Create centralized resources from individual projects which can be used by
+  all.
+- **Hub operation**: Create centralized tools from a central location to be used by all.
+
+---
+
 ## Why you need it
 
-Two things, mainly: **it keeps Claude Code cheap to run**, and **it saves you from rebuilding the
-same conventions in every project.**
+- **It keeps Claude Code cheap to run.**
+- **It saves you from rebuilding the same conventions in every project.**
 
-- **Token economy.** `checkpoint`/`resume` keep each project's `CLAUDE.md` and progress notes lean,
-  so only the current state loads every session — not a growing history. The tools you install add
-  to this too: a hook like `consistency_check.py` checks your code the moment you save it, as plain
-  local Python, at **zero LLM tokens** — instead of asking Claude to re-review it.
-- **Time.** Fix a hook or refine a convention once, here, and every project that's opted in picks it
-  up automatically — no copy-pasting the same fix into five `CLAUDE.md` files, and no risk of one
-  copy drifting from the rest.
+### Here's what it looks like to use Claude with Tower Crane
 
-The longer version: Claude Code loads a project's `CLAUDE.md` on every single session. Left alone,
-that file tends to grow without bound — accumulated instructions, a running history of everything
-that ever happened — burning tokens every session whether or not any of it still matters, while
-nothing forces work into git along the way. Tower Crane's conventions put a firm line between what a
-session actually needs loaded and what's just history worth reading once, and make sure work reaches
-git as a habit, not something to remember.
+### Create CLAUDE.md
+- **Without Tower Crane** — Manually create CLAUDE.md for each project: Hand write, or copy and
+  paste from the CLAUDE.md of other projects.
+- **With Tower Crane** — Tower Crane generates a CLAUDE.md template pre-filled with conventions,
+  and all necessary support documentation.
+
+### "Teaching" Claude things in multiple projects
+- **Without Tower Crane** — **Repeat yourself**: Explain the same thing for the agent in each new
+  project. Figure the same things out multiple times. Re-hash previously decided context. Be
+  frustrated.
+- **With Tower Crane** — **Teach Claude Once**: If a decision in one project would apply to many,
+  save the conversation as a Shared Insight. Any connected project can pick up where this decision
+  left off.
+
+### Tools and files outside dedicated project
+- **Without Tower Crane** — Files outside a project are invisible. Information and tools that
+  should govern Claude's behavior is added manually, ad hoc.
+- **With Tower Crane** — Add a pointer to files outside projects to Shared Resources. Opt in to
+  shared files and tools depending on the project.
+
+  > For example, you wrote documentation about how SEO works. Add a pointer file to your SEO
+  > documentation in Shared Resources. Opt all your SEO client projects into the SEO resource. Now,
+  > in all your SEO client projects, Claude knows how to do SEO.
+
+### Context Window Length
+- **Without Tower Crane** — **Context window grows long**: Every /resume command re-loads the
+  previous context window.
+- **With Tower Crane** — **Keep Context short**: "Resume" loads the "project_progress.md", not the
+  previous context. Claude only has notes on what's important, and preparation to continue, not the
+  entire previous conversation.
+
+### Local Access
+- **Without Tower Crane** — **Claude Code outage means work stops** because commands live in
+  Claude Code.
+- **With Tower Crane** — **Work is stored locally** because project_progress.md is both a local
+  file, and human readable. If connectivity lapses, you can pick up the project manually by reading
+  the work log, or give the work log to another AI agent and continue.
+
+### Organization
+- **Without Tower Crane** — **/resume is memory of conversation, not a plan**: Claude looks
+  backwards to guess what might be ahead. Requires a separate to-do list. Easy to forget things or
+  become disorganized.
+- **With Tower Crane** — **Claude looks ahead**: project_progress.md is both a log of what's been
+  accomplished, and a list of things you've mentioned you want to do. Every "resume" begins with
+  Claude telling you what's listed next. Work is systematic and nothing gets forgotten.
+
+### Git and CLI Commands
+- **Without Tower Crane** — **Git commits and pushing to GitHub are invoked manually**: Setup, and
+  CLI commands to use git and a remote repo must be configured and used manually.
+- **With Tower Crane** — **Git commits and remote push and pull are automatic**: "Checkpoint"
+  commits and pushes to remote. Git and GitHub set up is bundled with standard set up.
+
+### Version Control, Remote Backup, Collaboration
+- **Without Tower Crane** — **No git or remote by default**: work lives locally only. No backup,
+  and no cross-machine collaboration unless you set it up and remember to use it.
+- **With Tower Crane** — **Automatic and easy use of git and remote repo**: All work has version
+  control, and remote backup. Easily revert to past versions, work from any machine with an
+  internet connection, no downtime if machine completely fails.
+
+Worth calling out separately: the tools you install add to this too — a hook like
+`consistency_check.py` checks your code the moment you save it, as plain local Python, at **zero
+LLM tokens**, instead of asking Claude to re-review it.
 
 You don't need to be a software engineer to use this — Claude Code drives almost every mechanical
 step (git commands, file creation, GitHub operations); you mostly describe intent and approve what
