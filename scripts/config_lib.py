@@ -95,10 +95,18 @@ def get_shared_config(shared_root=None):
         print("         The location marker just self-corrected - nothing broken here. But every "
               "registered")
         print("         consumer still has the OLD path baked into its hook command / @import "
-              "lines. If you're")
-        print("         an agent running this on the user's behalf: tell them, and offer to run "
-              "scripts\\relocate.py")
-        print("         now to bring every consumer back in sync.")
+              "lines, AND")
+        print("         so does this hub's own outer CLAUDE.md self-import and its own self-use "
+              "hooks. If")
+        print("         you're an agent running this on the user's behalf: tell them, and offer "
+              "to run")
+        print("         scripts\\relocate.py now - it brings every consumer AND this hub's own "
+              "self-import")
+        print("         back in sync in one pass (self-use hooks under `self_hooks.py` are "
+              "project-relative")
+        print("         and don't need this - see config_lib.py's space check below for the "
+              "other half of what")
+        print("         broke a live session this way once already).")
     if marker != live_root:
         cfg['shared_root'] = live_root
         try:
@@ -124,6 +132,36 @@ def get_shared_config(shared_root=None):
             "your home directory (any name, any depth)."
         )
     cfg['import_base'] = '~/' + str(rel).replace('\\', '/') + '/templates'
+
+    # Claude Code's own @import parser splits on whitespace with no quoting support, so a single
+    # space anywhere in this path silently kills EVERY @import line that resolves through it - no
+    # error, no warning, the imported content just never loads (confirmed permanent upstream
+    # limitation: github.com/anthropics/claude-code/issues/56927, closed "not planned"). This is
+    # not a Tower Crane path-convention rule - the repo can live anywhere, under any name, per the
+    # portability design above - it is a warning about a real Claude Code parser limitation that
+    # would otherwise fail completely silently. Checked live_root only (not the '~/...' form),
+    # since a space anywhere under the home directory reproduces the bug identically.
+    if ' ' in live_root:
+        print(f"[WARNING] This tower_crane folder's path contains a space: '{live_root}'.")
+        print("          Claude Code's @import directive silently fails to load anything through "
+              "a path")
+        print("          containing a space - no error, no dialog, the imported file just never "
+              "reaches")
+        print("          context (github.com/anthropics/claude-code/issues/56927, a confirmed, "
+              "permanent")
+        print("          upstream limitation, closed 'not planned'). This breaks every consumer's "
+              "@import")
+        print("          lines AND this hub's own outer CLAUDE.md self-import, every time, "
+              "completely")
+        print("          silently. The only reliable fix is removing the space from this path - "
+              "not moving")
+        print("          to any particular location, just renaming the offending folder segment "
+              "(e.g. 'My")
+        print("          Folder' -> 'My_Folder'). Tower Crane still doesn't care where or what "
+              "this folder")
+        print("          is named otherwise - this is the one literal character its @import "
+              "mechanism can't")
+        print("          route around.")
 
     # private_root: design\private_tools.md - the private, automatic analog to shared_root, always
     # recomputed live the same way (never trusted from the file) so a move/rename can't leave it

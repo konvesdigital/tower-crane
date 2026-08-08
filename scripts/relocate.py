@@ -145,6 +145,35 @@ def fix_imports(consumer_path, imports, import_base, dry_run):
     return changed
 
 
+# The outer hub's own CLAUDE.md carries exactly one hand-written @import line (pointing at this
+# same toolkit\'s AGENTS.md) - the one @import in the whole system that had no scaffolder/relocate
+# owner until this fix. Same "already-baked path, needs a relocate pass after a move" situation as
+# a consumer's @import lines above, so it gets the identical mechanical treatment. Found live
+# 2026-08-08: this line silently pointed at a stale, renamed-away path for a full session before
+# anyone noticed - nothing was keeping it in sync (project_progress.md Work Log, that date).
+def fix_self_import(project_root, import_base, dry_run):
+    claude_path = Path(project_root) / 'CLAUDE.md'
+    if not claude_path.exists():
+        return False
+    text = claude_path.read_text(encoding='utf-8')
+    lines = text.split('\n')
+    pattern = re.compile(r'^@.*/toolkit/AGENTS\.md\s*$')
+    expected = '@' + import_base.rsplit('/templates', 1)[0] + '/AGENTS.md'
+    changed = False
+    for i, line in enumerate(lines):
+        if pattern.match(line) and line.rstrip('\r') != expected:
+            verb = 'would change' if dry_run else 'change'
+            print(f"  [{verb}] hub self-import")
+            print(f"      from: {line.rstrip(chr(13))}")
+            print(f"      to:   {expected}")
+            lines[i] = expected
+            changed = True
+    if changed and not dry_run:
+        write_utf8(claude_path, '\n'.join(lines))
+        print(f"  wrote {claude_path}")
+    return changed
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Regenerate every registered consumer's hook command(s) from config.local.json."
@@ -162,6 +191,15 @@ def main():
     print(f"this host   : {this_host}")
     if args.dry_run:
         print("MODE        : DRY RUN (no files written)")
+
+    if not args.consumer:
+        print()
+        print("Hub itself:")
+        if fix_self_import(PROJECT_ROOT, config['import_base'], args.dry_run):
+            COUNTS['changed'] += 1
+        else:
+            print("  [no-op] self-import already current.")
+            COUNTS['noop'] += 1
 
     files = sorted(CONSUMERS_DIR.glob('*.md')) if CONSUMERS_DIR.is_dir() else []
     if args.consumer:

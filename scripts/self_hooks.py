@@ -67,6 +67,30 @@ def available_tools():
     return sorted(p.stem for p in OPTINS_DIR.glob('*.json'))
 
 
+def _localize(optin, config):
+    """Self-use hook commands never need to be an absolute, rename-fragile path: unlike a real
+    consumer (a separate project referencing this hub externally), self-use always runs THIS same
+    hub's own toolkit\\ nested one level under its own project root (SHARED_ROOT == PROJECT_ROOT /
+    'toolkit', enforced by this file's own layout comment above). So once get_expanded_optin has
+    substituted the concrete {{SHARED_ROOT}} path, swap that absolute prefix back out for Claude
+    Code's own $CLAUDE_PROJECT_DIR env var - the command then resolves correctly no matter where
+    or what this repo is later moved/renamed to, with no relocate-equivalent ever needed for a
+    self-use hook again. (Found the hard way: a hand-edited absolute path here is exactly what
+    broke self-use hooks after a folder rename, 2026-08-08 - see project_progress.md Work Log.)
+    """
+    prefix = config['shared_root']
+    for groups in optin.get('hooks', {}).values():
+        for grp in groups:
+            for h in grp.get('hooks', []):
+                if 'command' in h and prefix in h['command']:
+                    h['command'] = h['command'].replace(prefix, '$CLAUDE_PROJECT_DIR/toolkit')
+    return optin
+
+
+def _load_optin(tool, optins_dir, config):
+    return _localize(get_expanded_optin(optins_dir / f"{tool}.json", config), config)
+
+
 def load_settings():
     if SETTINGS_PATH.exists():
         settings = json.loads(SETTINGS_PATH.read_text(encoding='utf-8'))
@@ -118,7 +142,7 @@ def tool_status(tool, settings, config):
     key - nothing here to toggle yet). 'on' requires every declared hook AND every declared skill
     (whichever keys are present) to already match; a mismatched/missing skill copy counts as 'off',
     same as a missing hook entry."""
-    optin = get_expanded_optin(OPTINS_DIR / f"{tool}.json", config)
+    optin = _load_optin(tool, OPTINS_DIR, config)
     has_hooks = 'hooks' in optin
     has_skills = 'skills' in optin
     if not has_hooks and not has_skills:
@@ -203,7 +227,7 @@ def cmd_enable(tool, config):
     if not optin_path.exists():
         raise RuntimeError(f"Unknown tool '{tool}' - no opt-in snippet at {optin_path}. "
                             f"Available: {', '.join(available_tools()) or '(none)'}")
-    optin = get_expanded_optin(optin_path, config)
+    optin = _localize(get_expanded_optin(optin_path, config), config)
     if 'hooks' not in optin and 'skills' not in optin:
         raise RuntimeError(f"'{tool}' has nothing to enable (no 'hooks' or 'skills' key in {optin_path}).")
 
@@ -232,7 +256,7 @@ def cmd_disable(tool, config):
     if not optin_path.exists():
         raise RuntimeError(f"Unknown tool '{tool}' - no opt-in snippet at {optin_path}. "
                             f"Available: {', '.join(available_tools()) or '(none)'}")
-    optin = get_expanded_optin(optin_path, config)
+    optin = _localize(get_expanded_optin(optin_path, config), config)
     if 'hooks' not in optin and 'skills' not in optin:
         raise RuntimeError(f"'{tool}' has nothing to disable (no 'hooks' or 'skills' key in {optin_path}).")
 

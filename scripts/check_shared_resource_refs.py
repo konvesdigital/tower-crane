@@ -40,7 +40,12 @@ import re
 import sys
 from pathlib import Path
 
-IMPORT_LINE_RE = re.compile(r'^@(\S+)\s*$', re.MULTILINE)
+# '.' (not '\S') so an import_base path containing a space still matches - '.' excludes only
+# newlines, and an @import line is always exactly one line, so this can't over-match into the
+# next line. Same fix as check_tower_crane.py/scan_consumer_update.py's identical regex
+# (2026-08-08) - found here the same day while auditing for other latent instances of the same
+# whitespace-intolerant pattern.
+IMPORT_LINE_RE = re.compile(r'^@(.+?)\s*$', re.MULTILINE)
 SKILL_STUB_PATH_RE = re.compile(r'`(~/[^`]+)`')
 
 
