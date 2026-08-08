@@ -67,7 +67,10 @@ STANDALONE_SKILLS = ['update', 'commands', 'capability_relationships']
 def read_consumer_state(project_root):
     claude_md_path = project_root / 'CLAUDE.md'
     md_text = claude_md_path.read_text(encoding='utf-8') if claude_md_path.exists() else ''
-    md_imports = set(re.findall(r'@\S*?templates/(\w+)\.md', md_text))
+    # '.' (not '\S') so an import_base path containing a space still matches - '.' excludes
+    # only newlines, and an @import line is always exactly one line, so this can't over-match
+    # into the next line.
+    md_imports = set(re.findall(r'@.*?templates/(\w+)\.md', md_text))
 
     settings_path = project_root / '.claude' / 'settings.json'
     settings = {}

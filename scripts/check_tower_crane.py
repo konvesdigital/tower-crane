@@ -387,7 +387,10 @@ def test_consumer(c, config):
     md_imports = []
     if claude_md_path.exists():
         md = claude_md_path.read_text(encoding='utf-8')
-        md_imports = re.findall(r'@\S*?templates/(\w+)\.md', md)
+        # '.' (not '\S') so an import_base path containing a space still matches - '.' excludes
+        # only newlines, and an @import line is always exactly one line, so this can't
+        # over-match into the next line.
+        md_imports = re.findall(r'@.*?templates/(\w+)\.md', md)
     elif c['imported']:
         names = ', '.join(p['name'] for p in c['imported'])
         devs.append(Dev('FAIL', 'consumer', "No CLAUDE.md but registry lists imported protocol piece(s).",
