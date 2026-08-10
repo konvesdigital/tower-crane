@@ -43,6 +43,15 @@ The hub is two nested git repos in one folder: an outer, private repo (holds `pr
 Two different starting points reach this file, and you need to tell them apart before doing
 anything else — ask the user directly if it isn't obvious; don't guess from folder names alone.
 
+**Bringing an existing hub to a new machine? Clone, don't copy.** If the user mentions they
+physically copied (or are about to copy) the folder from another machine rather than `git clone`ing
+both repos fresh, stop and steer them toward cloning instead: it's strictly less total work (no
+separate reconcile-with-remotes step afterward) and it structurally avoids stale gitignored
+per-machine state (`config.local.json`'s `host_id`, `.claude\settings.local.json`'s baked hook
+paths) riding along from the old machine — see README.md's "Second machine" section for the exact
+two-clone steps. A copy isn't fatal (this file still works from one), but it invites exactly the
+kind of stale-state bugs `design\second_machine_onboarding.md` documents a live session hitting.
+
 **A. An existing hub, already set up.** You're running from inside `toolkit\`, and the outer folder
 one level up already has (or is meant to have) `project_progress.md`/`consumers\`/
 `change_requests\`. Verify `config.example.json` exists in **this** (`toolkit\`) folder's root. If

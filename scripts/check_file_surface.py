@@ -97,11 +97,22 @@ Seven checks, five hard-fail, two soft-flag:
                                                        soft because this repo's own docs legitimately
                                                        use placeholder paths like `C:\\Users\\you\\...`
                                                        as examples.
-                                                  Both gracefully report PASS/N-A (not a false FAIL)
-                                                  when consumers\\ isn't reachable from this checkout -
-                                                  expected for a standalone toolkit\\ clone or this
-                                                  repo's own CI runner, which never checks out the
-                                                  outer private repo and shouldn't.
+                                                    8c HARD - added content literally matching a live
+                                                       host_id (machine name) - either a registered
+                                                       consumer's `host:` field, or this machine's own
+                                                       config.local.json `host_id`. Added
+                                                       2026-08-10 (design\\multi_machine_hub.md's
+                                                       Decisions table): the same class of leak as 8a
+                                                       (an identifier that names a specific person's
+                                                       setup, not generic tooling), so it gets the
+                                                       same hard-fail treatment and the same signal
+                                                       source, just a different registry field.
+                                                  All three gracefully report PASS/N-A (not a false
+                                                  FAIL) when consumers\\ / config.local.json isn't
+                                                  reachable from this checkout - expected for a
+                                                  standalone toolkit\\ clone or this repo's own CI
+                                                  runner, which never checks out the outer private
+                                                  repo and won't have a filled-in per-machine config.
 
 Usage: python scripts\\check_file_surface.py --base-sha <sha> --head-sha <sha>
 Run from anywhere; always resolves paths against this toolkit\\ repo, not the caller's cwd.
@@ -111,7 +122,10 @@ import argparse
 import re
 import subprocess
 import sys
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from config_lib import get_shared_config
 
 SHARED_ROOT = None  # set in main() after argparse, so this file can be imported without side effects
 
@@ -418,6 +432,65 @@ def _load_consumer_signals(shared_root):
     return names, path_segments
 
 
+def _load_host_signals(shared_root):
+    """Live host_id (machine name) values - every registered consumer's `host:` field, plus this
+    machine's own config.local.json `host_id` if a filled-in config is reachable. Same signal
+    shape as _load_consumer_signals above, mirrored per design\\multi_machine_hub.md's Decisions
+    table: a host_id is exactly as identifying as a consumer/project name and deserves the same
+    outgoing-leak protection. Returns [] when nothing is reachable - expected for a standalone
+    toolkit\\ checkout (no outer consumers\\, no filled-in config.local.json), never a false FAIL."""
+    hosts = []
+    consumers_dir = shared_root.parent / 'consumers'
+    if consumers_dir.is_dir():
+        for md in sorted(consumers_dir.glob('*.md')):
+            raw = md.read_text(encoding='utf-8')
+            block_m = re.search(r'```yaml\s*\r?\n(.*?)\r?\n```', raw, re.DOTALL)
+            if not block_m:
+                continue
+            host_m = re.search(r'^host:\s*(.+?)\s*$', block_m.group(1), re.MULTILINE)
+            if host_m and host_m.group(1).strip():
+                hosts.append(host_m.group(1).strip())
+    try:
+        cfg = get_shared_config(shared_root)
+        host_id = cfg.get('host_id')
+        if host_id and not str(host_id).startswith('<'):
+            hosts.append(str(host_id))
+    except RuntimeError:
+        pass  # no filled-in config.local.json reachable - nothing to add, not an error here
+    return hosts
+
+
+def check_outgoing_host_id(shared_root, files, base_sha, head_sha):
+    """Check 8c, HARD - see check 8 in the module docstring for the full rationale. Added content
+    literally matching a live host_id value."""
+    hosts = sorted(set(_load_host_signals(shared_root)), key=len, reverse=True)
+    if not hosts:
+        report('PASS', "no live host_id reachable from this checkout - nothing to match against "
+                       "(expected for a standalone toolkit\\ checkout, e.g. CI).")
+        return
+    hits = []
+    for status, path in files:
+        norm = path.replace('\\', '/')
+        proc = git(shared_root, ['diff', f'{base_sha}..{head_sha}', '--', path])
+        for line in proc.stdout.splitlines():
+            if not line.startswith('+') or line.startswith('+++'):
+                continue
+            content = line[1:]
+            for host in hosts:
+                if host in content:
+                    hits.append((norm, host, content.strip()))
+                    break
+    if not hits:
+        report('PASS', "no live host_id (machine name) found in added content.")
+        return
+    for norm, host, content in hits[:10]:
+        report('FAIL', f"'{norm}' adds content matching a live host_id ({host!r}) - a machine name "
+                       "identifies a specific person's setup exactly like a consumer/project name "
+                       "does, and toolkit\\'s public repo must stay generic. If this is a "
+                       "coincidental match on generic prose, rephrase it; otherwise this belongs in "
+                       "shared_resources\\ (hub root) or a private consumer note, never toolkit\\.")
+
+
 def check_outgoing_private_content(shared_root, files, base_sha, head_sha):
     """Check 8a, HARD - see check 8 in the module docstring for the full rationale. Added content
     literally matching a live consumer's registered name or leaf path segment."""
@@ -502,6 +575,7 @@ def main():
     check_invisible_unicode(shared_root, files, args.base_sha, args.head_sha)
     check_python_capability_creep(shared_root, files, args.base_sha, args.head_sha)
     check_outgoing_private_content(shared_root, files, args.base_sha, args.head_sha)
+    check_outgoing_host_id(shared_root, files, args.base_sha, args.head_sha)
     check_generic_absolute_paths(shared_root, files, args.base_sha, args.head_sha)
 
     print()
