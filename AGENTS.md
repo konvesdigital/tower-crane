@@ -296,30 +296,34 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
 4. Remove those entries from `project_progress.md`. Confirm what was archived.
 
 **"resume"**
-1. Outer project repo: `git pull`.
-2. Inner `toolkit\` repo — check only, never pull/merge (`update` is separate, below). If
+1. Read `host_id` from `toolkit\config.local.json`. Never infer machine identity any other way
+   (path, `hostname`, prior context).
+2. Outer project repo: `git pull`.
+3. Inner `toolkit\` repo — check only, never pull/merge (`update` is separate, below). If
    `toolkit\` exists: `python scripts\update_toolkit.py --notify` from inside `toolkit\` (fetch +
    compare against `last_reviewed_sha`, no golden suite, no mutation). "Up to date": say nothing
    further; an update available: note it (e.g. "toolkit\ has N commit(s) available — run `update`
    to review"); `toolkit\` missing: skip silently.
-3. Rung-2 hook activation: `python toolkit\scripts\check_hook_activation.py --project-root .` —
+4. Rung-2 hook activation: `python toolkit\scripts\check_hook_activation.py --project-root .` —
    notify-only check for whether every synced `.claude\hooks\` script is referenced in this
    machine's own gitignored `settings.local.json`. Note any `[UNWIRED]` line; say nothing if only
    `[WIRED]`/`[N/A]`. Never blocks.
-4. Read `project_progress.md`: Current Status, Next Up, Decisions table, most recent Work Log
+5. Read `project_progress.md`: Current Status, Next Up, Decisions table, most recent Work Log
    entry only.
-5. Scan `change_requests\` per "Scanning at session start" below — this is what surfaces a Piece 3
+6. Scan `change_requests\` per "Scanning at session start" below — this is what surfaces a Piece 3
    automation PR (`design\sync_automation.md`).
-6. State status and next step in 1-3 lines, folding in anything steps 2/3/5 surfaced. Do not
-   replay full history.
+7. State status and next step in 1-3 lines, leading with the machine identity from step 1, folding
+   in anything steps 3/4/6 surfaced. Do not replay full history.
 
 **"quick resume"** — a thinner `resume`, for reopening seconds after a `checkpoint` mid-session
 (the only way to flush a long context window mid-session). Skips every sync check above entirely —
 a session opened moments after its own `checkpoint`'s push has nothing new to find. No staleness
 tag by design. Use plain `resume` for a day-start or any longer gap.
-1. Read `project_progress.md`: Current Status, Next Up, Decisions table, most recent Work Log
+1. Read `host_id` from `toolkit\config.local.json`.
+2. Read `project_progress.md`: Current Status, Next Up, Decisions table, most recent Work Log
    entry only.
-2. State status and next step in 1-3 lines. Do not replay full history.
+3. State status and next step in 1-3 lines, leading with the machine identity from step 1. Do not
+   replay full history.
 
 **"update"** — pulls `toolkit\`'s `origin` remote under a diff-review trust gate
 (`design\update_trust_review.md`, `design\local_first_reframe.md`). User-initiated only; mechanical
