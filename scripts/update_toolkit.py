@@ -65,8 +65,13 @@ runs itself; nothing schedules --check automatically.
 
   --notify    The "check for update" proactive notice (design\\local_first_reframe.md): plain
               fetch + comparison against last_reviewed_sha, no golden suite, no pending-file
-              write, never mutates state. Prints one line. Safe on any cadence (resume, cron) -
-              never triggers the full review gate; that stays --check, user-initiated only.
+              write, never mutates state. Prints one line per direction. Safe on any cadence
+              (resume, cron) - never triggers the full review gate; that stays --check,
+              user-initiated only. Also checks the outgoing direction
+              (design\\cross_machine_toolkit_sync.md): local HEAD ahead of origin/main means an
+              earlier checkpoint's push was rejected or never completed - surfaced independently of
+              the incoming last_reviewed_sha comparison, so a stranded local commit is never
+              silently forgotten by a later session on any machine.
 
 Remote-identity check (added 2026-07-27, security stress-test pass, design\\security_stress_test.md):
 every subcommand that talks to `origin` first confirms `git remote get-url origin` still matches
@@ -491,6 +496,18 @@ def cmd_notify(cfg):
         return
 
     target = origin_main_sha()
+
+    # Outgoing check (design\\cross_machine_toolkit_sync.md): local HEAD ahead of origin/main means
+    # an earlier checkpoint's push was rejected or never ran - independent of the incoming
+    # last_reviewed_sha comparison below, and checked even before a baseline exists.
+    head = _git(['rev-parse', 'HEAD']).stdout.strip()
+    if head != target:
+        ahead = _git(['rev-list', f'{target}..{head}', '--count']).stdout.strip()
+        if ahead != '0':
+            print(f"[update check] toolkit\\ has {ahead} local commit(s) not yet pushed to origin "
+                  "- run `checkpoint` to retry the push, or `update` first if origin has moved "
+                  "ahead too.")
+
     base = read_last_reviewed()
     if base is None or not _sha_exists(base):
         print("[update check] no reviewed baseline yet - run `update` to establish one.")

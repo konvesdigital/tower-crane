@@ -281,8 +281,15 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
         the bad commit stays local-only until it passes. `[WARN]` (check 8b — generic
         absolute-path shape) doesn't block; mention it as a nudge.
       - `git -C toolkit push` — safe once the gate above passes.
-      - If the push fails (no remote/access/diverged): report it; don't block or roll back the
-        outer-repo checkpoint above.
+      - **If the push fails** (`design\cross_machine_toolkit_sync.md`): don't block/roll back the
+        outer-repo checkpoint (2a already landed) — but name the specific condition from git's
+        output plus the exact resolving action, never a bare refusal. Non-fast-forward: state the
+        pending-commit count and say "run `update`, then re-run `checkpoint`." No remote/auth: name
+        that (check `git -C toolkit remote -v` / credentials). **Then correct step 1's
+        already-written `project_progress.md` text** — it assumed this push would succeed. Work
+        Log/Current Status must say "committed locally only, blocked on: `<reason>`" (with the
+        SHA), never a stray "built" claim. Amend and re-push the outer repo — a second small commit
+        beats a stale persisted claim.
 3. Confirm to the user: saved and pushed (note whether `toolkit\` push happened, was skipped
    clean, or failed).
 4. **Suggest archiving** if the file has grown past roughly **400 lines (~40 KB)**, or the Work Log
@@ -299,11 +306,13 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
 1. Read `host_id` from `toolkit\config.local.json`. Never infer machine identity any other way
    (path, `hostname`, prior context).
 2. Outer project repo: `git pull`.
-3. Inner `toolkit\` repo — check only, never pull/merge (`update` is separate, below). If
-   `toolkit\` exists: `python scripts\update_toolkit.py --notify` from inside `toolkit\` (fetch +
-   compare against `last_reviewed_sha`, no golden suite, no mutation). "Up to date": say nothing
-   further; an update available: note it (e.g. "toolkit\ has N commit(s) available — run `update`
-   to review"); `toolkit\` missing: skip silently.
+3. Inner `toolkit\` repo — check only, never pull/merge/push (`update`/`checkpoint` are separate).
+   If `toolkit\` exists: `python scripts\update_toolkit.py --notify` from inside `toolkit\` (fetch,
+   checks both directions — incoming vs `last_reviewed_sha`, outgoing local HEAD vs `origin/main`,
+   `design\cross_machine_toolkit_sync.md` — no golden suite, no mutation). Report each
+   independently: incoming → "toolkit\ has N commit(s) available — run `update`"; outgoing →
+   "toolkit\ has N local commit(s) not yet pushed — run `checkpoint`"; neither → say nothing;
+   `toolkit\` missing: skip silently.
 4. Rung-2 hook activation: `python toolkit\scripts\check_hook_activation.py --project-root .` —
    notify-only check for whether every synced `.claude\hooks\` script is referenced in this
    machine's own gitignored `settings.local.json`. Note any `[UNWIRED]` line; say nothing if only
