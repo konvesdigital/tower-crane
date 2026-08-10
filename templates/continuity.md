@@ -23,18 +23,26 @@ this mechanism works and how it relates to other mechanisms.
 ### "checkpoint"
 
 1. Update `project_progress.md`:
-   - Refresh **Current Status** (base) and/or **Current Focus** (expanded) and **Next Up** so they
-     describe only the PRESENT — where things stand now and what is still open. **Edit the existing
-     text in place** (update or delete a stale fact) — never append a new bullet narrating what this
-     session did; that's the dated Work Log entry's job, even for something still true right now. A
-     session that changed nothing about present-tense reality needs no edit to these sections at all
-     (a Work Log entry still always gets added). **Never let completed work accumulate here** — no
-     "landed so far" recap, no growing list of done/`[x]` items, no per-session bullet that just
-     restates what the new Work Log entry already says. These sections load into context every
-     session, so restating finished work is a recurring token cost, and it defeats archiving (moving
-     Work Log entries out can't shrink the file while the same done-detail is duplicated up top).
-     Done work has one home: its dated Work Log entry. (Ticking a **Phases** checkbox is terse
-     status, not a recap — that stays.)
+   - Update **Current Status** (base) and/or **Current Focus** (expanded) and **Next Up** in two
+     passes, every checkpoint:
+     1. **Fold in what changed** — edit the existing text in place (update or delete a stale fact)
+        to match what's true right now. Never append a new bullet narrating what this session did;
+        that's the dated Work Log entry's job, even for something still true right now.
+     2. **Then re-read the WHOLE section, line by line** — not just what you just touched — and
+        strike anything narrating a past event instead of stating present fact. Concrete test: a
+        sentence with a completion verb (built, fixed, verified, confirmed, found, discovered,
+        logged, resolved, done, landed) or a date tied to an event, or the phrase "this session", is
+        narrating history, not describing the present — delete it (its detail already lives in a
+        Work Log entry) or keep only its present-tense residue with no date/verb ("the hub runs on
+        two machines", not "multi-machine support was built and verified on 2026-08-10"). A Next Up
+        item whose action is now complete gets **deleted outright**, never marked done in place —
+        Next Up holds only items not yet done.
+     A session that changed nothing about present-tense reality needs no edit to these sections at
+     all (a Work Log entry still always gets added). These sections load into context every session,
+     so restating finished work is a recurring token cost, and it defeats archiving (moving Work Log
+     entries out can't shrink the file while the same done-detail is duplicated up top). Done work
+     has one home: its dated Work Log entry. (Ticking a **Phases** checkbox is terse status, not a
+     recap — that stays.)
    - If the project uses **Phases**: update the phase checklist — tick completed stages, mark
      which phase is now active.
    - Move any settled decisions from Open → Locked: flip the status column (base) **or** move the

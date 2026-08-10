@@ -248,11 +248,15 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
 
 **"checkpoint"**
 1. Update `project_progress.md`:
-   - Refresh Current Status and Next Up to describe only the PRESENT — **edit the existing text in
-     place**; never append a new bullet narrating what this session did (that belongs solely in
-     the Work Log entry below). A session with no present-tense change needs no Current Status
-     edit at all (a Work Log entry still always gets added). **Never accumulate completed work
-     here.** (Rationale: `README.md` "Why this exists".)
+   - Update Current Status and Next Up in two passes: (1) **fold in what changed** — edit the
+     existing text in place to match what's true right now, never append a new bullet narrating what
+     this session did (that's the Work Log entry's job). (2) **Re-read the WHOLE section** and
+     strike anything narrating a past event rather than present fact — a completion verb (built,
+     fixed, verified, confirmed, found, resolved, done), a date tied to an event, or "this session"
+     means it's history: delete it, or keep only its present-tense residue with no date/verb. A Next
+     Up item whose action is done gets deleted outright, never marked done in place. A session with
+     no present-tense change needs no edit here at all (Work Log entry still always gets added).
+     (Rationale: `README.md` "Why this exists".)
    - Move resolved Decisions rows from Open → Locked.
    - Prepend one dated Work Log entry (what changed, what's next). Newest on top.
    - Do NOT prune or move older entries automatically — only "archive" does that.
