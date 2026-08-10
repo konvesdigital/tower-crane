@@ -39,6 +39,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config_lib import get_shared_config, get_expanded_optin, materialize_skill_stub
+import registry_lib
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
 # consumers\ is private hub state, not shipped toolkit content - it lives at the outer root
@@ -109,8 +110,18 @@ def main():
                          help="Opt out of the (default-on) continuity protocol piece. filing + compliance + "
                               "shared_resources are always imported.")
     parser.add_argument('--date', default=None, help="Scaffold date (YYYY-MM-DD). Defaults to today.")
+    parser.add_argument('--scope', choices=['local', 'multi_machine'], default='local',
+                         help="design\\multi_machine_hub.md: 'local' (default) if this consumer should live on "
+                              "only this machine, 'multi_machine' to declare it available to all connected "
+                              "machines immediately (so other hosts' resume can nudge about connecting it too). "
+                              "Only meaningful for a BRAND NEW registry entry - connecting an already-registered "
+                              "consumer's 2nd host always sets multi_machine automatically (the 2-host floor), "
+                              "regardless of this flag.")
     parser.add_argument('--force', action='store_true',
-                         help="Overwrite an existing CLAUDE.md / project_progress.md / FIRST_RUN.md / registry entry.")
+                         help="Overwrite an existing CLAUDE.md / project_progress.md / FIRST_RUN.md. Never "
+                              "applies to an already-registered consumer's registry file - a slug collision "
+                              "there always routes into an additive host-merge (design\\multi_machine_hub.md's "
+                              "locked slug-collision routing), never a blind overwrite.")
     args = parser.parse_args()
 
     target_path = Path(args.target_path)
@@ -148,9 +159,21 @@ def main():
                                 f"{PRIVATE_OPTINS_DIR / (t + '.json')} and no skill stub at "
                                 f"{PRIVATE_SKILLS_DIR / t / 'SKILL.md'}")
 
+    # Slug-collision routing (design\multi_machine_hub.md, locked 2026-08-10): an already-
+    # registered consumer is never an error and never a --force blind overwrite target - it
+    # always routes into an additive host-merge below (step 6a), so a second machine connecting
+    # the same project can never destroy the first machine's hosts: entry.
     registry_path = CONSUMERS_DIR / f"{slug}.md"
-    if registry_path.exists() and not args.force:
-        raise RuntimeError(f"Consumer '{slug}' already registered ({registry_path}). Use --force to overwrite.")
+    existing_consumer = None
+    already_connected_here = False
+    if registry_path.exists():
+        existing_consumer = registry_lib.parse_registry(registry_path)
+        if existing_consumer is None:
+            raise RuntimeError(
+                f"Consumer '{slug}' already registered ({registry_path}) but its yaml block "
+                "isn't parseable - fix it by hand before scaffolding here."
+            )
+        already_connected_here = config['host_id'] in existing_consumer['hosts']
 
     # protocol pieces: filing + compliance + shared_resources mandatory; continuity default-on
     pieces = ['filing', 'compliance', 'shared_resources']
@@ -181,7 +204,15 @@ def main():
     # companion (e.g. 'filing' -> 'filing_resume_check'); everything else imports itself directly.
     import_pieces = [SKILL_PIECES[p]['companion'] if p in SKILL_PIECES else p for p in pieces]
 
-    print(f"Scaffolding consumer '{project_name}' (slug: {slug})")
+    if existing_consumer is not None:
+        if already_connected_here:
+            print(f"Consumer '{project_name}' (slug: {slug}) already has a hosts.{config['host_id']} entry - "
+                  "re-scaffolding local files only, registry unchanged.")
+        else:
+            print(f"Consumer '{project_name}' (slug: {slug}) is already registered elsewhere - "
+                  f"connecting this machine ('{config['host_id']}') as an additional host.")
+    else:
+        print(f"Scaffolding consumer '{project_name}' (slug: {slug})")
     print(f"  target : {target_path}")
     print(f"  tools  : {', '.join(tools)}")
     if private_tools:
@@ -371,12 +402,26 @@ Scaffolded from tower_crane on {scaffold_date}. Do these once, then delete this 
             f"  - tool: {t}\n    since: {scaffold_date}" for t in private_tools)
 
     registry_path_forward_slash = str(target_path).replace('\\', '/')
-    registry = f"""# {project_name}
+
+    if existing_consumer is not None:
+        if already_connected_here:
+            print(f"  skip   {registry_path} already has a hosts.{config['host_id']} entry - nothing to merge.")
+        else:
+            raw = registry_path.read_text(encoding='utf-8')
+            new_raw, was_present, host_count = registry_lib.add_host_to_text(
+                raw, config['host_id'], registry_path_forward_slash, scaffold_date)
+            write_utf8(registry_path, new_raw)
+            floor_note = ", scope -> multi_machine (2-host floor)" if host_count >= 2 else ""
+            print(f"  wrote  {registry_path} (added hosts.{config['host_id']}, now {host_count} host(s){floor_note})")
+    else:
+        hosts_yaml = registry_lib.format_hosts_block(
+            {config['host_id']: {'path': registry_path_forward_slash, 'registered': scaffold_date}})
+        registry = f"""# {project_name}
 
 ```yaml
 name: {project_name}
-path: {registry_path_forward_slash}
-host: {config['host_id']}
+scope: {args.scope}
+{hosts_yaml}
 owner: {config['identity']['git_user_name']}
 registered: {scaffold_date}
 {opted_in_yaml}
@@ -388,8 +433,8 @@ Notes: scaffolded by `scripts/new_consumer.py` on {scaffold_date}. Registry form
 `consumers/<slug>.md` (the machine-readable block the scaffolder writes and
 `check_tower_crane.py` reads).
 """
-    write_utf8(registry_path, registry)
-    print(f"  wrote  {registry_path}")
+        write_utf8(registry_path, registry)
+        print(f"  wrote  {registry_path}")
 
     # --- 7. next steps -------------------------------------------------------------------------
     print()

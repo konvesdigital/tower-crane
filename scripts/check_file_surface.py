@@ -424,21 +424,29 @@ def _load_consumer_signals(shared_root):
         name_m = re.search(r'^name:\s*(.+?)\s*$', block, re.MULTILINE)
         if name_m and name_m.group(1).strip():
             names.append(name_m.group(1).strip())
-        path_m = re.search(r'^path:\s*(.+?)\s*$', block, re.MULTILINE)
-        if path_m and path_m.group(1).strip():
-            segs = [s for s in re.split(r'[\\/]', path_m.group(1).strip()) if s and s != '~']
+        # path: now lives per-host under `hosts:` (design\multi_machine_hub.md's schema migration,
+        # 2026-08-10) instead of a single top-level line - collect every host's path (`    path:`,
+        # 4-space indent), not just this machine's, since a leak from ANY host's path is still a
+        # leak. Old flat `path:` also matched here for an unmigrated entry.
+        for path_m in re.finditer(r'^(?:path|    path):\s*(.+?)\s*$', block, re.MULTILINE):
+            raw_path = path_m.group(1).strip()
+            if not raw_path:
+                continue
+            segs = [s for s in re.split(r'[\\/]', raw_path) if s and s != '~']
             if segs:
                 path_segments.append(segs[-1])  # the leaf project folder - the actual identifier
     return names, path_segments
 
 
 def _load_host_signals(shared_root):
-    """Live host_id (machine name) values - every registered consumer's `host:` field, plus this
-    machine's own config.local.json `host_id` if a filled-in config is reachable. Same signal
-    shape as _load_consumer_signals above, mirrored per design\\multi_machine_hub.md's Decisions
-    table: a host_id is exactly as identifying as a consumer/project name and deserves the same
-    outgoing-leak protection. Returns [] when nothing is reachable - expected for a standalone
-    toolkit\\ checkout (no outer consumers\\, no filled-in config.local.json), never a false FAIL."""
+    """Live host_id (machine name) values - every registered consumer's `hosts:` map keys (the
+    per-machine schema, design\\multi_machine_hub.md's Problem 2, migrated 2026-08-10 from the old
+    flat `host:` field - both forms are scanned so an unmigrated entry still contributes), plus
+    this machine's own config.local.json `host_id` if a filled-in config is reachable. Same signal
+    shape as _load_consumer_signals above: a host_id is exactly as identifying as a consumer/
+    project name and deserves the same outgoing-leak protection. Returns [] when nothing is
+    reachable - expected for a standalone toolkit\\ checkout (no outer consumers\\, no filled-in
+    config.local.json), never a false FAIL."""
     hosts = []
     consumers_dir = shared_root.parent / 'consumers'
     if consumers_dir.is_dir():
@@ -447,9 +455,29 @@ def _load_host_signals(shared_root):
             block_m = re.search(r'```yaml\s*\r?\n(.*?)\r?\n```', raw, re.DOTALL)
             if not block_m:
                 continue
+            # old flat shape (pre-migration entries, if any survive)
             host_m = re.search(r'^host:\s*(.+?)\s*$', block_m.group(1), re.MULTILINE)
             if host_m and host_m.group(1).strip():
                 hosts.append(host_m.group(1).strip())
+            # current hosts: map shape - each 2-space-indented key under `hosts:` is a host_id.
+            # Line-walked rather than a single regex: the block also contains 4-space-indented
+            # path:/registered: sub-lines, which a naive "every indented line" capture would stop
+            # at (they don't match the 2-space host-key shape), silently missing any host after
+            # the first.
+            block_lines = re.split(r'\r?\n', block_m.group(1))
+            in_hosts = False
+            for line in block_lines:
+                if re.match(r'^hosts:\s*$', line):
+                    in_hosts = True
+                    continue
+                if not in_hosts:
+                    continue
+                if re.match(r'^\S', line):  # next top-level key ends the hosts: block
+                    in_hosts = False
+                    continue
+                host_id_m = re.match(r'^  (\S+):\s*$', line)
+                if host_id_m:
+                    hosts.append(host_id_m.group(1))
     try:
         cfg = get_shared_config(shared_root)
         host_id = cfg.get('host_id')

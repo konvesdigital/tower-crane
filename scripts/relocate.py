@@ -33,6 +33,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config_lib import get_shared_config, get_expanded_optin
+from registry_lib import parse_registry, host_path, reconcile_scope_floor
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
 # consumers\ is private hub state, not shipped toolkit content - it lives at the outer root
@@ -53,67 +54,17 @@ def write_utf8(path, content):
     path.write_text(content, encoding='utf-8', newline='\n')
 
 
-# Minimal registry reader - just the fields relocate needs (name, path, host, opted-in tools,
-# imported template pieces).
+# registry parsing lives in registry_lib.py (shared with check_tower_crane.py/update_consumers.py/
+# broadcast_guidance.py) - this wrapper just reshapes its opted_in:/imported:/private_opted_in:
+# (each a list of {'name':, 'since':} dicts) into the flat name lists this script's own loop below
+# was already written against.
 def read_registry_entry(path):
-    raw = path.read_text(encoding='utf-8')
-    m = re.search(r'```yaml\s*\r?\n(.*?)\r?\n```', raw, re.DOTALL)
-    if not m:
+    obj = parse_registry(path)
+    if obj is None:
         return None
-    obj = {'name': None, 'path': None, 'host': None, 'tools': [], 'imports': [], 'private_tools': []}
-    section = None
-    for line in re.split(r'\r?\n', m.group(1)):
-        m1 = re.match(r'^name:\s*(.+?)\s*$', line)
-        if m1:
-            obj['name'] = m1.group(1)
-            section = None
-            continue
-        m1 = re.match(r'^path:\s*(.+?)\s*$', line)
-        if m1:
-            obj['path'] = m1.group(1)
-            section = None
-            continue
-        m1 = re.match(r'^host:\s*(.+?)\s*$', line)
-        if m1:
-            obj['host'] = m1.group(1)
-            section = None
-            continue
-        if re.match(r'^opted_in:\s*\[\s*\]\s*$', line):
-            section = None
-            continue
-        if re.match(r'^opted_in:\s*$', line):
-            section = 'opted_in'
-            continue
-        if re.match(r'^imported:\s*\[\s*\]\s*$', line):
-            section = None
-            continue
-        if re.match(r'^imported:\s*$', line):
-            section = 'imported'
-            continue
-        if re.match(r'^private_opted_in:\s*\[\s*\]\s*$', line):
-            section = None
-            continue
-        if re.match(r'^private_opted_in:\s*$', line):
-            section = 'private_opted_in'
-            continue
-        if re.match(r'^(registered|owner):', line):
-            section = None
-            continue
-        if section == 'opted_in':
-            m1 = re.match(r'^\s*-\s*tool:\s*(.+?)\s*$', line)
-            if m1:
-                obj['tools'].append(m1.group(1))
-                continue
-        if section == 'imported':
-            m1 = re.match(r'^\s*-\s*piece:\s*(.+?)\s*$', line)
-            if m1:
-                obj['imports'].append(m1.group(1))
-                continue
-        if section == 'private_opted_in':
-            m1 = re.match(r'^\s*-\s*tool:\s*(.+?)\s*$', line)
-            if m1:
-                obj['private_tools'].append(m1.group(1))
-                continue
+    obj['tools'] = [ti['name'] for ti in obj['opted_in']]
+    obj['imports'] = [pi['name'] for pi in obj['imported']]
+    obj['private_tools'] = [ti['name'] for ti in obj['private_opted_in']]
     return obj
 
 
@@ -182,17 +133,24 @@ def main():
         print()
         print(f"Consumer: {c['name']} ({f.stem})")
 
-        # Federate (#1): only regenerate consumers that live on this machine.
-        if c['host'] and c['host'] != this_host:
-            print(f"  [skip] registered on host '{c['host']}', not this machine ('{this_host}').")
+        # 2-host write-back floor (design\multi_machine_hub.md) - applies regardless of whether
+        # this consumer is reachable on this machine.
+        if reconcile_scope_floor(f, c):
+            print(f"  [fixed] scope -> multi_machine (2+ hosts: entries present).")
+
+        # Federate (#1): only regenerate consumers connected on this machine.
+        this_path = host_path(c, this_host)
+        if not this_path:
+            print(f"  [skip] not connected on this machine ('{this_host}') - hosts: "
+                  f"{', '.join(sorted(c['hosts'])) or '(none)'}.")
             COUNTS['skipped'] += 1
             continue
-        if not c['path'] or not Path(c['path']).exists():
-            print(f"  [warn] path not found on disk: {c['path']}")
+        if not Path(this_path).exists():
+            print(f"  [warn] path not found on disk: {this_path}")
             COUNTS['warn'] += 1
             continue
 
-        imports_changed = fix_imports(c['path'], c['imports'], config['import_base'], args.dry_run)
+        imports_changed = fix_imports(this_path, c['imports'], config['import_base'], args.dry_run)
 
         all_tools = c['tools'] + c['private_tools']
         if not all_tools:
@@ -203,7 +161,7 @@ def main():
                 COUNTS['noop'] += 1
             continue
 
-        settings_path = Path(c['path']) / '.claude' / 'settings.json'
+        settings_path = Path(this_path) / '.claude' / 'settings.json'
         if not settings_path.exists():
             print("  [warn] no .claude/settings.json but registry lists opted-in tool(s).")
             COUNTS['warn'] += 1

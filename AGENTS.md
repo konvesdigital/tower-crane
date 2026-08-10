@@ -115,19 +115,31 @@ gitignored `.claude\settings.local.json`; a mirror auto-regenerates at
 its `templates\optins\<tool>.json` exists.
 
 ## Adding a consumer
-**Trigger: "connect project".** Ask new-from-scratch vs. existing project first. Either way the
-consumer ends up in the registry (`consumers\<slug>.md`) and floats on this repo's HEAD.
+**Trigger: "connect project".** Ask new-from-scratch vs. existing project first, then always ask
+**local to this machine only, or available to all connected machines?** (`design\multi_machine_hub.md`
+"Problem 2" — the answer is never assumed and never depends on how many machines the hub already
+has). Either path, the consumer ends up in the registry (`consumers\<slug>.md`) and floats on this
+repo's HEAD.
 1. **New project from scratch** — `scripts\new_consumer.py --target-path <abs path> --project-name
-   "<Full Title>"`. Writes ALL consumer files (`.claude\settings.json`, `CLAUDE.md` with `@import`
-   lines, skeleton `project_progress.md`, `FIRST_RUN.md`) plus the registry entry. Defaults: opts
-   into `consistency_check`, imports `filing` + `compliance` + `continuity`. Flags: `-Tools @()` for
-   no hooks, `-NoContinuity` to skip, `-Force` to overwrite. Does NOT run git — the new project's
-   first session does that via its `FIRST_RUN.md`.
+   "<Full Title>" --scope local|multi_machine` (per the question above; default `local`). Writes ALL
+   consumer files (`.claude\settings.json`, `CLAUDE.md` with `@import` lines, skeleton
+   `project_progress.md`, `FIRST_RUN.md`) plus the registry entry. Defaults: opts into
+   `consistency_check`, imports `filing` + `compliance` + `continuity`. Flags: `-Tools @()` for no
+   hooks, `-NoContinuity` to skip, `-Force` to overwrite. Does NOT run git — the new project's first
+   session does that via its `FIRST_RUN.md`.
 2. **Existing (hand-copied) project** — the human copies `templates\register.md` into that
    project's root and tells its agent to follow it; that agent swaps pasted workflow prose for
-   `@import` lines and files a `register` ticket here (per "Registration tickets" below).
+   `@import` lines and files a `register` ticket here (per "Registration tickets" below — that's
+   where the local/multi_machine question actually gets asked and recorded, since the consumer-side
+   session filing the ticket has no `config.local.json` access to know its own `host_id`).
+3. **Already registered, connecting another machine** — same `new_consumer.py` invocation as #1,
+   pointed at wherever this project lives on THIS machine. The slug collision is detected
+   automatically and routes into an additive `hosts.<this_host_id>` merge instead of erroring or
+   overwriting (`design\multi_machine_hub.md`'s locked slug-collision routing) — `scope`
+   self-corrects to `multi_machine` the moment a 2nd host lands, regardless of what was asked at
+   original registration.
 
-Either path: run `scripts\check_tower_crane.py` to confirm the new consumer validates clean.
+Either path: run `scripts\check_tower_crane.py` to confirm the consumer validates clean.
 
 ## Changing or removing an existing tool
 **Trigger: "modify tool".**
@@ -195,17 +207,25 @@ A `register` ticket has two shapes — check for a fenced `yaml` block first, si
 tells them apart:
 
 **New project joining** (fenced `yaml` block: name/path/opted_in/imported, filed by
-`templates\register.md` since the consumer can't edit shared files itself). Action immediately:
+`templates\register.md` since the consumer can't edit shared files itself — it carries no
+`host:`/`hosts:` field, since the ticket-filing session has no `config.local.json` access to know
+its own `host_id`). Action immediately:
 1. Read the `yaml` block.
 2. **Validate before trusting it:** confirm `path` exists on disk; for each `opted_in` tool,
    confirm `templates\optins\<tool>.json` exists; for each `imported` piece, confirm the project's
    `CLAUDE.md` actually imports it. Reconcile anything off rather than blindly copying.
-3. Create `consumers\<slug>.md` from the block (same format as an existing entry). Never record a
+3. Ask the user **local to this machine only, or available to all connected machines?**
+   (`design\multi_machine_hub.md` "Problem 2") — this session's own `host_id`
+   (`config.local.json`) is the host being connected.
+4. If `consumers\<slug>.md` doesn't exist yet: create it with `scope:` from step 3 and a `hosts:`
+   map holding this one host (path from the ticket, registered = today). Never record a
    project/client name anywhere in `toolkit\` itself (including `MENU.md`) — that repo tracks the
    public repo, and `consumers\` exists in the outer, private repo specifically so this never
-   reaches it.
-4. Run `scripts\check_tower_crane.py --consumer <slug>` to confirm the new entry validates clean.
-5. Flip `Status` to **DONE** (no consumer-verify round-trip — the registry entry existing *is* the
+   reaches it. If it already exists (slug collision — this project registered from another machine
+   before): merge-add this `hosts.<host_id>` entry instead, never overwrite the file — `scope`
+   self-corrects to `multi_machine` once 2 hosts exist, regardless of step 3's answer.
+5. Run `scripts\check_tower_crane.py --consumer <slug>` to confirm the entry validates clean.
+6. Flip `Status` to **DONE** (no consumer-verify round-trip — the registry entry existing *is* the
    completion). Log it in `project_progress.md`, commit, and push.
 
 **Existing consumer reporting a standalone-skill/tool adoption** (no `yaml` block — filename shape
@@ -317,12 +337,16 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
    notify-only check for whether every synced `.claude\hooks\` script is referenced in this
    machine's own gitignored `settings.local.json`. Note any `[UNWIRED]` line; say nothing if only
    `[WIRED]`/`[N/A]`. Never blocks.
-5. Read `project_progress.md`: Current Status, Next Up, Decisions table, most recent Work Log
+5. Multi-machine nudge (`design\multi_machine_hub.md` "Problem 2"):
+   `python toolkit\scripts\check_multi_machine.py` — notify-only, never mutates. Any `[NUDGE]` line
+   names a `scope: multi_machine` consumer with no `hosts.<this host>` entry yet; mention it and
+   offer to run "connect project". Silent output means nothing to nudge about.
+6. Read `project_progress.md`: Current Status, Next Up, Decisions table, most recent Work Log
    entry only.
-6. Scan `change_requests\` per "Scanning at session start" below — this is what surfaces a Piece 3
+7. Scan `change_requests\` per "Scanning at session start" below — this is what surfaces a Piece 3
    automation PR (`design\sync_automation.md`).
-7. State status and next step in 1-3 lines, leading with the machine identity from step 1, folding
-   in anything steps 3/4/6 surfaced. Do not replay full history.
+8. State status and next step in 1-3 lines, leading with the machine identity from step 1, folding
+   in anything steps 3/4/5/7 surfaced. Do not replay full history.
 
 **"quick resume"** — a thinner `resume`, for reopening seconds after a `checkpoint` mid-session
 (the only way to flush a long context window mid-session). Skips every sync check above entirely —

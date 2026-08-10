@@ -36,6 +36,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config_lib import get_shared_config
 from check_tower_crane import parse_registry, CONSUMERS_DIR
+from registry_lib import host_path, reconcile_scope_floor
 from scan_consumer_update import (
     SKILL_PIECES, read_consumer_state, scan_hooks, scan_skills, scan_pieces, scan_private,
     apply_hook, apply_skill, apply_piece, apply_private, resolve_selection,
@@ -55,21 +56,26 @@ def local_consumers(this_host, consumer_filter=None):
         if c is None:
             print(f"  [skip] {f.name}: no parseable yaml registry block.")
             continue
-        if c['host'] and this_host and c['host'] != this_host:
-            print(f"  [skip] {c['name']}: registered on host '{c['host']}', not this machine ('{this_host}').")
+        # 2-host write-back floor (design\multi_machine_hub.md) - applies to every consumer this
+        # tool touches, regardless of whether it's reachable on THIS machine.
+        if reconcile_scope_floor(f, c):
+            print(f"  [fixed] {f.stem}: scope -> multi_machine (2+ hosts: entries present).")
+        if this_host not in c['hosts']:
+            print(f"  [skip] {c['name']}: not connected on this machine ('{this_host}').")
             continue
         out.append(c)
     return out
 
 
-def scan_all(cfg, consumers):
+def scan_all(cfg, consumers, this_host):
     """Returns an ordered dict-like list of (slug, {'consumer': c, 'project_root': Path,
     'items': [...]}) for every consumer that has at least one available item."""
     result = []
     for c in consumers:
-        project_root = Path(c['path'])
+        this_path = host_path(c, this_host)
+        project_root = Path(this_path)
         if not (project_root / 'CLAUDE.md').exists():
-            print(f"  [skip] {c['name']}: no CLAUDE.md at {c['path']} - path stale or moved?")
+            print(f"  [skip] {c['name']}: no CLAUDE.md at {this_path} - path stale or moved?")
             continue
         state = read_consumer_state(project_root)
         items = scan_hooks(cfg, state) + scan_skills(state) + scan_pieces(state) + scan_private(cfg, state)
@@ -239,7 +245,7 @@ def main():
         print(f"[ABORT] No local registry entry for consumer '{args.consumer}'.")
         sys.exit(1)
 
-    scanned = scan_all(cfg, consumers)
+    scanned = scan_all(cfg, consumers, this_host)
     global_index = print_all(scanned)
 
     if args.apply is None:

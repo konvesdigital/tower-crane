@@ -46,30 +46,43 @@ CONSUMERS_DIR = PROJECT_ROOT / 'consumers'
 
 
 def parse_registry_minimal(path):
-    """Minimal registry read - name/path/host only, enough to target a broadcast. Deliberately
+    """Minimal registry read - name + hosts: map only, enough to target a broadcast. Deliberately
     duplicated rather than imported from check_tower_crane.py: each maintainer script reads the
     registry independently (same pattern relocate.py/new_consumer.py already use) - only the
     guidance-file section logic is shared, per design\\broadcast_guidance.md's Primitive-shape
-    decision.
+    decision. Schema per design\\multi_machine_hub.md (2026-08-10 migration): hosts: is a map of
+    host_id -> {path, registered}, replacing the old flat path:/host: pair.
     """
     raw = path.read_text(encoding='utf-8')
     m = re.search(r'```yaml\s*\r?\n(.*?)\r?\n```', raw, re.DOTALL)
     if not m:
         return None
-    obj = {'name': None, 'path': None, 'host': None}
+    obj = {'name': None, 'hosts': {}}
+    section = None
+    current_host = None
     for line in re.split(r'\r?\n', m.group(1)):
         m1 = re.match(r'^name:\s*(.+?)\s*$', line)
         if m1:
             obj['name'] = m1.group(1)
+            section = None
             continue
-        m1 = re.match(r'^path:\s*(.+?)\s*$', line)
-        if m1:
-            obj['path'] = m1.group(1)
+        if re.match(r'^hosts:\s*$', line):
+            section = 'hosts'
+            current_host = None
             continue
-        m1 = re.match(r'^host:\s*(.+?)\s*$', line)
-        if m1:
-            obj['host'] = m1.group(1)
+        if re.match(r'^(scope|owner|registered|opted_in|imported|private_opted_in):', line):
+            section = None
             continue
+        if section == 'hosts':
+            m1 = re.match(r'^  (\S+):\s*$', line)
+            if m1:
+                current_host = m1.group(1)
+                obj['hosts'][current_host] = {'path': None}
+                continue
+            m1 = re.match(r'^    path:\s*(.+?)\s*$', line)
+            if m1 and current_host:
+                obj['hosts'][current_host]['path'] = m1.group(1)
+                continue
     return obj
 
 
@@ -86,7 +99,7 @@ def load_targets(consumer_filter):
     targets = []
     for f in files:
         c = parse_registry_minimal(f)
-        if c is None or not c['name'] or not c['path']:
+        if c is None or not c['name'] or not c['hosts']:
             print(f"[WARN] {f.name} : no parseable registry block - skipped.")
             continue
         targets.append(c)
@@ -107,17 +120,18 @@ def get_head_sha():
 
 
 def reachable(c, this_host):
-    """Federate (#1) parity with check_tower_crane.py: skip silently when a consumer is
-    registered on another machine's clone - its path can't be validated/written from here.
-    """
-    if c['host'] and this_host and c['host'] != this_host:
-        print(f"[skip] {c['name']} : registered on host '{c['host']}', not this machine ('{this_host}').")
-        return False
-    cpath = Path(c['path'])
+    """Federate (#1) parity with check_tower_crane.py: skip silently when a consumer has no
+    hosts.<this_host> entry - its path can't be validated/written from here. Returns this host's
+    path on success, None otherwise."""
+    this_path = c['hosts'].get(this_host, {}).get('path')
+    if not this_path:
+        print(f"[skip] {c['name']} : not connected on this machine ('{this_host}').")
+        return None
+    cpath = Path(this_path)
     if not cpath.exists():
-        print(f"[WARN] {c['name']} : path not found on disk ({c['path']}) - skipped.")
-        return False
-    return True
+        print(f"[WARN] {c['name']} : path not found on disk ({this_path}) - skipped.")
+        return None
+    return this_path
 
 
 def do_broadcast(guidance_file, consumer_filter, this_host):
@@ -137,11 +151,12 @@ def do_broadcast(guidance_file, consumer_filter, this_host):
     targets = load_targets(consumer_filter)
     sent, skipped = 0, 0
     for c in targets:
-        if not reachable(c, this_host):
+        this_path = reachable(c, this_host)
+        if not this_path:
             skipped += 1
             continue
-        write_section(c['path'], c['name'], SECTION_BROADCAST, body_lines)
-        print(f"[sent] {c['name']} : wrote Broadcast section to {Path(c['path']) / 'COMPLIANCE_GUIDANCE.md'}")
+        write_section(this_path, c['name'], SECTION_BROADCAST, body_lines)
+        print(f"[sent] {c['name']} : wrote Broadcast section to {Path(this_path) / 'COMPLIANCE_GUIDANCE.md'}")
         sent += 1
     print()
     print(f"=== Broadcast complete: {sent} sent, {skipped} skipped ===")
@@ -150,14 +165,10 @@ def do_broadcast(guidance_file, consumer_filter, this_host):
 def do_status(consumer_filter, this_host):
     targets = load_targets(consumer_filter)
     for c in targets:
-        if c['host'] and this_host and c['host'] != this_host:
-            print(f"[skip] {c['name']} : registered on host '{c['host']}', not this machine ('{this_host}').")
+        this_path = reachable(c, this_host)
+        if not this_path:
             continue
-        cpath = Path(c['path'])
-        if not cpath.exists():
-            print(f"[WARN] {c['name']} : path not found on disk ({c['path']}).")
-            continue
-        sections = read_sections(cpath)
+        sections = read_sections(this_path)
         if SECTION_BROADCAST in sections:
             note = " (+ checker deviations also pending)" if SECTION_CHECKER in sections else ''
             print(f"[pending] {c['name']}{note}")

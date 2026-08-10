@@ -70,6 +70,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config_lib import get_shared_config, get_expanded_optin, materialize_skill_stub
 from guidance_lib import read_sections, write_section, SECTION_CHECKER
+from registry_lib import parse_registry, effective_scope, host_path, reconcile_scope_floor
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
 # consumers\ is private hub state, not shipped toolkit content - it lives at the outer root
@@ -148,93 +149,10 @@ def parse_expected(lines):
     return out
 
 
-# --- registry (consumers/<slug>.md) parser -------------------------------------------------------
-def parse_registry(path):
-    raw = path.read_text(encoding='utf-8')
-    m = re.search(r'```yaml\s*\r?\n(.*?)\r?\n```', raw, re.DOTALL)
-    if not m:
-        return None
-    lines = re.split(r'\r?\n', m.group(1))
-
-    obj = {
-        'name': None, 'path': None, 'host': None, 'owner': None, 'registered': None,
-        'opted_in': [], 'imported': [], 'private_opted_in': [], 'file': str(path),
-    }
-    section = None
-    for line in lines:
-        m1 = re.match(r'^name:\s*(.+?)\s*$', line)
-        if m1:
-            obj['name'] = m1.group(1)
-            section = None
-            continue
-        m1 = re.match(r'^path:\s*(.+?)\s*$', line)
-        if m1:
-            obj['path'] = m1.group(1)
-            section = None
-            continue
-        # host: (#1 Federate) and owner: (#3 multi-user) are additive/optional; entries
-        # predating them parse fine (None).
-        m1 = re.match(r'^host:\s*(.+?)\s*$', line)
-        if m1:
-            obj['host'] = m1.group(1)
-            section = None
-            continue
-        m1 = re.match(r'^owner:\s*(.+?)\s*$', line)
-        if m1:
-            obj['owner'] = m1.group(1)
-            section = None
-            continue
-        m1 = re.match(r'^registered:\s*(.+?)\s*$', line)
-        if m1:
-            obj['registered'] = m1.group(1)
-            section = None
-            continue
-        if re.match(r'^opted_in:\s*\[\s*\]\s*$', line):
-            obj['opted_in'] = []
-            section = None
-            continue
-        if re.match(r'^imported:\s*\[\s*\]\s*$', line):
-            obj['imported'] = []
-            section = None
-            continue
-        if re.match(r'^private_opted_in:\s*\[\s*\]\s*$', line):
-            obj['private_opted_in'] = []
-            section = None
-            continue
-        if re.match(r'^opted_in:\s*$', line):
-            section = 'opted_in'
-            continue
-        if re.match(r'^imported:\s*$', line):
-            section = 'imported'
-            continue
-        if re.match(r'^private_opted_in:\s*$', line):
-            section = 'private_opted_in'
-            continue
-        if section == 'opted_in':
-            m1 = re.match(r'^\s*-\s*tool:\s*(.+?)\s*$', line)
-            if m1:
-                obj['opted_in'].append({'name': m1.group(1), 'since': None})
-                continue
-        if section == 'imported':
-            m1 = re.match(r'^\s*-\s*piece:\s*(.+?)\s*$', line)
-            if m1:
-                obj['imported'].append({'name': m1.group(1), 'since': None})
-                continue
-        if section == 'private_opted_in':
-            m1 = re.match(r'^\s*-\s*tool:\s*(.+?)\s*$', line)
-            if m1:
-                obj['private_opted_in'].append({'name': m1.group(1), 'since': None})
-                continue
-        m1 = re.match(r'^\s*since:\s*(.+?)\s*$', line)
-        if m1:
-            if section == 'opted_in' and obj['opted_in']:
-                obj['opted_in'][-1]['since'] = m1.group(1)
-            elif section == 'imported' and obj['imported']:
-                obj['imported'][-1]['since'] = m1.group(1)
-            elif section == 'private_opted_in' and obj['private_opted_in']:
-                obj['private_opted_in'][-1]['since'] = m1.group(1)
-            continue
-    return obj
+# registry (consumers/<slug>.md) parsing lives in registry_lib.py (parse_registry, effective_scope,
+# host_path, reconcile_scope_floor) - imported above, shared with relocate.py/update_consumers.py/
+# broadcast_guidance.py so the schema (design\multi_machine_hub.md's scope:/hosts: map) has exactly
+# one parser instead of N drifting copies.
 
 
 # ==================================================================================================
@@ -305,12 +223,13 @@ def invoke_golden_suite(config):
 # ==================================================================================================
 # Pass B - per-consumer reference & drift scan
 # ==================================================================================================
-def test_consumer(c, config):
+def test_consumer(c, config, this_host):
     devs = []
-    cpath = Path(c['path']) if c['path'] else None
+    raw_path = host_path(c, this_host)
+    cpath = Path(raw_path) if raw_path else None
 
     if not cpath or not cpath.exists():
-        devs.append(Dev('WARN', 'registry', f"Consumer path not found on disk: {c['path']}", None))
+        devs.append(Dev('WARN', 'registry', f"Consumer path not found on disk: {raw_path}", None))
         return devs  # unreachable - can't check settings / CLAUDE.md
 
     settings_path = cpath / '.claude' / 'settings.json'
@@ -524,12 +443,13 @@ def test_consumer(c, config):
     return devs
 
 
-def write_guidance(c, devs, head_sha, today):
+def write_guidance(c, this_host, devs, head_sha, today):
     actionable = [d for d in devs if d.severity == 'FAIL' and d.target == 'consumer']
+    cpath = host_path(c, this_host)
 
     if not actionable:
-        had_section = SECTION_CHECKER in read_sections(c['path'])
-        write_section(c['path'], c['name'], SECTION_CHECKER, None)
+        had_section = SECTION_CHECKER in read_sections(cpath)
+        write_section(cpath, c['name'], SECTION_CHECKER, None)
         if had_section:
             print("  guidance: removed stale checker-deviations section (consumer now compliant).")
         return
@@ -550,7 +470,7 @@ def write_guidance(c, devs, head_sha, today):
         body_lines.append('')
     body_lines.append('Once every item above is resolved (or consciously declined), delete this file.')
 
-    write_section(c['path'], c['name'], SECTION_CHECKER, body_lines)
+    write_section(cpath, c['name'], SECTION_CHECKER, body_lines)
     print(f"  guidance: wrote checker-deviations section ({len(actionable)} actionable deviation(s)).")
 
 
@@ -576,19 +496,25 @@ def invoke_reference_scan(config, this_host, consumer_filter, write_guidance_fla
         if c is None:
             report('FAIL', f"{f.name} : no parseable `yaml` registry block.")
             continue
+
+        # 2-host write-back floor (design\multi_machine_hub.md): applies to every consumer this
+        # tool touches, regardless of whether it's reachable on THIS machine - a human opening the
+        # file directly must always see state that matches reality.
+        if reconcile_scope_floor(f, c):
+            print(f"  [fixed] {f.stem}: scope -> multi_machine (2+ hosts: entries present).")
+
         print()
         owner_suffix = f" - owner: {c['owner']}" if c['owner'] else ''
-        print(f"Consumer: {c['name']} ({f.stem}){owner_suffix}")
+        print(f"Consumer: {c['name']} ({f.stem}) - scope: {effective_scope(c)}{owner_suffix}")
 
-        # Federate (#1): a consumer registered on another machine's clone isn't on THIS disk, so
-        # its path/settings can't be validated here. Skip silently (not a WARN) when host is set
-        # and differs from this machine. Entries with no host: (pre-field) fall through and
-        # validate.
-        if c['host'] and this_host and c['host'] != this_host:
-            print(f"  [skip] registered on host '{c['host']}', not this machine ('{this_host}').")
+        # Federate (#1): a consumer with no hosts.<this_host> entry isn't on THIS disk, so its
+        # path/settings can't be validated here. Skip silently (not a WARN).
+        if this_host not in c['hosts']:
+            print(f"  [skip] not connected on this machine ('{this_host}') - hosts: "
+                  f"{', '.join(sorted(c['hosts'])) or '(none)'}.")
             continue
 
-        devs = test_consumer(c, config)
+        devs = test_consumer(c, config, this_host)
         if not devs:
             report('PASS', "no deviations.")
         else:
@@ -596,7 +522,7 @@ def invoke_reference_scan(config, this_host, consumer_filter, write_guidance_fla
                 report(d.severity, d.message)
 
         if write_guidance_flag:
-            write_guidance(c, devs, head_sha, today)
+            write_guidance(c, this_host, devs, head_sha, today)
 
 
 def check_hub_self_use_skills(config):
