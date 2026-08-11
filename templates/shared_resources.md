@@ -155,7 +155,7 @@ fix can conjure a script onto a computer that never had it. This is a **differen
 that may genuinely not exist here at all.
 
 **Browse/search** tags a hit with which host(s) actually have it whenever the entry carries a
-`Hosts:` block (e.g. `[LOGAN only]`) — never presents something as usable somewhere it isn't. A
+`Hosts:` block (e.g. `[<host_id> only]`) — never presents something as usable somewhere it isn't. A
 self-contained entry (its content lives inside its own `shared_resources\` file, nothing external
 to point at) never carries a `Hosts:` block and is never tagged this way.
 
