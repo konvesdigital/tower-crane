@@ -143,7 +143,15 @@ repo's HEAD.
    `relocate.py`'s own regeneration logic, and never touches `project_progress.md` or (re)writes
    `FIRST_RUN.md`. If the target folder is empty and the registry has a `remote:` on record
    (`design\consumer_reconnect.md`), it's cloned from there before any scaffolding runs; pass
-   `--no-clone` to scaffold a blank folder instead. Recovering a lost/corrupted local clone is the
+   `--no-clone` to scaffold a blank folder instead. If the target folder is empty and the registry
+   has **no** `remote:` on record (an older registration, or the project was never pushed
+   anywhere), **ask the user for the project's git remote URL**, then `git clone <url>
+   <target-path>` directly before calling `new_consumer.py` — the folder is no longer empty at
+   that point, so the same patch-in-place branch above handles it, and the registry-write step
+   backfills `remote:` from the freshly cloned `.git\` automatically (seed-once, never overwrites
+   an existing value), so future connects for this project skip the question. If the user has no
+   remote either, fall back to asking them to get the files onto this machine themselves (copy or
+   clone) before repeating this same invocation. Recovering a lost/corrupted local clone is the
    same flow — empty the broken folder first, then run this same invocation.
 
 Either path: run `scripts\check_tower_crane.py` to confirm the consumer validates clean.
