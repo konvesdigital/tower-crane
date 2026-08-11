@@ -25,13 +25,25 @@ actually invoked.
       `config.local.json`): `git add -A && git commit -m "Checkpoint: <summary>" && git push`
       - If no repo/remote is found: stop and ask the user whether to set one up now — flag it
         rather than skip silently.
+      - **Verify-clean loop (2026-08-11):** afterward, `git status --porcelain` must be empty. If
+        it isn't (an edit landed after the commit above — e.g. correcting this same Work Log entry
+        once more), stage and commit the remainder now and push again; repeat until clean.
+        `checkpoint` is not finished while this repo carries uncommitted changes — see step 3.
    b. Inner `toolkit\` repo — only if `toolkit\` exists and `git -C toolkit status --porcelain`
       shows changes:
       - **Soft disclosure guardrail** (`design\update_trust_review.md`): if the pending changes
         touch `AGENTS.md`, run `python scripts\check_standing_constraints.py --base HEAD --head
         worktree` from inside `toolkit\`. `[UNCHANGED]`: proceed silently. `[CHANGED]`: surface the
         printed before/after text as an explicit notice before committing — never skip silently.
-      - `git -C toolkit add -A && git -C toolkit commit -m "Checkpoint: <summary>"`.
+        **Paper trail (2026-08-11):** on `[CHANGED]`, the commit message below MUST carry a
+        `Standing-Constraints-changed: <one-line reason>` trailer summarizing what changed and why
+        (e.g. "pointer text only, no obligation added/removed" or a real substantive description if
+        one was) — this lands the declaration permanently in the public `toolkit\` repo's own
+        history, not only in this private repo's Work Log, since anyone auditing `toolkit\` directly
+        would otherwise see nothing marking this class of change.
+      - `git -C toolkit add -A && git -C toolkit commit -m "Checkpoint: <summary>"` — include the
+        `Standing-Constraints-changed:` trailer in this same commit message when the guardrail above
+        fired `[CHANGED]`.
       - **Hard outgoing leak-scan gate, before pushing** (`design\resource_sharing_model.md` B1):
         `git fetch origin`, then
         `python scripts\check_file_surface.py --base-sha origin/main --head-sha HEAD` (from inside
@@ -50,8 +62,19 @@ actually invoked.
         Log/Current Status must say "committed locally only, blocked on: `<reason>`" (with the
         SHA), never a stray "built" claim. Amend and re-push the outer repo — a second small commit
         beats a stale persisted claim.
-3. Confirm to the user: saved and pushed (note whether `toolkit\` push happened, was skipped
-   clean, or failed).
+      - **Verify-clean loop (2026-08-11):** afterward (whether or not a push happened),
+        `git -C toolkit status --porcelain` must be empty. If it isn't — most often a further edit
+        landed on a companion/procedure file after the commit above — restart from the guardrail
+        check: re-run `check_standing_constraints.py` if `AGENTS.md` changed again, commit the
+        remainder (with its own trailer if the guardrail fires again), re-run the leak-scan gate,
+        and push. Repeat until clean. Found live this same day: a follow-up edit to this very
+        procedure (the paper-trail sentence a few lines up) was made after its own checkpoint
+        commit and never re-committed, leaving `toolkit\` dirty into the next session undetected —
+        `update`'s own dirty-tree abort is what finally caught it. `--notify` (`resume` step 3) now
+        also flags a dirty `toolkit\` immediately, as a second line of defense, but this loop is
+        the actual fix: don't let it happen in the first place.
+3. Confirm to the user: saved and pushed, **both repos' working trees clean** (note whether
+   `toolkit\` push happened, was skipped clean, or failed).
 4. **Suggest archiving** if the file has grown past roughly **400 lines (~40 KB)**, or the Work Log
    holds many settled entries — a prompt only, never automatic.
 

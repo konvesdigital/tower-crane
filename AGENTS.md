@@ -96,11 +96,12 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
 2. Outer project repo: `git pull`.
 3. Inner `toolkit\` repo — check only, never pull/merge/push (`update`/`checkpoint` are separate).
    If `toolkit\` exists: `python scripts\update_toolkit.py --notify` from inside `toolkit\` (fetch,
-   checks both directions — incoming vs `last_reviewed_sha`, outgoing local HEAD vs `origin/main`,
-   `design\cross_machine_toolkit_sync.md` — no golden suite, no mutation). Report each
-   independently: incoming → "toolkit\ has N commit(s) available — run `update`"; outgoing →
-   "toolkit\ has N local commit(s) not yet pushed — run `checkpoint`"; neither → say nothing;
-   `toolkit\` missing: skip silently.
+   checks three independent conditions — uncommitted changes, incoming vs `last_reviewed_sha`,
+   outgoing local HEAD vs `origin/main`, `design\cross_machine_toolkit_sync.md` — no golden suite,
+   no mutation). Report each independently: dirty → "toolkit\ has uncommitted changes — run
+   `checkpoint`"; incoming → "toolkit\ has N commit(s) available — run `update`"; outgoing →
+   "toolkit\ has N local commit(s) not yet pushed — run `checkpoint`"; none of the three → say
+   nothing; `toolkit\` missing: skip silently.
 4. Rung-2 hook activation: `python toolkit\scripts\check_hook_activation.py --project-root .` —
    notify-only check for whether every synced `.claude\hooks\` script is referenced in this
    machine's own gitignored `settings.local.json`. Note any `[UNWIRED]` line; say nothing if only

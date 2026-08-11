@@ -71,7 +71,11 @@ runs itself; nothing schedules --check automatically.
               (design\\cross_machine_toolkit_sync.md): local HEAD ahead of origin/main means an
               earlier checkpoint's push was rejected or never completed - surfaced independently of
               the incoming last_reviewed_sha comparison, so a stranded local commit is never
-              silently forgotten by a later session on any machine.
+              silently forgotten by a later session on any machine. Also checks for an uncommitted
+              working tree (added 2026-08-11): a dirty toolkit\\ previously passed unnoticed through
+              --notify/resume, only surfacing later when --check's own dirty-tree abort happened to
+              run - now checked here too, on the same immediate-every-resume footing as the other
+              two directions.
 
 Remote-identity check (added 2026-07-27, security stress-test pass, design\\security_stress_test.md):
 every subcommand that talks to `origin` first confirms `git remote get-url origin` still matches
@@ -483,6 +487,10 @@ def cmd_notify(cfg):
     triggers the full review gate (that stays --check, user-initiated only). The remote-identity
     check here is a WARN, not an abort - --notify's whole point is a safe, side-effect-free
     heads-up, so it still reports a mismatched origin without blocking `resume`."""
+    if _is_dirty():
+        print("[update check] toolkit\\ has uncommitted changes - run `checkpoint` to commit them "
+              "(a prior checkpoint likely ended before the working tree was actually clean).")
+
     mismatch = _origin_remote_mismatch(cfg)
     if mismatch is not None:
         expected, actual = mismatch
