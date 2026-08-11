@@ -32,7 +32,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from config_lib import get_shared_config, build_new_cmd_map, apply_hook_command_fixes, fix_skill_stubs
+from config_lib import (get_shared_config, build_new_cmd_map, apply_hook_command_fixes,
+                         fix_skill_stubs, fix_adopted_stub_paths, commit_consumer_changes)
 from registry_lib import parse_registry, host_path, reconcile_scope_floor
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
@@ -97,6 +98,30 @@ def fix_imports(consumer_path, imports, import_base, dry_run):
     return changed
 
 
+# design\resource_sharing_model.md's "Saving now propagates itself" fix, one level down
+# (project_progress.md's 2026-08-11 Work Log): this pass writes into a consumer's own repo with
+# no live session there to notice and checkpoint it, so it closes its own loop instead of leaving
+# uncommitted state for a human to remember later.
+COMMIT_LABELS = {
+    'not-a-repo': None,  # nothing this function can do - not worth a line every run
+    'noop': None,        # nothing changed here - not worth a line every run
+    'committed-pushed': '  [git] committed and pushed in this consumer\'s own repo.',
+    'committed-no-remote': '  [git] committed in this consumer\'s own repo (no origin remote to push to).',
+    'commit-failed': None,   # commit_consumer_changes() already logged the warn line itself
+    'push-failed': None,     # ditto
+}
+
+
+def report_consumer_commit(this_path, dry_run):
+    if dry_run:
+        return
+    result = commit_consumer_changes(
+        this_path, "Tower Crane sync: relocate.py path/hook regeneration", log=print)
+    label = COMMIT_LABELS.get(result)
+    if label:
+        print(label)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Regenerate every registered consumer's hook command(s) from config.local.json."
@@ -153,6 +178,11 @@ def main():
 
         imports_changed = fix_imports(this_path, c['imports'], config['import_base'], args.dry_run)
         skills_changed = fix_skill_stubs(this_path, TEMPLATES_DIR, config['import_base'], args.dry_run, log=print)
+        # design\directive_economy.md's "Adopted-stub path portability" - a private
+        # shared_resources\-adopted stub has no canonical source, so it regenerates from its own
+        # marker's hub-rel: anchor instead of a diff against templates\skills\.
+        adopted_changed = fix_adopted_stub_paths(this_path, PROJECT_ROOT, args.dry_run, log=print)
+        skills_changed = skills_changed or adopted_changed
 
         all_tools = c['tools'] + c['private_tools']
         if not all_tools:
@@ -161,6 +191,7 @@ def main():
             else:
                 print("  [no-op] no opted-in tools (prose-only consumer).")
                 COUNTS['noop'] += 1
+            report_consumer_commit(this_path, args.dry_run)
             continue
 
         settings_path = Path(this_path) / '.claude' / 'settings.json'
@@ -203,6 +234,7 @@ def main():
         else:
             print("  [no-op] settings already current.")
             COUNTS['noop'] += 1
+        report_consumer_commit(this_path, args.dry_run)
 
     print()
     print(f"=== Summary: {COUNTS['changed']} changed, {COUNTS['noop']} no-op, {COUNTS['skipped']} off-host, {COUNTS['warn']} warning(s) ===")

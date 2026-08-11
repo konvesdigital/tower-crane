@@ -31,6 +31,7 @@ import json
 import os
 import platform
 import re
+import subprocess
 from pathlib import Path
 
 
@@ -336,3 +337,127 @@ def fix_skill_stubs(consumer_path, templates_dir, import_base, dry_run=False, lo
                 stub_path.write_text(expected, encoding='utf-8', newline='\n')
             changed = True
     return changed
+
+
+# design\directive_economy.md's "Adopted-stub path portability" - a shared_resources\-adopted
+# reference/tool skill stub (private-only, no canonical toolkit\ source - see fix_skill_stubs()'s
+# docstring for that contrast) still needs its embedded path to survive a move across hosts. The
+# adoption-marker comment templates\shared_resources.md's Apply step already writes carries an
+# optional `hub-rel:<path>` field (the entry file's path relative to the hub root, e.g.
+# `shared_resources/seo_resources.md`) precisely so this can be recomputed for whichever host it
+# runs on, the same way {{IMPORT_BASE}} already is for toolkit-governed stubs - just with no whole
+# canonical file to diff against, only this one anchor.
+ADOPTED_MARKER_RE = re.compile(
+    r'<!--\s*shared_resources:\s*(?P<entry>.+?)\s+adopted\s+\d{4}-\d{2}-\d{2}'
+    r'(?:\s+index-sha256:[0-9a-f]{64})?'
+    r'(?:\s+hub-rel:(?P<hubrel>\S+))?'
+    r'(?:\s+hosts-ignored:(?P<hostsignored>\S+))?'
+    r'\s*-->'
+)
+
+
+def hub_root_tilde(hub_root):
+    """Home-relative '~/...' form of the hub root (one level above shared_root/toolkit\\) - the
+    same form import_base already computes, and the only path shape this mechanism's backtick-
+    quoted references (and Claude Code's own @import) ever resolve reliably."""
+    rel = Path(hub_root).resolve().relative_to(Path.home().resolve())
+    return '~/' + str(rel).replace('\\', '/')
+
+
+def fix_adopted_stub_paths(consumer_path, hub_root, dry_run=False, log=None):
+    """Regenerate a private, shared_resources\\-adopted skill stub's embedded path for THIS host,
+    using the hub-relative fragment recorded in its own adoption marker at Apply time
+    (design\\directive_economy.md's "Adopted-stub path portability"). Unlike fix_skill_stubs(),
+    there's no canonical templates\\skills\\ source to diff a whole file against - an adopted
+    stub's trigger/body is bespoke, private, written once. The marker's `hub-rel:` field is the
+    only portable anchor: `~/<hub-relative fragment>` recomputed against THIS host's live
+    hub_root, substituted for whatever backtick-quoted `~/...shared_resources/...` path currently
+    appears in the stub body, only if it differs. A stub with no `hub-rel:` field (an insight
+    adoption, or one written before this feature existed) is left untouched - out of scope, not a
+    failure. Returns True if anything changed (or would, under dry_run).
+    """
+    skills_dir = Path(consumer_path) / '.claude' / 'skills'
+    if not skills_dir.is_dir():
+        return False
+    changed = False
+    for skill_md in sorted(skills_dir.glob('*/SKILL.md')):
+        text = skill_md.read_text(encoding='utf-8')
+        m = ADOPTED_MARKER_RE.search(text)
+        if not m or not m.group('hubrel'):
+            continue
+        expected = f"{hub_root_tilde(hub_root)}/{m.group('hubrel')}"
+        new_text, n = re.subn(r'`~/[^`]*shared_resources/[^`]*`', f'`{expected}`', text)
+        if n and new_text != text:
+            if log:
+                verb = 'would regenerate' if dry_run else 'regenerate'
+                log(f"  [{verb}] adopted stub path: {skill_md.parent.name}")
+            if not dry_run:
+                skill_md.write_text(new_text, encoding='utf-8', newline='\n')
+            changed = True
+    return changed
+
+
+# The Tower-Crane-owned paths inside a consumer project's own working tree - every hub-invoked
+# writer (relocate.py, update_consumers.py) is confirmed to touch only these three (fix_imports/
+# apply_piece -> CLAUDE.md; apply_hook_command_fixes/apply_hook/apply_private -> .claude/settings.json;
+# fix_skill_stubs/fix_adopted_stub_paths/apply_skill/apply_piece/apply_private -> .claude/skills/).
+CONSUMER_OWNED_PATHS = ('CLAUDE.md', '.claude/settings.json', '.claude/skills')
+
+
+def commit_consumer_changes(consumer_path, message, log=None):
+    """Commit (and push, if a remote is configured) any pending change under a consumer
+    project's OWN Tower-Crane-owned paths, into THAT PROJECT'S OWN git repo - never the hub's.
+
+    Why this exists: a hub-invoked routine pass (relocate.py's path/hook regeneration,
+    update_consumers.py's bulk push) writes directly into a consumer's working tree with no live
+    session there to notice and checkpoint it - unlike a consumer's own session adopting something
+    itself, which naturally checkpoints right after. Left alone, that write just sits uncommitted
+    indefinitely, with no reminder mechanism short of a human remembering. Mirrors
+    `shared_resources\\`'s own "saving now propagates itself" fix
+    (design\\resource_sharing_model.md) one level down: don't ask, don't rely on a human/agent
+    remembering to push later - make the routine pass close its own loop, every time, as its own
+    last step for that consumer.
+
+    Scoped add (CONSUMER_OWNED_PATHS only, never `-A`) so an unrelated in-progress edit elsewhere
+    in that project (the user's own client work, mid-edit) is never swept in - same discipline as
+    `shared_resources\\`'s own scoped `git add shared_resources`.
+
+    Returns one of: 'not-a-repo' (no .git\\ here - nothing this function can do), 'noop' (nothing
+    changed under the owned paths), 'committed-pushed', 'committed-no-remote' (committed locally;
+    no 'origin' remote configured to push to), 'commit-failed', 'push-failed'. Never raises on a
+    git failure - reports it via the return value / `log` instead, so one consumer's git trouble
+    can't abort a batch run touching several.
+    """
+    consumer_path = Path(consumer_path)
+    if not (consumer_path / '.git').is_dir():
+        return 'not-a-repo'
+
+    owned = [p for p in CONSUMER_OWNED_PATHS if (consumer_path / p).exists()]
+    if not owned:
+        return 'noop'
+
+    def _git(git_args):
+        return subprocess.run(['git', '-C', str(consumer_path)] + git_args,
+                               capture_output=True, text=True)
+
+    status = _git(['status', '--porcelain', '--'] + owned)
+    if not status.stdout.strip():
+        return 'noop'
+
+    _git(['add', '--'] + owned)
+    commit = _git(['commit', '-m', message])
+    if commit.returncode != 0:
+        if log:
+            log(f"  [warn] commit failed in {consumer_path}: {commit.stderr.strip() or commit.stdout.strip()}")
+        return 'commit-failed'
+
+    remotes = _git(['remote'])
+    if 'origin' not in remotes.stdout.split():
+        return 'committed-no-remote'
+
+    push = _git(['push'])
+    if push.returncode != 0:
+        if log:
+            log(f"  [warn] push failed in {consumer_path}: {push.stderr.strip() or push.stdout.strip()}")
+        return 'push-failed'
+    return 'committed-pushed'

@@ -97,9 +97,90 @@ disk-writing action in the whole mechanism and the one carrying the classificati
 it gets its own explicit checkpoint even though entering the mode already got one.
 
 When saving a `reference` or `tool` entry: create one new file in `shared_resources\`, then append
-one row to `shared_resources\CATALOG.md` (`Status` column left blank — active by default). For
-`insight`, see "Insights are different" below — its save flow is a negotiation, not a fixed
-write.
+one row to `shared_resources\CATALOG.md` (`Status` column left blank — active by default), then
+**propagate the write** (see below). For `insight`, see "Insights are different" below — its save
+flow is a negotiation, not a fixed write, but ends the same way.
+
+**If the entry is a `tool`, or a `reference` whose real content is a pointer to something kept
+outside `shared_resources\` (not copied into the entry file itself)** — never write a flat target
+path. Instead give the entry a `**Hosts:**` block, keyed by this machine's own `host_id` (read it
+from `<hub root>\toolkit\config.local.json`, the same file the hub itself reads at every session):
+
+```markdown
+# <Entry Name>
+
+**Kind:** tool
+**Hosts:**
+  <this host's host_id>:
+    path: <the real target's absolute path on this machine>
+    registered: YYYY-MM-DD
+```
+
+See "Per-host availability for pointer entries" below for why, and for what happens when a project
+that adopted this entry runs on a machine not yet in this list.
+
+### Every write here ends with the same propagation step
+
+Any write into `shared_resources\` — a new `reference`/`tool`/`insight` entry, an `insight` archive
+edit, or a new-host addition to an existing entry's `Hosts:` block (see "Per-host availability for
+pointer entries" below) — finishes with a scoped commit+push against the **hub's own outer repo**
+(the private repo one level above `toolkit\`, not this project's own repo), run immediately, from
+this session, right after the write:
+
+```
+git -C <hub root> add shared_resources
+git -C <hub root> commit -m "shared_resources: <entry name>"
+git -C <hub root> push
+```
+
+Never `git add -A` here — that could sweep in an unrelated in-flight hub-root edit (a
+`project_progress.md` draft mid-edit, say) that nobody has reviewed yet; scope the add to exactly
+`shared_resources\`. No leak-scan gate applies (that guards pushes to `toolkit\`'s *public* remote;
+the hub's own outer repo is private) and no `change_requests\` ticket is needed — this is the same
+self-approving write "Saving" already established, just made durable and visible instead of sitting
+uncommitted until some unrelated hub-level `checkpoint` happens to run. A second machine's own
+`resume` (its ordinary `git pull` on the outer repo) picks it up the normal way — nothing new
+needed on the receiving side. If the push fails (no remote, auth problem, non-fast-forward), say so
+plainly rather than silently leaving the write local-only — the write itself already succeeded on
+disk either way, only its propagation to other machines is at risk.
+
+### Per-host availability for pointer entries
+
+`shared_resources\` itself syncs to every machine this operator uses (per the propagation step
+above) — but a `tool` entry, or a pointer-authored `reference` entry, only ever describes something
+that lives *outside* the hub, genuinely machine-local (a proprietary script, say). The entry
+reaching a second machine doesn't mean the thing it points at reached that machine too — no path
+fix can conjure a script onto a computer that never had it. This is a **different problem** from
+"Adopted-stub path portability" above: that one is a stale-but-fixable path; this one is a target
+that may genuinely not exist here at all.
+
+**Browse/search** tags a hit with which host(s) actually have it whenever the entry carries a
+`Hosts:` block (e.g. `[LOGAN only]`) — never presents something as usable somewhere it isn't. A
+self-contained entry (its content lives inside its own `shared_resources\` file, nothing external
+to point at) never carries a `Hosts:` block and is never tagged this way.
+
+**At `resume`,** `scripts\check_shared_resource_refs.py` (run by
+`templates\shared_resources_resume_check.md`) checks every adopted `tool`/pointer-`reference` skill
+stub against its entry's `Hosts:` block. If this host is missing, it prints `[HOST-GAP]` —
+notify-only, never blocking — and the acting agent presents three options, same shape as an
+unresolved `## Broadcast` section:
+
+1. **Ignore** — this host genuinely will never have the thing (e.g. a tool that only ever makes
+   sense on the machine it was built for). Add this host's id to the stub's own adoption marker's
+   `hosts-ignored:` field (comma-separated if more than one host is already ignored). Never asked
+   about again for this project, on this host — the check finds the marker and goes quiet.
+2. **Connect it now** — the user places the real target on this machine (there's no assumption its
+   path corresponds to any other host's path — ask for the new path plus whatever else is needed to
+   actually use it here) and confirms it's ready. Append a `hosts.<this host>` entry to the entry's
+   own `Hosts:` block in `shared_resources\` (same self-approving write as any other addition to an
+   existing entry — no ticket), then propagate it (see "Every write here ends with the same
+   propagation step" above). Resolves the gap for good — the next `resume`'s check finds this host
+   in the list and goes quiet too.
+3. **Proceed without deciding** — use this session without the tool/reference, decide nothing yet.
+   Neither the entry nor the stub's marker changes, so the exact same `[HOST-GAP]` notice — with the
+   same three options — resurfaces at the next `resume` on this host, and every one after that,
+   until it's resolved via option 1 or 2. This is the default when the user doesn't pick a lane, not
+   a failure state — matches how an unresolved `## Broadcast` section already behaves.
 
 ### Discovery: search or browse, then select, then apply
 
@@ -128,6 +209,8 @@ distinct match.
        "Insights are different") — where one exists. An insight applied with nothing persisted
        (see "Apply routes through a destination question" there) has no marker to find; that's an
        accepted gap, not a bug.
+     - a **host-availability tag** for a `tool`/pointer-`reference` entry carrying a `Hosts:`
+       block — see "Per-host availability for pointer entries" below.
 2. **Select** — ask which of the matching/listed entries actually apply here. Don't assume a
    single match is automatically wanted.
 3. **Apply** — adopt the selected entry:
@@ -150,10 +233,16 @@ distinct match.
         file's own current content, so a later `resume` can notice if that content has changed
         since the trigger above was drafted from it (`design\directive_economy.md`'s "Drift
         mechanics", checked by `scripts\check_shared_resource_drift.py` — see "Checking adopted
-        references at resume" below):
+        references at resume" below) — plus the entry file's own path relative to the hub root
+        (`hub-rel:`), so a later `relocate.py` run can recompute the stub's embedded path for
+        whichever host it's running on rather than leaving it baked to the host that adopted it
+        (`design\directive_economy.md`'s "Adopted-stub path portability" — the stub body's own
+        `Read ~/.../shared_resources/<file>` line stays a concrete, resolved path for this host
+        right now; `hub-rel:` is only the portable anchor used to regenerate it later, never
+        written into the body itself):
         ```
         <!-- shared_resources: <entry name> adopted YYYY-MM-DD index-sha256:<hash of the entry
-        file's content at adoption time> -->
+        file's content at adoption time> hub-rel:shared_resources/<entry file's own name> -->
         ```
      4. **Show the draft — trigger description and stub body — to the user and confirm before
         writing anything.** Same checkpoint this file already requires for Saving, above.
@@ -233,6 +322,7 @@ right hook/summary/verbatim split genuinely varies per entry and isn't derivable
    ```
    (repeat the `## Verbatim:` block zero or more times; omit the whole section if this entry is a
    pure judgment call with nothing to reuse verbatim)
+4. Propagate the write (see "Every write here ends with the same propagation step" above).
 
 This can be as small as a one-line hook plus a one-sentence summary, saved in under a minute, or as
 long as several separately-labeled verbatim blocks for a deep investigation — don't impose ceremony
@@ -294,6 +384,7 @@ in the same self-approving spirit as Saving above — no ticket, no round-trip:
    and re-adoptable, just hidden from an ordinary browse listing (see "Discovery" above) so a
    brand-new project that hasn't hit this pain point yet can still find it instead of quietly
    re-solving the same problem from zero.
+3. Propagate the write (see "Every write here ends with the same propagation step" above).
 
 Archiving is always a deliberate, user-initiated call — never automatic, matching this project's
 own `project_progress_archive.md` archiving stance. `reference`/`tool` entries don't get this

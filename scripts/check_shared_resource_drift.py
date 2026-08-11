@@ -48,7 +48,13 @@ from pathlib import Path
 
 MARKER_RE = re.compile(
     r'<!--\s*shared_resources:\s*(?P<entry>.+?)\s+adopted\s+\d{4}-\d{2}-\d{2}'
-    r'(?:\s+index-sha256:(?P<hash>[0-9a-f]{64}))?\s*-->'
+    r'(?:\s+index-sha256:(?P<hash>[0-9a-f]{64}))?'
+    # design\directive_economy.md's "Adopted-stub path portability" and
+    # resource_sharing_model.md's "Per-host availability for pointer entries" both add optional
+    # trailing marker fields (hub-rel:/hosts-ignored:) this script doesn't use but must tolerate.
+    r'(?:\s+hub-rel:\S+)?'
+    r'(?:\s+hosts-ignored:\S+)?'
+    r'\s*-->'
 )
 SKILL_STUB_PATH_RE = re.compile(r'`(~/[^`]+)`')
 

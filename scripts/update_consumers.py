@@ -34,7 +34,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from config_lib import get_shared_config
+from config_lib import get_shared_config, commit_consumer_changes
 from check_tower_crane import parse_registry, CONSUMERS_DIR
 from registry_lib import host_path, reconcile_scope_floor
 from scan_consumer_update import (
@@ -223,9 +223,21 @@ def do_apply(cfg, scanned, global_index, spec, today):
             if apply_private(project_root, cfg, item):
                 per_consumer_writeback.setdefault(slug, []).append(('private', item['name']))
 
+    # design\resource_sharing_model.md's "Saving now propagates itself" fix, one level down
+    # (project_progress.md's 2026-08-11 Work Log): this pushes into a consumer's own repo with no
+    # live session there to notice and checkpoint it, so it closes its own loop per consumer
+    # instead of leaving uncommitted state behind for a human to remember later.
     for slug, entries in per_consumer_writeback.items():
         c = scanned_by_slug[slug]['consumer']
         update_registry_entry(Path(c['file']), entries, today)
+        names = ', '.join(f"{cat}:{name}" for cat, name in entries)
+        result = commit_consumer_changes(
+            scanned_by_slug[slug]['project_root'],
+            f"Tower Crane sync: applied {names}", log=print)
+        if result == 'committed-pushed':
+            print(f"  [git] {c['name']}: committed and pushed in its own repo.")
+        elif result == 'committed-no-remote':
+            print(f"  [git] {c['name']}: committed in its own repo (no origin remote to push to).")
 
 
 def main():

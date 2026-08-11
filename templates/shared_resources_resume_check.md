@@ -33,6 +33,11 @@ report plainly, never silently (per "Shared resources folder maintenance" in `sh
 Out of scope: a `tool`-kind entry adopted as free-text "pointer note" prose (no fixed shape to
 check); an adopted `insight` (its content was copied/adapted in, nothing left pointing back).
 
+Same run also prints `[HOST-GAP]` for a `tool`/pointer-`reference` entry whose `Hosts:` block
+doesn't list this machine - notify-only, never causes a failure exit. On a `[HOST-GAP]`, present
+the ignore / connect-now / proceed-and-re-ask remedy from `shared_resources.md`'s "Per-host
+availability for pointer entries" - don't silently skip past it.
+
 Also run `python <hub root>\toolkit\scripts\check_shared_resource_drift.py --project-root <this
 project's root>` - notify-only (`[DRIFT]`, always exits 0). Compares the sha256 stamped into a
 Track-1 stub's adoption marker at Apply time against the source entry's current content. On
