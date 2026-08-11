@@ -32,14 +32,15 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from config_lib import get_shared_config, get_expanded_optin
+from config_lib import get_shared_config, build_new_cmd_map, apply_hook_command_fixes, fix_skill_stubs
 from registry_lib import parse_registry, host_path, reconcile_scope_floor
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
 # consumers\ is private hub state, not shipped toolkit content - it lives at the outer root
 # (design\local_first_reframe.md's outer/inner split), one level above SHARED_ROOT (toolkit\).
 PROJECT_ROOT = SHARED_ROOT.parent
-OPTINS_DIR = SHARED_ROOT / 'templates' / 'optins'
+TEMPLATES_DIR = SHARED_ROOT / 'templates'
+OPTINS_DIR = TEMPLATES_DIR / 'optins'
 CONSUMERS_DIR = PROJECT_ROOT / 'consumers'
 # design\private_tools.md - a moved/renamed hub needs its consumers' private hook commands
 # regenerated too, same as public ones.
@@ -151,10 +152,11 @@ def main():
             continue
 
         imports_changed = fix_imports(this_path, c['imports'], config['import_base'], args.dry_run)
+        skills_changed = fix_skill_stubs(this_path, TEMPLATES_DIR, config['import_base'], args.dry_run, log=print)
 
         all_tools = c['tools'] + c['private_tools']
         if not all_tools:
-            if imports_changed:
+            if imports_changed or skills_changed:
                 COUNTS['changed'] += 1
             else:
                 print("  [no-op] no opted-in tools (prose-only consumer).")
@@ -176,51 +178,18 @@ def main():
 
         # Build tool -> new concrete command map from the canonical opt-ins (public + private -
         # design\private_tools.md; a private command's path already contains 'hooks/<tool>.py'
-        # same as a public one, so the rewrite loop below needs no separate pattern per source).
-        new_cmd = {}
-        for t in c['tools']:
-            optin_path = OPTINS_DIR / f"{t}.json"
-            if not optin_path.exists():
-                print(f"  [warn] no canonical opt-in for '{t}' - skipping that tool.")
-                COUNTS['warn'] += 1
-                continue
-            optin = get_expanded_optin(optin_path, config)
-            for evt, groups in optin.get('hooks', {}).items():
-                for grp in groups:
-                    for h in grp.get('hooks', []):
-                        if 'command' in h:
-                            new_cmd[t] = h['command']
-        for t in c['private_tools']:
-            optin_path = PRIVATE_OPTINS_DIR / f"{t}.json"
-            if not optin_path.exists():
-                continue  # a private "tool" may be a Track-1 skill instead of a hook - nothing to relocate
-            optin = get_expanded_optin(optin_path, config)
-            for evt, groups in optin.get('hooks', {}).items():
-                for grp in groups:
-                    for h in grp.get('hooks', []):
-                        if 'command' in h:
-                            new_cmd[t] = h['command']
+        # same as a public one, so the rewrite below needs no separate pattern per source). Shared
+        # with new_consumer.py's host-merge reuse (design\consumer_reconnect.md) - config_lib.py's
+        # build_new_cmd_map/apply_hook_command_fixes.
+        def _warn(msg):
+            print(f"  [warn] {msg}")
+            COUNTS['warn'] += 1
+        new_cmd = build_new_cmd_map(c['tools'], c['private_tools'], config, OPTINS_DIR, PRIVATE_OPTINS_DIR, warn=_warn)
 
-        # Walk the consumer's hooks; rewrite any command that references an opted-in tool's hook
-        # file (hooks/<tool>.ps1 or .py) to that tool's new command. This handles both path
-        # relocation and the .ps1 -> .py migration in one motion.
-        changed_here = False
-        for evt, groups in settings.get('hooks', {}).items():
-            for grp in groups:
-                for h in grp.get('hooks', []):
-                    if 'command' not in h:
-                        continue
-                    for t in all_tools:
-                        if t not in new_cmd:
-                            continue
-                        pattern = r'hooks[\\/]' + re.escape(t) + r'\.(ps1|py)'
-                        if re.search(pattern, h['command']) and h['command'] != new_cmd[t]:
-                            verb = 'would change' if args.dry_run else 'change'
-                            print(f"  [{verb}] {t}")
-                            print(f"      from: {h['command']}")
-                            print(f"      to:   {new_cmd[t]}")
-                            h['command'] = new_cmd[t]
-                            changed_here = True
+        # Rewrite any command that references an opted-in tool's hook file (hooks/<tool>.ps1 or
+        # .py) to that tool's new command. This handles both path relocation and the .ps1 -> .py
+        # migration in one motion.
+        changed_here = apply_hook_command_fixes(settings, new_cmd, all_tools, args.dry_run, log=print)
 
         if changed_here:
             if args.dry_run:
@@ -229,7 +198,7 @@ def main():
                 write_utf8(settings_path, json.dumps(settings, indent=2))
                 print(f"  wrote {settings_path}")
             COUNTS['changed'] += 1
-        elif imports_changed:
+        elif imports_changed or skills_changed:
             COUNTS['changed'] += 1
         else:
             print("  [no-op] settings already current.")

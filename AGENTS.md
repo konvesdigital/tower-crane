@@ -137,7 +137,14 @@ repo's HEAD.
    automatically and routes into an additive `hosts.<this_host_id>` merge instead of erroring or
    overwriting (`design\multi_machine_hub.md`'s locked slug-collision routing) — `scope`
    self-corrects to `multi_machine` the moment a 2nd host lands, regardless of what was asked at
-   original registration.
+   original registration. If the target folder already has files (a physical copy, a hand-recovered
+   clone), the host-merge branch patches only what's stale in place — `CLAUDE.md`'s `@import`
+   lines, `settings.json`'s hook command(s), and any drifted `.claude\skills\` stub — via
+   `relocate.py`'s own regeneration logic, and never touches `project_progress.md` or (re)writes
+   `FIRST_RUN.md`. If the target folder is empty and the registry has a `remote:` on record
+   (`design\consumer_reconnect.md`), it's cloned from there before any scaffolding runs; pass
+   `--no-clone` to scaffold a blank folder instead. Recovering a lost/corrupted local clone is the
+   same flow — empty the broken folder first, then run this same invocation.
 
 Either path: run `scripts\check_tower_crane.py` to confirm the consumer validates clean.
 

@@ -241,3 +241,98 @@ def materialize_skill_stub(canon_path, import_base=None):
     if import_base is not None:
         text = text.replace('{{IMPORT_BASE}}', str(import_base))
     return text
+
+
+def build_new_cmd_map(tools, private_tools, config, optins_dir, private_optins_dir, warn=None):
+    """tool name -> its current concrete hook command, read from the canonical opt-in snippets.
+    Single source of truth for 'what should this tool's hook command be right now' - relocate.py's
+    regeneration pass and new_consumer.py's host-merge reuse of it both call this instead of each
+    hand-rolling the same walk (design\\consumer_reconnect.md).
+
+    `warn`, if given, is called with a message for a tool with no canonical opt-in file (public
+    tools only - a private "tool" may be a Track-1 skill instead of a hook, so a missing private
+    opt-in is silently skipped, matching relocate.py's prior behavior).
+    """
+    new_cmd = {}
+    for t in tools:
+        optin_path = Path(optins_dir) / f"{t}.json"
+        if not optin_path.exists():
+            if warn:
+                warn(f"no canonical opt-in for '{t}' - skipping that tool.")
+            continue
+        optin = get_expanded_optin(optin_path, config)
+        for evt, groups in optin.get('hooks', {}).items():
+            for grp in groups:
+                for h in grp.get('hooks', []):
+                    if 'command' in h:
+                        new_cmd[t] = h['command']
+    for t in private_tools:
+        optin_path = Path(private_optins_dir) / f"{t}.json"
+        if not optin_path.exists():
+            continue
+        optin = get_expanded_optin(optin_path, config)
+        for evt, groups in optin.get('hooks', {}).items():
+            for grp in groups:
+                for h in grp.get('hooks', []):
+                    if 'command' in h:
+                        new_cmd[t] = h['command']
+    return new_cmd
+
+
+def apply_hook_command_fixes(settings, new_cmd, all_tools, dry_run=False, log=None):
+    """Rewrite, in place, any hook command in `settings` (an already-loaded settings.json dict)
+    that references an opted-in tool's hook file (hooks/<tool>.ps1 or .py) to that tool's current
+    command from `new_cmd` (see build_new_cmd_map). Never adds, removes, or reorders unrelated
+    hooks. Returns True if anything changed (or would, under dry_run).
+    """
+    changed = False
+    for evt, groups in settings.get('hooks', {}).items():
+        for grp in groups:
+            for h in grp.get('hooks', []):
+                if 'command' not in h:
+                    continue
+                for t in all_tools:
+                    if t not in new_cmd:
+                        continue
+                    pattern = r'hooks[\\/]' + re.escape(t) + r'\.(ps1|py)'
+                    if re.search(pattern, h['command']) and h['command'] != new_cmd[t]:
+                        if log:
+                            verb = 'would change' if dry_run else 'change'
+                            log(f"  [{verb}] {t}")
+                            log(f"      from: {h['command']}")
+                            log(f"      to:   {new_cmd[t]}")
+                        h['command'] = new_cmd[t]
+                        changed = True
+    return changed
+
+
+def fix_skill_stubs(consumer_path, templates_dir, import_base, dry_run=False, log=None):
+    """Regenerate every installed .claude\\skills\\<name>\\SKILL.md stub whose content doesn't
+    match what materialize_skill_stub() would produce right now from the canonical
+    templates\\skills\\<name>\\SKILL.md source (design\\consumer_reconnect.md - closes a
+    pre-existing gap: stubs are baked with {{IMPORT_BASE}} at scaffold time and were never
+    revisited by anything, even on a single-machine rename). Skips a skill dir with no matching
+    canonical source (e.g. a private-tool-managed skill). Returns True if anything changed (or
+    would, under dry_run).
+    """
+    skills_dir = Path(consumer_path) / '.claude' / 'skills'
+    if not skills_dir.is_dir():
+        return False
+    changed = False
+    for skill_dir in sorted(skills_dir.iterdir()):
+        if not skill_dir.is_dir():
+            continue
+        stub_path = skill_dir / 'SKILL.md'
+        canon_path = Path(templates_dir) / 'skills' / skill_dir.name / 'SKILL.md'
+        if not stub_path.exists() or not canon_path.exists():
+            continue
+        expected = materialize_skill_stub(canon_path, import_base)
+        current = stub_path.read_text(encoding='utf-8')
+        if current != expected:
+            if log:
+                verb = 'would regenerate' if dry_run else 'regenerate'
+                log(f"  [{verb}] skill stub: {skill_dir.name}")
+            if not dry_run:
+                stub_path.write_text(expected, encoding='utf-8', newline='\n')
+            changed = True
+    return changed

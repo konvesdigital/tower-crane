@@ -5,6 +5,7 @@ registry_lib.py - shared consumers\\<slug>.md registry parser/writer (design\\mu
 
 Schema (2026-08 migration, replacing the old single `path:`/`host:` pair):
   scope: local | multi_machine
+  remote: <git remote URL> (optional, top-level - design\\consumer_reconnect.md)
   hosts:
     <host_id>:
       path: <absolute path, forward-slash form>
@@ -15,6 +16,14 @@ correction): registration sets it directly, but any tool that touches the regist
 correct it to `multi_machine` the moment 2+ hosts: entries exist, regardless of the declared
 value. reconcile_scope_floor() below is that correction, meant to be called by every script that
 walks the registry (check_tower_crane.py Pass B, relocate.py).
+
+`remote` (design\\consumer_reconnect.md) is a project-level property (sibling to `scope`/`owner`,
+not nested under any one host) recording the consumer's OWN git remote URL, captured once at first
+registration from `git remote get-url origin` when available. Deliberately static - seed-once, no
+continuous drift-check (see that design doc's rationale). Absent for a consumer registered before
+this field existed, or one with no git remote configured at registration time; `new_consumer.py`
+reads it to offer a clone-before-scaffold bootstrap when connecting an already-registered consumer
+to an empty target folder.
 
 Single source of truth for registry parsing - check_tower_crane.py, relocate.py,
 update_consumers.py, and broadcast_guidance.py all import parse_registry() from here instead of
@@ -42,7 +51,7 @@ def parse_registry(path):
     lines = re.split(r'\r?\n', m.group(1))
 
     obj = {
-        'name': None, 'scope': None, 'hosts': {}, 'owner': None, 'registered': None,
+        'name': None, 'scope': None, 'remote': None, 'hosts': {}, 'owner': None, 'registered': None,
         'opted_in': [], 'imported': [], 'private_opted_in': [], 'file': str(path),
     }
     section = None
@@ -56,6 +65,11 @@ def parse_registry(path):
         m1 = re.match(r'^scope:\s*(.+?)\s*$', line)
         if m1:
             obj['scope'] = m1.group(1)
+            section = None
+            continue
+        m1 = re.match(r'^remote:\s*(.+?)\s*$', line)
+        if m1:
+            obj['remote'] = m1.group(1)
             section = None
             continue
         m1 = re.match(r'^owner:\s*(.+?)\s*$', line)
@@ -227,3 +241,28 @@ def format_hosts_block(hosts):
         lines.append(f"    path: {entry['path']}")
         lines.append(f"    registered: {entry['registered']}")
     return '\n'.join(lines)
+
+
+def set_remote_if_absent(raw_text, remote):
+    """Adds a top-level `remote:` line (sibling to `scope:`, before `hosts:`) if this registry
+    entry doesn't already have one - design\\consumer_reconnect.md's seed-once backfill for a
+    consumer registered before the field existed. Never overwrites an existing `remote:` value.
+    Returns (new_text, was_added)."""
+    m = YAML_BLOCK_RE.search(raw_text)
+    if not m:
+        raise ValueError("no parseable yaml block")
+    yaml_text = m.group(1)
+    if re.search(r'(?m)^remote:\s*.+?\s*$', yaml_text):
+        return raw_text, False
+    lines = yaml_text.split('\n')
+    scope_idx = None
+    for i, line in enumerate(lines):
+        if re.match(r'^scope:\s*.+?\s*$', line):
+            scope_idx = i
+            break
+    if scope_idx is None:
+        raise ValueError("no scope: line found")
+    lines = lines[:scope_idx + 1] + [f'remote: {remote}'] + lines[scope_idx + 1:]
+    new_yaml_text = '\n'.join(lines)
+    new_raw = raw_text[:m.start(1)] + new_yaml_text + raw_text[m.end(1):]
+    return new_raw, True

@@ -33,12 +33,17 @@ CLAUDE.md, project_progress.md, FIRST_RUN.md, registry entry) now use LF line en
 import argparse
 import json
 import re
+import subprocess
 import sys
 from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from config_lib import get_shared_config, get_expanded_optin, materialize_skill_stub
+from config_lib import (
+    get_shared_config, get_expanded_optin, materialize_skill_stub,
+    build_new_cmd_map, apply_hook_command_fixes,
+)
+from relocate import fix_imports
 import registry_lib
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
@@ -95,6 +100,22 @@ def get_slug(name):
     return s
 
 
+def try_capture_remote(target_path):
+    """Best-effort `git remote get-url origin` from target_path's own clone, or None if there's
+    no .git\\ yet, no `origin` remote, or git isn't available - design\\consumer_reconnect.md's
+    `remote:` registry field is seed-once/best-effort, never required."""
+    if not (target_path / '.git').exists():
+        return None
+    try:
+        result = subprocess.run(['git', '-C', str(target_path), 'remote', 'get-url', 'origin'],
+                                 capture_output=True, text=True)
+    except OSError:
+        return None
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() or None
+
+
 def main():
     parser = argparse.ArgumentParser(description="Scaffold a new tower_crane consumer project.")
     parser.add_argument('--target-path', required=True, help="Absolute path to the new consumer's project root.")
@@ -122,6 +143,10 @@ def main():
                               "applies to an already-registered consumer's registry file - a slug collision "
                               "there always routes into an additive host-merge (design\\multi_machine_hub.md's "
                               "locked slug-collision routing), never a blind overwrite.")
+    parser.add_argument('--no-clone', action='store_true',
+                         help="design\\consumer_reconnect.md: when connecting an already-registered consumer to "
+                              "an empty target folder and its registry has a remote: on record, the default is "
+                              "to `git clone` it before scaffolding. Pass this to scaffold a blank folder instead.")
     args = parser.parse_args()
 
     target_path = Path(args.target_path)
@@ -175,6 +200,26 @@ def main():
             )
         already_connected_here = config['host_id'] in existing_consumer['hosts']
 
+    # Blank-folder bootstrap (design\consumer_reconnect.md): connecting an already-registered
+    # consumer whose target folder is genuinely empty and whose registry carries a remote: -
+    # clone before any scaffolding touches the folder. Ordering matters: cloning AFTER scaffolding
+    # would hit `refusing to merge unrelated histories`, or a same-path merge conflict in
+    # CLAUDE.md/settings.json/project_progress.md. Once cloned, the folder "already has files" and
+    # falls straight through to the same file-existence-keyed patch logic below as a physical copy
+    # would - no separate code path. Recovery (a corrupted/deleted local clone) reduces to this
+    # same path once the broken folder has been emptied first.
+    if existing_consumer is not None and not already_connected_here and not args.no_clone:
+        remote = existing_consumer.get('remote')
+        folder_empty = not target_path.exists() or (target_path.is_dir() and not any(target_path.iterdir()))
+        if remote and folder_empty:
+            print(f"Target folder is empty and '{project_name}' has a remote on record: {remote}")
+            print(f"  cloning before scaffolding: git clone {remote} {target_path}")
+            target_path.mkdir(parents=True, exist_ok=True)
+            result = subprocess.run(['git', 'clone', remote, str(target_path)], capture_output=True, text=True)
+            if result.returncode != 0:
+                raise RuntimeError(f"git clone of '{remote}' into {target_path} failed:\n{result.stderr}")
+            print("  cloned OK")
+
     # protocol pieces: filing + compliance + shared_resources mandatory; continuity default-on
     pieces = ['filing', 'compliance', 'shared_resources']
     if not args.no_continuity:
@@ -225,13 +270,27 @@ def main():
 
     # --- 2. settings.json (merge opt-in snippets) -------------------------------------------
     settings_path = claude_dir / 'settings.json'
-    if settings_path.exists():
+    settings_existed = settings_path.exists()
+    if settings_existed:
         settings = json.loads(settings_path.read_text(encoding='utf-8'))
         if settings is None:
             settings = {}
     else:
         settings = {}
     settings.setdefault('hooks', {})
+
+    if settings_existed and existing_consumer is not None:
+        # host-merge branch (design\consumer_reconnect.md): repoint any ALREADY-PRESENT hook
+        # command (from a physically-copied settings.json) for tools the registry already lists
+        # as opted-in, reusing relocate.py's own regeneration. Fixes the double-hook-firing risk:
+        # a stale other-machine-path entry and a freshly-appended current-path entry below would
+        # never match as duplicates under the exact-JSON dedup the append loop uses.
+        existing_tool_names = [o['name'] for o in existing_consumer['opted_in']]
+        existing_private_names = [o['name'] for o in existing_consumer['private_opted_in']]
+        stale_cmd = build_new_cmd_map(existing_tool_names, existing_private_names, config, OPTINS_DIR, PRIVATE_OPTINS_DIR)
+        if apply_hook_command_fixes(settings, stale_cmd, existing_tool_names + existing_private_names,
+                                     dry_run=False, log=print):
+            print(f"  patched stale hook command(s) in {settings_path}")
 
     # Every consumer reads canonical Track-1 skill/resume-check content straight out of
     # toolkit\templates (e.g. "Read {{IMPORT_BASE}}/filing.md in full") - that's outside the
@@ -276,27 +335,38 @@ def main():
 
     # --- 3. CLAUDE.md from template ----------------------------------------------------------
     claude_md_path = target_path / 'CLAUDE.md'
-    if claude_md_path.exists() and not args.force:
-        raise RuntimeError(f"CLAUDE.md already exists at {claude_md_path}. Use --force to overwrite.")
-
-    if not tools:
-        tools_list = '_No shared tools opted in yet._'
-    else:
-        tools_list = '\n'.join(
-            f"- `{t}` - {TOOL_BLURBS.get(t, 'see tower_crane MENU.md.')}" for t in tools
-        )
     protocol_imports = '\n'.join(f"@{import_base}/{p}.md" for p in import_pieces)
 
-    tmpl = TMPL_PATH.read_text(encoding='utf-8')
-    # strip the template's own leading HTML-comment header (documentation for maintainers, not consumers)
-    tmpl = re.sub(r'^\s*<!--.*?-->\s*', '', tmpl, count=1, flags=re.DOTALL)
-    claude_md = (tmpl
-                 .replace('{{PROJECT_NAME}}', project_name)
-                 .replace('{{DATE}}', scaffold_date)
-                 .replace('{{SHARED_TOOLS_LIST}}', tools_list)
-                 .replace('{{PROTOCOL_IMPORTS}}', protocol_imports))
-    write_utf8(claude_md_path, claude_md)
-    print(f"  wrote  {claude_md_path}")
+    if claude_md_path.exists() and existing_consumer is not None:
+        # host-merge branch (design\consumer_reconnect.md): patch only the @import lines in place
+        # via relocate.py's fix_imports(), instead of the old error-or-`--force` gate - `--force`
+        # used to be the only way past this check, and it also unconditionally reset
+        # project_progress.md to the blank skeleton. The project overview and everything else in
+        # CLAUDE.md is left untouched.
+        if fix_imports(target_path, import_pieces, import_base, dry_run=False):
+            print(f"  patched {claude_md_path} (@import lines only)")
+        else:
+            print(f"  skip   {claude_md_path} already current (@import lines match)")
+    elif claude_md_path.exists() and not args.force:
+        raise RuntimeError(f"CLAUDE.md already exists at {claude_md_path}. Use --force to overwrite.")
+    else:
+        if not tools:
+            tools_list = '_No shared tools opted in yet._'
+        else:
+            tools_list = '\n'.join(
+                f"- `{t}` - {TOOL_BLURBS.get(t, 'see tower_crane MENU.md.')}" for t in tools
+            )
+
+        tmpl = TMPL_PATH.read_text(encoding='utf-8')
+        # strip the template's own leading HTML-comment header (documentation for maintainers, not consumers)
+        tmpl = re.sub(r'^\s*<!--.*?-->\s*', '', tmpl, count=1, flags=re.DOTALL)
+        claude_md = (tmpl
+                     .replace('{{PROJECT_NAME}}', project_name)
+                     .replace('{{DATE}}', scaffold_date)
+                     .replace('{{SHARED_TOOLS_LIST}}', tools_list)
+                     .replace('{{PROTOCOL_IMPORTS}}', protocol_imports))
+        write_utf8(claude_md_path, claude_md)
+        print(f"  wrote  {claude_md_path}")
 
     # --- 3b. Track-1 skill stubs (toolkit-governed pieces only) ------------------------------
     for p in pieces:
@@ -307,7 +377,7 @@ def main():
             skill_dir = claude_dir / 'skills' / skill_name
             skill_dir.mkdir(parents=True, exist_ok=True)
             stub_path = skill_dir / 'SKILL.md'
-            if stub_path.exists() and not args.force:
+            if stub_path.exists() and not args.force and existing_consumer is None:
                 print(f"  skip   {stub_path} exists (use --force to overwrite)")
                 continue
             stub_content = materialize_skill_stub(stub_src, import_base)
@@ -320,7 +390,7 @@ def main():
         skill_dir = claude_dir / 'skills' / skill_name
         skill_dir.mkdir(parents=True, exist_ok=True)
         stub_path = skill_dir / 'SKILL.md'
-        if stub_path.exists() and not args.force:
+        if stub_path.exists() and not args.force and existing_consumer is None:
             print(f"  skip   {stub_path} exists (use --force to overwrite)")
             continue
         stub_content = materialize_skill_stub(stub_src, import_base)
@@ -335,7 +405,7 @@ def main():
         skill_dir = claude_dir / 'skills' / t
         skill_dir.mkdir(parents=True, exist_ok=True)
         stub_path = skill_dir / 'SKILL.md'
-        if stub_path.exists() and not args.force:
+        if stub_path.exists() and not args.force and existing_consumer is None:
             print(f"  skip   {stub_path} exists (use --force to overwrite)")
             continue
         write_utf8(stub_path, materialize_skill_stub(stub_src))
@@ -368,12 +438,21 @@ consumer registry.
             write_utf8(progress_path, progress)
             print(f"  wrote  {progress_path}")
 
-    # --- 5. FIRST_RUN.md ----------------------------------------------------------------------
-    first_run_path = target_path / 'FIRST_RUN.md'
-    if first_run_path.exists() and not args.force:
-        print("  skip   FIRST_RUN.md exists (use --force to overwrite)")
+    # --- 5. FIRST_RUN.md (brand-new projects only) --------------------------------------------
+    if existing_consumer is not None:
+        # design\consumer_reconnect.md: an already-registered consumer connecting a host was never
+        # a "first run" - its checklist (git init, fill in the overview placeholder) doesn't apply
+        # to a project that already has real history and a real overview. A one-line reminder
+        # replaces the file; FIRST_RUN.md is never (re)written in this branch.
+        if not (target_path / '.git').exists():
+            print(f"  note   no .git\\ found at {target_path} - run `git init` (or finish cloning) "
+                  "before your first session here.")
     else:
-        first_run = f"""# First Run - one-time setup for {project_name}
+        first_run_path = target_path / 'FIRST_RUN.md'
+        if first_run_path.exists() and not args.force:
+            print("  skip   FIRST_RUN.md exists (use --force to overwrite)")
+        else:
+            first_run = f"""# First Run - one-time setup for {project_name}
 
 Scaffolded from tower_crane on {scaffold_date}. Do these once, then delete this file.
 
@@ -386,8 +465,8 @@ Scaffolded from tower_crane on {scaffold_date}. Do these once, then delete this 
       is, who it's for, key constraints).
 - [ ] Delete this file (`FIRST_RUN.md`) once the above are done.
 """
-        write_utf8(first_run_path, first_run)
-        print(f"  wrote  {first_run_path}")
+            write_utf8(first_run_path, first_run)
+            print(f"  wrote  {first_run_path}")
 
     # --- 6a. registry entry --------------------------------------------------------------------
     if not tools:
@@ -410,10 +489,21 @@ Scaffolded from tower_crane on {scaffold_date}. Do these once, then delete this 
             raw = registry_path.read_text(encoding='utf-8')
             new_raw, was_present, host_count = registry_lib.add_host_to_text(
                 raw, config['host_id'], registry_path_forward_slash, scaffold_date)
+            # Backfill remote: (design\consumer_reconnect.md) if this consumer predates the field
+            # and this machine's own clone can supply it - seed-once, never overwrites a value
+            # that's already there.
+            if not existing_consumer.get('remote'):
+                captured_remote = try_capture_remote(target_path)
+                if captured_remote:
+                    new_raw, remote_added = registry_lib.set_remote_if_absent(new_raw, captured_remote)
+                    if remote_added:
+                        print(f"  note   backfilled remote: {captured_remote}")
             write_utf8(registry_path, new_raw)
             floor_note = ", scope -> multi_machine (2-host floor)" if host_count >= 2 else ""
             print(f"  wrote  {registry_path} (added hosts.{config['host_id']}, now {host_count} host(s){floor_note})")
     else:
+        captured_remote = try_capture_remote(target_path)
+        remote_line = f"remote: {captured_remote}\n" if captured_remote else ""
         hosts_yaml = registry_lib.format_hosts_block(
             {config['host_id']: {'path': registry_path_forward_slash, 'registered': scaffold_date}})
         registry = f"""# {project_name}
@@ -421,7 +511,7 @@ Scaffolded from tower_crane on {scaffold_date}. Do these once, then delete this 
 ```yaml
 name: {project_name}
 scope: {args.scope}
-{hosts_yaml}
+{remote_line}{hosts_yaml}
 owner: {config['identity']['git_user_name']}
 registered: {scaffold_date}
 {opted_in_yaml}
