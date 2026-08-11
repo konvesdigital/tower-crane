@@ -1,7 +1,9 @@
 # Fix 3 Checkpoint 2's mechanical merge-time gate (design\update_trust_review.md, Phase 3).
-# Runs scripts\check_agents_pr_gate.py against any PR touching AGENTS.md. Paired with
-# .github\CODEOWNERS (requires operator review on AGENTS.md) and branch protection on `main`
-# requiring both this check and that review before merge.
+# Runs scripts\check_agents_pr_gate.py against any PR touching AGENTS.md or one of its structural
+# companion files (agents_tools.md/agents_consumers.md/agents_change_requests.md/
+# agents_continuity.md - 2026-08-11 split). Paired with .github\CODEOWNERS (requires operator
+# review on all five files) and branch protection on `main` requiring both this check and that
+# review before merge.
 #
 # Branch protection is live on `main` as of the 2026-07-27 public flip: this check and
 # general-gate are both required status checks, CODEOWNERS review is required, admin bypass is
@@ -25,6 +27,10 @@ on:
     branches: [main]
     paths:
       - 'AGENTS.md'
+      - 'agents_tools.md'
+      - 'agents_consumers.md'
+      - 'agents_change_requests.md'
+      - 'agents_continuity.md'
 
 permissions:
   contents: read

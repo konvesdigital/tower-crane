@@ -4,6 +4,15 @@
 # protection needs a public repo, or a paid plan, to take effect on GitHub's Free tier).
 /AGENTS.md @konvesdigital
 
+# AGENTS.md's own structural companion files (2026-08-11 split, design\update_trust_review.md's
+# "Fix 3 single-file vs. split-into-pieces" row) - each holds procedural content that used to live
+# inside AGENTS.md itself and was covered by the line above. Same reviewer requirement, so a PR
+# touching only one of these can't merge unreviewed.
+/agents_tools.md @konvesdigital
+/agents_consumers.md @konvesdigital
+/agents_change_requests.md @konvesdigital
+/agents_continuity.md @konvesdigital
+
 # The gate infrastructure itself needs at least the same protection as what it guards - otherwise a
 # PR could silently edit a check to always pass, or remove this file's own restriction, defeating
 # Phase 3 entirely. Found live 2026-07-27 while building the file-surface classifier below.

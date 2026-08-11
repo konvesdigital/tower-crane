@@ -7,13 +7,25 @@ review - this script is the deterministic teeth that give Checkpoint 2 real subs
 human eyeballed it," mirroring check_tower_crane.py's PASS/WARN/FAIL discipline aimed at code.
 
 No-ops (prints "not applicable", exits 0) if the diff between --base-sha and --head-sha doesn't
-touch AGENTS.md at all - this gate only ever fires on the one file it's scoped to.
+touch AGENTS.md or one of its structural companion files at all - this gate only ever fires on the
+files it's scoped to.
+
+AGENTS.md's own 2026-08-11 split (design\\update_trust_review.md's "Fix 3 single-file vs.
+split-into-pieces" row) moved most of its procedure content into four companion files
+(COMPANION_FILES below) that AGENTS.md points to by plain filename, not @import - AGENTS.md itself
+stays the one file carrying frontmatter and the Standing Constraints section. Checks 1-3 are about
+that specific structure and stay scoped to AGENTS_FILE only; checks 4-6 are content-agnostic
+(a keyword scan, a line-count diff, a PR-body string check) and run against every file in
+ALL_GATED_FILES, so a PR touching only a companion still gets the same mechanical scrutiny a PR
+touching AGENTS.md itself always got.
 
 Six checks, split hard-fail (exit 1, blocks the status check) vs soft-flag (WARN, never fails the
 build - same convention as check_tower_crane.py) per the Decisions table in
 design\\update_trust_review.md:
   1. Filename invariant           HARD  - AGENTS.md must still exist, at that path, at head.
+                                           AGENTS_FILE only.
   2. Frontmatter schema           HARD  - the 4 required keys, correct shape, all present.
+                                           AGENTS_FILE only - the companions carry no frontmatter.
   3. Standing Constraints match   HARD  - reuses check_standing_constraints.py's exact-text compare;
                                            unconditional, no exceptions (Locked 2026-07-27 - corrects
                                            a build drift: the doc's original design always specified
@@ -24,17 +36,22 @@ design\\update_trust_review.md:
                                            tightening, so a blanket fail is the only version of "hard"
                                            that means anything. The amendment path is external to this
                                            script entirely: GitHub's own admin-override-merge action.
+                                           AGENTS_FILE only - no companion carries this section.
   4. Capability-vs-content        SOFT  - heuristic keyword scan; a heuristic can't safely hard-fail.
-  5. Diff-size gate               SOFT  - Locked threshold (2026-07-26): >60 changed lines of
-                                           AGENTS.md, or the file growing past its own declared
-                                           max_lines.
+                                           Runs against every touched file in ALL_GATED_FILES.
+  5. Diff-size gate               SOFT  - Locked threshold (2026-07-26): >60 changed lines of a
+                                           gated file. AGENTS_FILE additionally flags growing past
+                                           its own declared max_lines; the companions carry no such
+                                           declared cap, so only the flat line-count threshold
+                                           applies to them.
   6. Required PR trailer          HARD  - PR body must carry both authoring-assistant headings
                                            ("### Contributor statement" / "### Independent read")
-                                           whenever AGENTS.md is touched. This is the one check that
-                                           actually enforces Checkpoint 1 having been followed (or
-                                           its output manually reproduced) - everything else here is
-                                           advisory, so without this check Checkpoint 2 would have no
-                                           real teeth of its own beyond CODEOWNERS review.
+                                           whenever any file in ALL_GATED_FILES is touched. This is
+                                           the one check that actually enforces Checkpoint 1 having
+                                           been followed (or its output manually reproduced) -
+                                           everything else here is advisory, so without this check
+                                           Checkpoint 2 would have no real teeth of its own beyond
+                                           CODEOWNERS review.
 
 Reads the PR body from an environment variable (name given by --pr-body-env) rather than a CLI
 argument - PR titles/bodies are attacker-controlled text, and interpolating them directly into a
@@ -57,7 +74,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from check_standing_constraints import extract_section  # noqa: E402  (path insert above)
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
-TARGET_FILE = 'AGENTS.md'
+TARGET_FILE = 'AGENTS.md'  # AGENTS_FILE alias below - kept for checks 1-3, which are AGENTS.md-only
+AGENTS_FILE = TARGET_FILE
+COMPANION_FILES = [
+    'agents_tools.md', 'agents_consumers.md', 'agents_change_requests.md', 'agents_continuity.md',
+]
+ALL_GATED_FILES = [AGENTS_FILE] + COMPANION_FILES
 DIFF_SIZE_THRESHOLD = 60
 REQUIRED_TRAILERS = ['### Contributor statement', '### Independent read']
 
@@ -78,9 +100,10 @@ def show(ref, path):
     return proc.stdout if proc.returncode == 0 else None
 
 
-def touches_target(base_sha, head_sha):
-    proc = git(['diff', '--name-only', f'{base_sha}..{head_sha}', '--', TARGET_FILE])
-    return TARGET_FILE in proc.stdout.splitlines()
+def touched_gated_files(base_sha, head_sha):
+    proc = git(['diff', '--name-only', f'{base_sha}..{head_sha}', '--'] + ALL_GATED_FILES)
+    touched = set(proc.stdout.splitlines())
+    return [f for f in ALL_GATED_FILES if f in touched]
 
 
 # --- check 1: filename invariant -----------------------------------------------------------------
@@ -182,59 +205,66 @@ SUSPECT_TOKENS = [
 ]
 
 
-def check_capability_vs_content(base_sha, head_sha):
-    proc = git(['diff', f'{base_sha}..{head_sha}', '--', TARGET_FILE])
-    added_lines = [l[1:] for l in proc.stdout.splitlines() if l.startswith('+') and not l.startswith('+++')]
+def check_capability_vs_content(base_sha, head_sha, touched_files):
     hits = []
-    for line in added_lines:
-        lower = line.lower()
-        for token in SUSPECT_TOKENS:
-            if token in lower:
-                hits.append((token, line.strip()))
+    for path in touched_files:
+        proc = git(['diff', f'{base_sha}..{head_sha}', '--', path])
+        added_lines = [l[1:] for l in proc.stdout.splitlines()
+                       if l.startswith('+') and not l.startswith('+++')]
+        for line in added_lines:
+            lower = line.lower()
+            for token in SUSPECT_TOKENS:
+                if token in lower:
+                    hits.append((path, token, line.strip()))
     if not hits:
         report('PASS', "no added text suggests an undeclared capability.")
         return
     report('WARN', "added text mentions capability-like token(s) not obviously covered by the "
                    "declared 'capabilities:' list - reviewer should confirm the frontmatter still "
                    "matches what the new prose actually does:")
-    for token, line in hits[:10]:
-        print(f"  matched {token!r}: {line}")
+    for path, token, line in hits[:10]:
+        print(f"  {path}: matched {token!r}: {line}")
 
 
 # --- check 5: diff-size gate (soft) ---------------------------------------------------------------
-def check_diff_size(base_sha, head_sha, head_text, max_lines):
-    proc = git(['diff', '--numstat', f'{base_sha}..{head_sha}', '--', TARGET_FILE])
-    added = deleted = 0
-    for line in proc.stdout.splitlines():
-        parts = line.split('\t')
-        if len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit():
-            added += int(parts[0])
-            deleted += int(parts[1])
-    changed = added + deleted
-    head_line_count = len(head_text.splitlines())
-
+def check_diff_size(base_sha, head_sha, touched_files, max_lines):
     flagged = False
-    if changed > DIFF_SIZE_THRESHOLD:
-        report('WARN', f"diff touches {changed} line(s) of {TARGET_FILE} (+{added}/-{deleted}), "
-                       f"over the {DIFF_SIZE_THRESHOLD}-line soft-flag threshold.")
-        flagged = True
-    if max_lines is not None and head_line_count > max_lines:
-        report('WARN', f"{TARGET_FILE} is {head_line_count} line(s) at head, past its own declared "
-                       f"max_lines ({max_lines}).")
-        flagged = True
-    if not flagged:
-        report('PASS', f"diff size ({changed} line(s)) and file length ({head_line_count} line(s)) "
-                       "are within bounds.")
+    for path in touched_files:
+        proc = git(['diff', '--numstat', f'{base_sha}..{head_sha}', '--', path])
+        added = deleted = 0
+        for line in proc.stdout.splitlines():
+            parts = line.split('\t')
+            if len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit():
+                added += int(parts[0])
+                deleted += int(parts[1])
+        changed = added + deleted
+
+        path_flagged = False
+        if changed > DIFF_SIZE_THRESHOLD:
+            report('WARN', f"diff touches {changed} line(s) of {path} (+{added}/-{deleted}), "
+                           f"over the {DIFF_SIZE_THRESHOLD}-line soft-flag threshold.")
+            flagged = path_flagged = True
+        if path == AGENTS_FILE and max_lines is not None:
+            head_text = show(head_sha, path) or ''
+            head_line_count = len(head_text.splitlines())
+            if head_line_count > max_lines:
+                report('WARN', f"{path} is {head_line_count} line(s) at head, past its own declared "
+                               f"max_lines ({max_lines}).")
+                flagged = path_flagged = True
+        if not path_flagged:
+            report('PASS', f"{path}: diff size ({changed} line(s)) within bounds.")
+    return flagged
 
 
 # --- check 6: required PR trailer (hard) -----------------------------------------------------------
-def check_pr_trailer(pr_body):
+def check_pr_trailer(pr_body, touched_files):
     missing = [t for t in REQUIRED_TRAILERS if t not in (pr_body or '')]
     if missing:
         report('FAIL', f"PR body is missing required heading(s): {', '.join(missing)}. Any PR "
-                       f"touching {TARGET_FILE} must carry both the contributor's own statement and "
-                       "Claude's independent read (AGENTS.md's \"propose upstream\" step 2a-c) - "
-                       "this is the one check that actually enforces Checkpoint 1 was followed.")
+                       f"touching {', '.join(touched_files)} must carry both the contributor's own "
+                       "statement and Claude's independent read (AGENTS.md's \"propose upstream\" "
+                       "step 2a-c) - this is the one check that actually enforces Checkpoint 1 was "
+                       "followed.")
         return
     report('PASS', "PR body carries both required authoring-assistant headings.")
 
@@ -253,23 +283,32 @@ def main():
     print("=== check_agents_pr_gate.py ===")
     print(f"comparing {args.base_sha}..{args.head_sha}")
 
-    if not touches_target(args.base_sha, args.head_sha):
-        print(f"[N/A] this diff doesn't touch {TARGET_FILE} - gate not applicable, nothing to check.")
+    touched = touched_gated_files(args.base_sha, args.head_sha)
+    if not touched:
+        print(f"[N/A] this diff doesn't touch any of {', '.join(ALL_GATED_FILES)} - gate not "
+              "applicable, nothing to check.")
         sys.exit(0)
+    print(f"gated file(s) touched: {', '.join(touched)}")
 
-    base_text = show(args.base_sha, TARGET_FILE)
-    head_text = show(args.head_sha, TARGET_FILE)
+    max_lines = None
+    if AGENTS_FILE in touched:
+        base_text = show(args.base_sha, AGENTS_FILE)
+        head_text = show(args.head_sha, AGENTS_FILE)
 
-    if not check_filename_invariant(head_text):
-        print()
-        print(f"=== Summary: {COUNTS['PASS']} passed, {COUNTS['WARN']} warning(s), {COUNTS['FAIL']} failure(s) ===")
-        sys.exit(1)
+        if not check_filename_invariant(head_text):
+            print()
+            print(f"=== Summary: {COUNTS['PASS']} passed, {COUNTS['WARN']} warning(s), {COUNTS['FAIL']} failure(s) ===")
+            sys.exit(1)
 
-    max_lines = check_frontmatter_schema(head_text)
-    check_standing_constraints(base_text, head_text)
-    check_capability_vs_content(args.base_sha, args.head_sha)
-    check_diff_size(args.base_sha, args.head_sha, head_text, max_lines)
-    check_pr_trailer(os.environ.get(args.pr_body_env))
+        max_lines = check_frontmatter_schema(head_text)
+        check_standing_constraints(base_text, head_text)
+    else:
+        print(f"[N/A] {AGENTS_FILE} itself not touched - checks 1-3 (filename/frontmatter/Standing "
+              "Constraints, AGENTS.md-only) skipped.")
+
+    check_capability_vs_content(args.base_sha, args.head_sha, touched)
+    check_diff_size(args.base_sha, args.head_sha, touched, max_lines)
+    check_pr_trailer(os.environ.get(args.pr_body_env), touched)
 
     print()
     print(f"=== Summary: {COUNTS['PASS']} passed, {COUNTS['WARN']} warning(s), {COUNTS['FAIL']} failure(s) ===")

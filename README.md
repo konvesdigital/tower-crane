@@ -336,7 +336,7 @@ nothing leaving your machine:**
   project-specific, drop it in `hooks\`/`agents\`/`scripts\`, add a row + opt-in snippet to
   `MENU.md`. An automatic hook must exit code **2** with its failure report on **stderr** on a FAIL
   — any other exit code is silently non-blocking, so a real failure would never reach the agent.
-  Full steps: `AGENTS.md` ("Adding a new tool").
+  Full steps: `agents_tools.md` ("Adding a new tool").
 - **Refine a convention.** A purely additive or prose-only fix propagates to your own projects on
   their next session with no announcement, logged in the Work Log only — no need for the full
   change-request ceremony that a behavior-changing fix gets.
@@ -462,7 +462,10 @@ at `toolkit\AGENTS.md`), `toolkit\` (gitignored by this repo entirely).
 `capability_catalog.yaml` (the relationship map `"commands"`/`capability_relationships` draw from),
 `templates\` (shared prose + couriers), `scripts\` (maintainer tooling), `hooks\`/`agents\` (the
 executable tools), `CHANGELOG.md`, `config.example.json`/`config.local.json` (per-machine config,
-`.local` gitignored), `AGENTS.md` (the canonical operating instructions).
+`.local` gitignored), `AGENTS.md` (the canonical operating instructions — Standing Constraints,
+Purpose, and a trigger-phrase index only; the procedures it indexes live in its four companion
+files, `agents_tools.md`/`agents_consumers.md`/`agents_change_requests.md`/`agents_continuity.md`,
+each read only when its own trigger fires).
 
 ### Quick-start cheat sheet
 | I want to... | Do this |
