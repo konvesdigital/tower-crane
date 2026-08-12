@@ -232,6 +232,70 @@ def add_host_to_text(raw_text, host_id, path_str, registered_date):
     return new_raw, already_present, host_count_after
 
 
+def remove_host_from_text(raw_text, host_id):
+    """Inverse of add_host_to_text() - design\\disconnect.md's host-removal primitive. Removes a
+    `hosts.<host_id>` entry from a registry file's raw text. Also re-applies the 2-host floor in
+    reverse: if this removal brings the host count below 2, `scope:` auto-reverts to `local`
+    (symmetric with add_host_to_text's floor-up behavior) - a consumer that's no longer actually
+    on 2+ machines shouldn't keep claiming to be.
+
+    Returns (new_text, was_present, host_count_after). `host_count_after` of 0 means the caller
+    should hard-delete the registry file instead of writing new_text back (an entry with an empty
+    hosts: block is not a valid end state - disconnect.md's "hard delete, git history is the
+    record" decision, 2026-08-12). Raises ValueError if the file has no parseable yaml block or no
+    `hosts:` key.
+    """
+    m = YAML_BLOCK_RE.search(raw_text)
+    if not m:
+        raise ValueError("no parseable yaml block")
+    yaml_text = m.group(1)
+    lines = yaml_text.split('\n')
+
+    hosts_start = None
+    for i, line in enumerate(lines):
+        if re.match(r'^hosts:\s*$', line):
+            hosts_start = i
+            break
+    if hosts_start is None:
+        raise ValueError("no hosts: block found")
+    hosts_end = len(lines)
+    for i in range(hosts_start + 1, len(lines)):
+        if re.match(r'^\S', lines[i]):
+            hosts_end = i
+            break
+
+    block = lines[hosts_start + 1:hosts_end]
+    existing_ids = [mm.group(1) for l in block for mm in [re.match(r'^  (\S+):\s*$', l)] if mm]
+    was_present = host_id in existing_ids
+
+    if was_present:
+        entry_start = None
+        for i, line in enumerate(block):
+            if re.match(rf'^  {re.escape(host_id)}:\s*$', line):
+                entry_start = i
+                break
+        entry_end = len(block)
+        for i in range(entry_start + 1, len(block)):
+            if re.match(r'^  \S', block[i]):  # next host_id: line ends this one's entry
+                entry_end = i
+                break
+        block = block[:entry_start] + block[entry_end:]
+        lines = lines[:hosts_start + 1] + block + lines[hosts_end:]
+        hosts_end = hosts_start + 1 + len(block)
+
+    host_count_after = len(existing_ids) - (1 if was_present else 0)
+
+    if was_present and host_count_after < 2:
+        for i, line in enumerate(lines):
+            if re.match(r'^scope:\s*.+?\s*$', line):
+                lines[i] = 'scope: local'
+                break
+
+    new_yaml_text = '\n'.join(lines)
+    new_raw = raw_text[:m.start(1)] + new_yaml_text + raw_text[m.end(1):]
+    return new_raw, was_present, host_count_after
+
+
 def format_hosts_block(hosts):
     """Renders a hosts: dict (host_id -> {'path':.., 'registered':..}) as yaml lines, for a
     brand-new registry entry. `hosts` insertion order is preserved (Python dict semantics)."""

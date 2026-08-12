@@ -79,6 +79,10 @@ none of these are resident in this file.
   self-enabling, or changing a shared tool. Full: `agents_tools.md`.
 - **"connect project"** — registering a consumer (new scaffold, existing hand-copied project, or
   connecting another machine to an already-registered one). Full: `agents_consumers.md`.
+- **"disconnect project"** — reverses `connect_project` for one consumer (this machine only /
+  every other machine / everywhere). **"remove"** / **"uninstall"** — reverses `setup_machine` for
+  this whole machine (disconnects every consumer connected here, then clears this machine's own
+  hub state). Both require explicit confirmation before running — see `agents_consumers.md`.
 - Change-request tickets (filing round-trip, registration tickets, applying a fix, reverts) — the
   inbox is scanned every `"resume"` (step 7 below); full mechanics: `agents_change_requests.md`.
 - **"checkpoint"**, **"archive"**, **"update"**, **"propose upstream"**, **"curate shared

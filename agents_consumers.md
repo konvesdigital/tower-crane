@@ -1,7 +1,8 @@
-# Adding a consumer (AGENTS.md companion)
+# Adding / removing a consumer (AGENTS.md companion)
 
-Full mechanics for the `"connect project"` trigger named in `AGENTS.md`'s Procedures section.
-Read this file when that trigger fires — it is not preloaded.
+Full mechanics for the `"connect project"`, `"disconnect project"`, and `"remove"`/`"uninstall"`
+triggers named in `AGENTS.md`'s Procedures section. Read this file when any of those fire — it is
+not preloaded.
 
 ## Adding a consumer
 **Trigger: "connect project".** Ask new-from-scratch vs. existing project first, then always ask
@@ -45,3 +46,40 @@ repo's HEAD.
    same flow — empty the broken folder first, then run this same invocation.
 
 Either path: run `scripts\check_tower_crane.py` to confirm the consumer validates clean.
+
+## Disconnecting a consumer
+**Trigger: "disconnect project"** — reciprocal with `"connect project"`. Ask which mode if not
+already stated: **this machine only**, **every other machine** (keep this one), or **everywhere**.
+
+**Before running anything: show exactly what will be removed and get explicit go-ahead.** Name the
+consumer, the mode, which host(s) will be dropped from the registry, and — for this machine's own
+connection specifically — which local files in the consumer's own project folder will be stripped
+(`CLAUDE.md`'s `@import` lines, `.claude\settings.json`'s hook entries + the `Read` permission
+rule, every `.claude\skills\<name>\` directory). State the reversibility honestly: there's no
+dedicated undo, but running `"connect project"` again on the same path is the practical way back —
+it re-registers or host-merges correctly, just with a fresh `registered:`/`since:` date rather than
+restoring the old one, and a re-clone if the local folder is also gone. Don't imply a safety net
+that isn't actually there. Only proceed once the user has clearly said yes.
+
+Then run `scripts\disconnect_consumer.py --slug <slug> --mode this-only|all-but-this|all` from
+inside `toolkit\`. Deliberately NOT touched (say so in the summary, don't just skip silently): any
+`shared_resources\` adopted stub (its `hub-rel:` marker goes stale, doesn't break) and
+`COMPLIANCE_GUIDANCE.md`'s broadcast section. Full design: `design\disconnect.md`.
+
+## Removing this machine
+**Trigger: "remove" / "uninstall"** — reciprocal with `setup_machine`. Reverses this machine's
+setup entirely: disconnects every consumer connected here (this-only, so any other machine's own
+connection to the same consumer is untouched), then clears this machine's own gitignored state
+(`config.local.json`, `.claude\settings.local.json`, `.claude\self_hooks_status.md`,
+`.claude\automation_state.json`, `.claude\skills\`). Never touches `.claude\hooks\` (tracked
+personal content, not this hub's to delete) or the hub folder itself — physically deleting that,
+if wanted, is a manual step afterward, the same "can't finish mid-session" shape
+`setup_machine.md`'s own "Bootstrapping the outer hub" scenario already has.
+
+**Before running: list every consumer that will be disconnected here, by name, and get explicit
+go-ahead** — same discipline as above. State the reversal path honestly too: `setup_machine.md`
+run again on this machine, then reconnecting whichever consumers are wanted via `"connect
+project"` — a rebuild, not a restore.
+
+Then run `scripts\remove_hub.py` (no args — operates on this machine via its own
+`config.local.json`) from inside `toolkit\`. Full design: `design\disconnect.md`.

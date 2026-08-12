@@ -107,6 +107,25 @@ nodes:
     description: "Registers a new (scaffold) or existing (ticket) consumer"
     themes: []
 
+  - id: disconnect_consumer
+    trigger: "disconnect project"
+    context: hub
+    description: >-
+      Reverses connect_project for one consumer: this machine only, every other machine, or
+      everywhere. Cleans up the consumer's own local @import/hook/skill references when the host
+      being removed is this machine; a different host can only be cleaned on the registry side
+      from here.
+    themes: []
+
+  - id: remove_hub
+    trigger: "remove / uninstall"
+    context: hub
+    description: >-
+      Reverses setup_machine for this whole machine: disconnects every consumer connected here,
+      then clears this machine's own config.local.json/self-use state, so a later setup_machine
+      run here starts genuinely clean.
+    themes: []
+
   - id: process_ticket
     trigger: "implicit, \"resume\" scan / \"process requests\""
     context: hub
@@ -245,6 +264,24 @@ edges:
     b: process_ticket
     conditional: false
     note: null
+
+  - type: reciprocal
+    a: connect_project
+    b: disconnect_consumer
+    conditional: false
+    note: null
+
+  - type: reciprocal
+    a: setup_machine
+    b: remove_hub
+    conditional: false
+    note: null
+
+  - type: lifecycle-sibling
+    a: disconnect_consumer
+    b: remove_hub
+    conditional: false
+    note: "remove_hub loops disconnect_consumer (this-only mode) across every consumer connected on this machine, then clears this machine's own state"
 
   - type: lifecycle-sibling
     a: connect_project
