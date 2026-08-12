@@ -46,17 +46,17 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from config_lib import commit_consumer_changes, get_shared_config
+from config_lib import (
+    commit_consumer_changes, get_shared_config,
+    TC_IN_USE_HEADING, WORKFLOW_HEADING, DISCONNECTED_HEADING,
+    DISCONNECT_NOTES_FILENAME as NOTES_FILENAME,
+)
 import registry_lib
 from new_consumer import SKILL_PIECES, STANDALONE_SKILLS
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
 PROJECT_ROOT = SHARED_ROOT.parent
 CONSUMERS_DIR = PROJECT_ROOT / 'consumers'
-
-TC_IN_USE_HEADING = '## Tower Crane In Use'
-WORKFLOW_HEADING = '## Shared Workflow Protocol'
-NOTES_FILENAME = 'TOWER_CRANE_DISCONNECT_NOTES.md'
 
 
 def local_skill_names(consumer):
@@ -73,9 +73,6 @@ def local_skill_names(consumer):
     names.update(STANDALONE_SKILLS)
     names.update(o['name'] for o in consumer['private_opted_in'])
     return names
-
-
-DISCONNECTED_HEADING = '## Tower Crane (disconnected)'
 
 
 def replace_prose_sections(text, date, mode):

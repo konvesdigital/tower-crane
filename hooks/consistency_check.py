@@ -135,7 +135,9 @@ def check_file(path):
                 "lineno": node.lineno,
                 "arg_count": len(positional),
                 "min_args": len(positional) - len(args.defaults),
-                "arg_names": positional
+                "arg_names": positional,
+                "has_varargs": args.vararg is not None,
+                "has_varkw": args.kwarg is not None,
             }
             # Function name is also a defined name
             assigned_names[node.name] = node.lineno
@@ -203,8 +205,22 @@ def check_file(path):
                 fname = node.func.id
                 if fname in defined_functions:
                     defn = defined_functions[fname]
-                    # Count positional args passed (exclude **kwargs, *args)
-                    n_passed = len(node.args)
+                    # A call unpacking *args/**kwargs, or a def accepting *args/**kwargs, is too
+                    # dynamic for this simple count to reason about - skip rather than risk a
+                    # false positive.
+                    has_star_splat = any(isinstance(a, ast.Starred) for a in node.args)
+                    has_kwarg_splat = any(kw.arg is None for kw in node.keywords)
+                    if has_star_splat or has_kwarg_splat or defn["has_varargs"] or defn["has_varkw"]:
+                        continue
+                    # A keyword arg matching a named parameter counts toward coverage same as a
+                    # positional one - a required param passed by keyword (e.g. `f(1, 2, c=3)`)
+                    # is a valid call, not a missing-arg mismatch. A keyword name not among the
+                    # def's positional-or-keyword params (kwonly-after-*, or a typo) means this
+                    # simple model doesn't understand the call - skip rather than guess.
+                    keyword_names = [kw.arg for kw in node.keywords]
+                    if any(k not in defn["arg_names"] for k in keyword_names):
+                        continue
+                    n_passed = len(node.args) + len(keyword_names)
                     n_expected = defn["arg_count"]
                     n_min = defn["min_args"]
                     arity_desc = str(n_expected) if n_min == n_expected else f"{n_min}-{n_expected}"

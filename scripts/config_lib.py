@@ -397,15 +397,25 @@ def fix_adopted_stub_paths(consumer_path, hub_root, dry_run=False, log=None):
     return changed
 
 
+# Shared markers between disconnect_consumer.py (writer) and new_consumer.py (reader, for the
+# reconnect branch - design\\disconnect.md "Reconnect-after-disconnect gap"): the two live sections
+# a disconnect replaces, the pointer heading it replaces them with, and the breadcrumb notes file
+# that heading points to. Centralized here (rather than defined in disconnect_consumer.py alone) so
+# the two scripts can't drift out of sync on what marker text means "disconnected".
+TC_IN_USE_HEADING = '## Tower Crane In Use'
+WORKFLOW_HEADING = '## Shared Workflow Protocol'
+DISCONNECTED_HEADING = '## Tower Crane (disconnected)'
+DISCONNECT_NOTES_FILENAME = 'TOWER_CRANE_DISCONNECT_NOTES.md'
+
 # The Tower-Crane-owned paths inside a consumer project's own working tree - every hub-invoked
 # writer (relocate.py, update_consumers.py) is confirmed to touch only these three (fix_imports/
 # apply_piece -> CLAUDE.md; apply_hook_command_fixes/apply_hook/apply_private -> .claude/settings.json;
 # fix_skill_stubs/fix_adopted_stub_paths/apply_skill/apply_piece/apply_private -> .claude/skills/).
-# disconnect_consumer.py additionally writes TOWER_CRANE_DISCONNECT_NOTES.md (the generated
-# breadcrumb manifest a this-only local cleanup leaves behind) - harmless no-op for the other two
-# writers, which never touch that filename.
+# disconnect_consumer.py additionally writes DISCONNECT_NOTES_FILENAME (the generated breadcrumb
+# manifest a this-only local cleanup leaves behind) - harmless no-op for the other two writers,
+# which never touch that filename.
 CONSUMER_OWNED_PATHS = ('CLAUDE.md', '.claude/settings.json', '.claude/skills',
-                         'TOWER_CRANE_DISCONNECT_NOTES.md')
+                         DISCONNECT_NOTES_FILENAME)
 
 
 def commit_consumer_changes(consumer_path, message, log=None):

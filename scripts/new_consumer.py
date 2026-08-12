@@ -42,6 +42,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config_lib import (
     get_shared_config, get_expanded_optin, materialize_skill_stub,
     build_new_cmd_map, apply_hook_command_fixes,
+    TC_IN_USE_HEADING, WORKFLOW_HEADING, DISCONNECTED_HEADING, DISCONNECT_NOTES_FILENAME,
 )
 from relocate import fix_imports
 import registry_lib
@@ -114,6 +115,52 @@ def try_capture_remote(target_path):
     if result.returncode != 0:
         return None
     return result.stdout.strip() or None
+
+
+def detect_git_state(target_path):
+    """(has_git, remote) at target_path - design\\disconnect.md's "Reconnect-after-disconnect gap":
+    a reconnecting project (or a never-connected one someone already set up by hand) may already
+    have git, or a remote, or both - never assume a consumer starts from nothing. Drives
+    build_first_run_checklist() so the checklist only ever lists what's actually still missing."""
+    has_git = (Path(target_path) / '.git').exists()
+    return has_git, (try_capture_remote(target_path) if has_git else None)
+
+
+def strip_disconnected_section(text):
+    """Inverse of disconnect_consumer.py's replace_prose_sections(): removes the
+    DISCONNECTED_HEADING section (that heading through the next '## ' heading, or EOF) instead of
+    replacing it. Returns (new_text, found) - found is False if the marker isn't present."""
+    idx_start = text.find(DISCONNECTED_HEADING)
+    if idx_start == -1:
+        return text, False
+    idx_end = len(text)
+    for m in re.finditer(r'(?m)^## .+$', text):
+        if m.start() > idx_start:
+            idx_end = m.start()
+            break
+    return text[:idx_start] + text[idx_end:], True
+
+
+def build_first_run_checklist(has_git, remote, needs_overview):
+    """Only lists what's actually still needed, based on detected state - a reconnecting project
+    (real history, usually real git/remote already) and a never-connected one someone already set
+    up by hand both deserve an accurate checklist, not a blanket "start from scratch" one
+    (design\\disconnect.md "Reconnect-after-disconnect gap")."""
+    items = []
+    if not has_git:
+        items.append("- [ ] `git init` and make an initial commit. (The scaffolder does NOT run "
+                      "git - this is a one-time local step.)")
+    if not remote:
+        items.append("- [ ] Optional: add a git remote (e.g. on GitHub) if you want off-machine "
+                      "backup/sync - not required for Tower Crane itself.")
+    items.append("- [ ] On first launch, **accept the one-time CLAUDE.md import-approval dialog** "
+                 "if prompted. Declining disables `@import` permanently, so the shared protocol "
+                 "pieces (filing, compliance, shared_resources, continuity) won't load.")
+    if needs_overview:
+        items.append("- [ ] Fill in the project-overview placeholder near the top of `CLAUDE.md` "
+                      "(what this project is, who it's for, key constraints).")
+    items.append("- [ ] Delete this file (`FIRST_RUN.md`) once the above are done.")
+    return items
 
 
 def main():
@@ -337,6 +384,15 @@ def main():
     claude_md_path = target_path / 'CLAUDE.md'
     protocol_imports = '\n'.join(f"@{import_base}/{p}.md" for p in import_pieces)
 
+    # Reconnect detection (design\disconnect.md "Reconnect-after-disconnect gap"): a previously
+    # disconnected project has no registry entry (existing_consumer is None, same as brand new)
+    # but its CLAUDE.md still carries the DISCONNECTED_HEADING pointer disconnect_consumer.py
+    # wrote. That's a recognized, safe-to-automate shape - not the ambiguous collision the
+    # --force gate below exists to protect against.
+    is_reconnect = False
+    if claude_md_path.exists() and existing_consumer is None:
+        is_reconnect = DISCONNECTED_HEADING in claude_md_path.read_text(encoding='utf-8')
+
     if claude_md_path.exists() and existing_consumer is not None:
         # host-merge branch (design\consumer_reconnect.md): patch only the @import lines in place
         # via relocate.py's fix_imports(), instead of the old error-or-`--force` gate - `--force`
@@ -347,6 +403,35 @@ def main():
             print(f"  patched {claude_md_path} (@import lines only)")
         else:
             print(f"  skip   {claude_md_path} already current (@import lines match)")
+    elif claude_md_path.exists() and is_reconnect:
+        # Strip the disconnected-pointer section and re-append the live sections, preserving
+        # everything else (the real project overview, any hand-added content) untouched. Reuses
+        # the same template the brand-new branch below renders from, sliced to just the two live
+        # sections (TC_IN_USE_HEADING onward) so the project-name/overview-placeholder lines at
+        # the top of the template are never applied over real content.
+        text, _ = strip_disconnected_section(claude_md_path.read_text(encoding='utf-8'))
+        if not tools:
+            tools_list = '_No shared tools opted in yet._'
+        else:
+            tools_list = '\n'.join(
+                f"- `{t}` - {TOOL_BLURBS.get(t, 'see tower_crane MENU.md.')}" for t in tools
+            )
+        tmpl = TMPL_PATH.read_text(encoding='utf-8')
+        tmpl = re.sub(r'^\s*<!--.*?-->\s*', '', tmpl, count=1, flags=re.DOTALL)
+        live_idx = tmpl.find(TC_IN_USE_HEADING)
+        live_sections = tmpl[live_idx:] if live_idx != -1 else f"{TC_IN_USE_HEADING}\n\n{WORKFLOW_HEADING}\n\n"
+        live_sections = (live_sections
+                          .replace('{{DATE}}', scaffold_date)
+                          .replace('{{SHARED_TOOLS_LIST}}', tools_list)
+                          .replace('{{PROTOCOL_IMPORTS}}', protocol_imports))
+        text = text.rstrip('\n') + '\n\n' + live_sections
+        write_utf8(claude_md_path, text)
+        print(f"  wrote  {claude_md_path} (reconnected: removed disconnected-pointer section, "
+              f"re-added Tower Crane In Use / Shared Workflow Protocol sections)")
+        notes_path = target_path / DISCONNECT_NOTES_FILENAME
+        if notes_path.exists():
+            notes_path.unlink()
+            print(f"  removed {notes_path} (superseded - connection is live again)")
     elif claude_md_path.exists() and not args.force:
         raise RuntimeError(f"CLAUDE.md already exists at {claude_md_path}. Use --force to overwrite.")
     else:
@@ -438,7 +523,7 @@ consumer registry.
             write_utf8(progress_path, progress)
             print(f"  wrote  {progress_path}")
 
-    # --- 5. FIRST_RUN.md (brand-new projects only) --------------------------------------------
+    # --- 5. FIRST_RUN.md (brand-new + reconnect only; never for host-merge) --------------------
     if existing_consumer is not None:
         # design\consumer_reconnect.md: an already-registered consumer connecting a host was never
         # a "first run" - its checklist (git init, fill in the overview placeholder) doesn't apply
@@ -448,23 +533,24 @@ consumer registry.
             print(f"  note   no .git\\ found at {target_path} - run `git init` (or finish cloning) "
                   "before your first session here.")
     else:
+        # Checklist is built from actually-detected state, not assumed from scratch
+        # (design\disconnect.md "Reconnect-after-disconnect gap") - a reconnecting project (real
+        # history) or a never-connected one someone already set up by hand may already have git
+        # and/or a remote. needs_overview is False only for reconnect: the real overview already
+        # exists and was left untouched above.
+        has_git, remote = detect_git_state(target_path)
         first_run_path = target_path / 'FIRST_RUN.md'
         if first_run_path.exists() and not args.force:
             print("  skip   FIRST_RUN.md exists (use --force to overwrite)")
         else:
-            first_run = f"""# First Run - one-time setup for {project_name}
-
-Scaffolded from tower_crane on {scaffold_date}. Do these once, then delete this file.
-
-- [ ] `git init` and make an initial commit. (The scaffolder does NOT run git - this is a
-      one-time local step.)
-- [ ] On first launch, **accept the one-time CLAUDE.md import-approval dialog.** Declining
-      disables `@import` permanently, so the shared protocol pieces (filing, compliance,
-      shared_resources, continuity) won't load.
-- [ ] Fill in the project-overview placeholder near the top of `CLAUDE.md` (what this project
-      is, who it's for, key constraints).
-- [ ] Delete this file (`FIRST_RUN.md`) once the above are done.
-"""
+            needs_overview = not is_reconnect
+            checklist = build_first_run_checklist(has_git, remote, needs_overview)
+            heading = "Reconnected via tower_crane on" if is_reconnect else "Scaffolded from tower_crane on"
+            first_run = (
+                f"# First Run - one-time setup for {project_name}\n\n"
+                f"{heading} {scaffold_date}. Do these once, then delete this file.\n\n"
+                + '\n'.join(checklist) + '\n'
+            )
             write_utf8(first_run_path, first_run)
             print(f"  wrote  {first_run_path}")
 

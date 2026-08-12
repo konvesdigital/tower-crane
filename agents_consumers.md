@@ -22,7 +22,11 @@ repo's HEAD.
    `@import` lines and files a `register` ticket here (per `agents_change_requests.md`'s
    "Registration tickets" section — that's where the local/multi_machine question actually gets
    asked and recorded, since the consumer-side session filing the ticket has no `config.local.json`
-   access to know its own `host_id`).
+   access to know its own `host_id`). **Routing check first:** if the target `CLAUDE.md` already
+   contains `## Tower Crane (disconnected)`, this is NOT this case — it's a previously
+   disconnected project, not a project that was never Tower-Crane-shaped. Route through item 4
+   below instead (direct `new_consumer.py` invocation from this hub session), never through
+   `register.md`.
 3. **Already registered, connecting another machine** — same `new_consumer.py` invocation as #1,
    pointed at wherever this project lives on THIS machine. The slug collision is detected
    automatically and routes into an additive `hosts.<this_host_id>` merge instead of erroring or
@@ -44,6 +48,29 @@ repo's HEAD.
    remote either, fall back to asking them to get the files onto this machine themselves (copy or
    clone) before repeating this same invocation. Recovering a lost/corrupted local clone is the
    same flow — empty the broken folder first, then run this same invocation.
+4. **Reconnecting a previously disconnected project** — same `new_consumer.py` invocation as #1,
+   pointed at the project's existing local folder (its registry entry is gone — a full disconnect
+   hard-deletes it — but the local files, including real project history, are still there).
+   `new_consumer.py` detects the `## Tower Crane (disconnected)` marker in `CLAUDE.md`, strips just
+   that section, and re-appends the live "Tower Crane In Use" / "Shared Workflow Protocol" sections
+   — everything else in `CLAUDE.md` (the real project overview, any hand-added content) is left
+   untouched, and the stale `TOWER_CRANE_DISCONNECT_NOTES.md` is deleted (superseded — the
+   connection is live again). Never needs `--force`; this is a recognized shape, not the ambiguous
+   collision that gate exists to protect against. A fresh registry entry is written (new
+   `registered:`/`since:` date — not a restore of the old one, matching `design\disconnect.md`'s
+   "not a true undo" framing). `FIRST_RUN.md`'s checklist (see below) only lists what a project in
+   this position actually still needs — usually just re-accepting the import-approval dialog, since
+   git/a remote/the overview are almost always already there.
+
+**`FIRST_RUN.md`'s checklist adapts to what's actually detected**, for item 1 and item 4 alike —
+never assumed from scratch (design\disconnect.md "Reconnect-after-disconnect gap"). It checks for
+an existing `.git\` and an existing `origin` remote at the target path before writing the
+checklist: a `git init` line is only included if `.git\` is genuinely missing, a remote-setup line
+is offered as optional only if none is configured, and the overview-placeholder line is included
+only for a genuinely brand-new project (item 4 preserves the real overview, so it's skipped there).
+This covers every combination honestly — a never-connected project someone already `git init`'d and
+pushed to GitHub by hand gets a checklist with almost nothing left to do; a reconnecting project
+with git removed for some reason gets told to reinitialize it, same as a brand-new one would.
 
 Either path: run `scripts\check_tower_crane.py` to confirm the consumer validates clean.
 
