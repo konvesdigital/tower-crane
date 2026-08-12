@@ -401,7 +401,11 @@ def fix_adopted_stub_paths(consumer_path, hub_root, dry_run=False, log=None):
 # writer (relocate.py, update_consumers.py) is confirmed to touch only these three (fix_imports/
 # apply_piece -> CLAUDE.md; apply_hook_command_fixes/apply_hook/apply_private -> .claude/settings.json;
 # fix_skill_stubs/fix_adopted_stub_paths/apply_skill/apply_piece/apply_private -> .claude/skills/).
-CONSUMER_OWNED_PATHS = ('CLAUDE.md', '.claude/settings.json', '.claude/skills')
+# disconnect_consumer.py additionally writes TOWER_CRANE_DISCONNECT_NOTES.md (the generated
+# breadcrumb manifest a this-only local cleanup leaves behind) - harmless no-op for the other two
+# writers, which never touch that filename.
+CONSUMER_OWNED_PATHS = ('CLAUDE.md', '.claude/settings.json', '.claude/skills',
+                         'TOWER_CRANE_DISCONNECT_NOTES.md')
 
 
 def commit_consumer_changes(consumer_path, message, log=None):
