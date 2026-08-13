@@ -104,7 +104,7 @@ nodes:
   - id: connect_project
     trigger: "connect project"
     context: hub
-    description: "Registers a new (scaffold) or existing (ticket) consumer"
+    description: "Registers a new (scaffold), existing hand-copied (adopted in place), or already-registered-elsewhere (host-merge) consumer"
     themes: []
 
   - id: disconnect_consumer
@@ -137,12 +137,6 @@ nodes:
     context: consumer
     description: "Reports a bug, proposes shared content, or checks a ticket — a proposal ticket is itself a push toward the hub"
     themes: [push-outward]
-
-  - id: register
-    trigger: "read register.md and follow it"
-    context: consumer
-    description: "Stages a registration ticket to join the platform"
-    themes: []
 
   - id: setup_machine
     trigger: "read setup_machine.md and follow it"
@@ -284,12 +278,6 @@ edges:
     note: "remove_hub loops disconnect_consumer (this-only mode) across every consumer connected on this machine, then clears this machine's own state"
 
   - type: lifecycle-sibling
-    a: connect_project
-    b: register
-    conditional: false
-    note: "existing-project path only — register.md is the existing-hand-copied-project route into the same registration outcome connect_project reaches for a brand-new project"
-
-  - type: lifecycle-sibling
     a: process_ticket
     b: filing
     conditional: false
@@ -359,7 +347,7 @@ path:
   - hub_commands       # 4
   - self_hooks         # 5
   - setup_automation   # 6
-  - connect_project    # 7 (alternate route for an existing project: `register` instead — same destination, not a separate step)
+  - connect_project    # 7 (also covers an existing hand-copied project — adopted in place, no separate step)
   - commands           # 8
   - save               # 9
   - browse             # 10

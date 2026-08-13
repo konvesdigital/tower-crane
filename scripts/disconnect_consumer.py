@@ -341,15 +341,19 @@ def main():
 
     registry_path = CONSUMERS_DIR / f"{args.slug}.md"
     if not registry_path.exists():
-        raise SystemExit(f"No registry entry for '{args.slug}' at {registry_path}.")
+        raise SystemExit(f"No registry entry for '{args.slug}' at {registry_path}. See "
+                          "toolkit\\troubleshoot_project_connection.md if the project's CLAUDE.md "
+                          "still looks like it's connected.")
     consumer = registry_lib.parse_registry(registry_path)
     if consumer is None:
-        raise SystemExit(f"{registry_path} isn't parseable.")
+        raise SystemExit(f"{registry_path} isn't parseable. See "
+                          "toolkit\\troubleshoot_project_connection.md.")
 
     if args.mode in ('this-only', 'all-but-this') and this_host not in consumer['hosts']:
         raise SystemExit(f"'{args.slug}' has no hosts.{this_host} entry on this machine - "
                           f"'{args.mode}' requires this machine to be connected. Known hosts: "
-                          f"{', '.join(consumer['hosts']) or '(none)'}")
+                          f"{', '.join(consumer['hosts']) or '(none)'}. See "
+                          "toolkit\\troubleshoot_project_connection.md if that looks wrong.")
 
     if args.mode == 'this-only':
         targets = [this_host]

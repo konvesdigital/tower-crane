@@ -21,6 +21,16 @@ tracks the public konvesdigital/tower-crane repo. MENU.md's "In use by" column w
 2026-07-28 after it was found writing real consumer/client names into that public-repo-tracked
 file - see project_progress.md.
 
+Recognized existing-CLAUDE.md shapes, each handled non-destructively (see the "CLAUDE.md from
+template" section below): a registered consumer connecting another host (host-merge, patches
+@import lines only), a disconnected project reconnecting (strips the DISCONNECTED_HEADING marker,
+re-appends the live sections), and an unregistered hand-copied project with no Tower Crane content
+at all (adoption - appends the live sections to whatever's already there). This third shape used to
+require copying templates\\register.md into the target project and filing a ticket back here from
+a separate session; that courier is retired (2026-08-12, design\\disconnect.md's deferred
+"register.md's fate" note) now that this script can just be run directly from a hub session, the
+same as every other shape.
+
 This script does NOT run git - git init + first commit is a FIRST_RUN.md step in the new project.
 
 OS-reach Tier 2 port of new_consumer.ps1 (design\\portability.md, "OS-reach Tier 2: full
@@ -243,7 +253,8 @@ def main():
         if existing_consumer is None:
             raise RuntimeError(
                 f"Consumer '{slug}' already registered ({registry_path}) but its yaml block "
-                "isn't parseable - fix it by hand before scaffolding here."
+                "isn't parseable - fix it by hand before scaffolding here. See "
+                "toolkit\\troubleshoot_project_connection.md if the corruption's cause isn't obvious."
             )
         already_connected_here = config['host_id'] in existing_consumer['hosts']
 
@@ -264,7 +275,10 @@ def main():
             target_path.mkdir(parents=True, exist_ok=True)
             result = subprocess.run(['git', 'clone', remote, str(target_path)], capture_output=True, text=True)
             if result.returncode != 0:
-                raise RuntimeError(f"git clone of '{remote}' into {target_path} failed:\n{result.stderr}")
+                raise RuntimeError(
+                    f"git clone of '{remote}' into {target_path} failed:\n{result.stderr}\n"
+                    "See toolkit\\troubleshoot_project_connection.md's 'git clone ... failed' row."
+                )
             print("  cloned OK")
 
     # protocol pieces: filing + compliance + shared_resources mandatory; continuity default-on
@@ -393,6 +407,22 @@ def main():
     if claude_md_path.exists() and existing_consumer is None:
         is_reconnect = DISCONNECTED_HEADING in claude_md_path.read_text(encoding='utf-8')
 
+    # Adoption detection (register.md's subsumption, 2026-08-12 - design\disconnect.md's deferred
+    # "register.md's fate" note): an existing hand-copied project that was never put through
+    # new_consumer.py/register.md at all has a CLAUDE.md with no TC_IN_USE_HEADING and no
+    # protocol-piece @import line - troubleshoot_project_connection.md's "no Tower Crane content at
+    # all" shape, register.md's actual original target case. Recognized and safe to automate the
+    # same way reconnect is: append, never overwrite - never routed through register.md, which is
+    # retired (its no-hub-access scenario was already retired by design\local_first_reframe.md, and
+    # every other recognized shape here already runs straight from a hub session with no ticket).
+    is_adoption = False
+    if claude_md_path.exists() and existing_consumer is None and not is_reconnect:
+        existing_text = claude_md_path.read_text(encoding='utf-8')
+        has_import_line = bool(re.search(
+            r'(?m)^@\S+/(filing_resume_check|compliance|shared_resources_resume_check|'
+            r'continuity_resume_check)\.md\s*$', existing_text))
+        is_adoption = TC_IN_USE_HEADING not in existing_text and not has_import_line
+
     if claude_md_path.exists() and existing_consumer is not None:
         # host-merge branch (design\consumer_reconnect.md): patch only the @import lines in place
         # via relocate.py's fix_imports(), instead of the old error-or-`--force` gate - `--force`
@@ -403,13 +433,16 @@ def main():
             print(f"  patched {claude_md_path} (@import lines only)")
         else:
             print(f"  skip   {claude_md_path} already current (@import lines match)")
-    elif claude_md_path.exists() and is_reconnect:
-        # Strip the disconnected-pointer section and re-append the live sections, preserving
-        # everything else (the real project overview, any hand-added content) untouched. Reuses
-        # the same template the brand-new branch below renders from, sliced to just the two live
-        # sections (TC_IN_USE_HEADING onward) so the project-name/overview-placeholder lines at
-        # the top of the template are never applied over real content.
-        text, _ = strip_disconnected_section(claude_md_path.read_text(encoding='utf-8'))
+    elif claude_md_path.exists() and (is_reconnect or is_adoption):
+        # Reconnect: strip the disconnected-pointer section first, preserving everything else.
+        # Adoption: no marker to strip, just append to the existing content as-is. Either way,
+        # reuses the same template the brand-new branch below renders from, sliced to just the two
+        # live sections (TC_IN_USE_HEADING onward) so the project-name/overview-placeholder lines
+        # at the top of the template are never applied over real content.
+        if is_reconnect:
+            text, _ = strip_disconnected_section(claude_md_path.read_text(encoding='utf-8'))
+        else:
+            text = claude_md_path.read_text(encoding='utf-8')
         if not tools:
             tools_list = '_No shared tools opted in yet._'
         else:
@@ -426,14 +459,27 @@ def main():
                           .replace('{{PROTOCOL_IMPORTS}}', protocol_imports))
         text = text.rstrip('\n') + '\n\n' + live_sections
         write_utf8(claude_md_path, text)
-        print(f"  wrote  {claude_md_path} (reconnected: removed disconnected-pointer section, "
-              f"re-added Tower Crane In Use / Shared Workflow Protocol sections)")
-        notes_path = target_path / DISCONNECT_NOTES_FILENAME
-        if notes_path.exists():
-            notes_path.unlink()
-            print(f"  removed {notes_path} (superseded - connection is live again)")
+        if is_reconnect:
+            print(f"  wrote  {claude_md_path} (reconnected: removed disconnected-pointer section, "
+                  f"re-added Tower Crane In Use / Shared Workflow Protocol sections)")
+            notes_path = target_path / DISCONNECT_NOTES_FILENAME
+            if notes_path.exists():
+                notes_path.unlink()
+                print(f"  removed {notes_path} (superseded - connection is live again)")
+        else:
+            print(f"  wrote  {claude_md_path} (adopted: appended Tower Crane In Use / Shared "
+                  f"Workflow Protocol sections to existing content - register.md's former "
+                  f"target case, now handled directly)")
     elif claude_md_path.exists() and not args.force:
-        raise RuntimeError(f"CLAUDE.md already exists at {claude_md_path}. Use --force to overwrite.")
+        raise RuntimeError(
+            f"CLAUDE.md already exists at {claude_md_path} but doesn't match a recognized shape "
+            "(no registry entry, not the disconnected-project marker, and it already carries some "
+            "Tower Crane content - filing_resume_check/compliance/shared_resources_resume_check/"
+            "continuity_resume_check imports or the 'Tower Crane In Use' heading). This usually "
+            f"means registry drift: real content is present but consumers\\{slug}.md is missing. "
+            "See toolkit\\troubleshoot_project_connection.md ('Registry entry missing but CLAUDE.md "
+            "still looks live') before using --force."
+        )
     else:
         if not tools:
             tools_list = '_No shared tools opted in yet._'
@@ -499,13 +545,47 @@ def main():
     # --- 4. project_progress.md skeleton (continuity only) -----------------------------------
     if not args.no_continuity:
         progress_path = target_path / 'project_progress.md'
-        if progress_path.exists() and not args.force:
+        if progress_path.exists() and is_adoption:
+            # register.md's own Step 3: if project_progress.md already exists, leave it - just
+            # note the migration. Insert right after the "## Work Log" heading (newest-first
+            # convention); if that heading is missing (an unusual pre-existing file), fall back to
+            # appending a new section rather than guessing at unfamiliar structure.
+            note = (f"### {scaffold_date}\n"
+                    "Migrated onto the tower_crane platform (`scripts/new_consumer.py`'s adoption "
+                    "branch - register.md's former target case): replaced pasted workflow prose "
+                    "with `@import` lines, no ticket round-trip needed.\n\n")
+            text = progress_path.read_text(encoding='utf-8')
+            marker = '## Work Log'
+            idx = text.find(marker)
+            if idx != -1:
+                nl = text.find('\n', idx)
+                insert_at = nl + 1 if nl != -1 else len(text)
+                # skip a following blank line so the note lands immediately under the heading
+                while insert_at < len(text) and text[insert_at] == '\n':
+                    insert_at += 1
+                text = text[:insert_at] + note + text[insert_at:]
+            else:
+                text = text.rstrip('\n') + '\n\n## Work Log\n' + note
+            write_utf8(progress_path, text)
+            print(f"  updated {progress_path} (prepended migration note to Work Log)")
+        elif progress_path.exists() and not args.force:
             print("  skip   project_progress.md exists (use --force to overwrite)")
         else:
+            status_line = (f"_Migrated onto tower_crane {scaffold_date} via "
+                            "`scripts/new_consumer.py`'s adoption branch. Fill in on the next "
+                            "working session._" if is_adoption else
+                            f"_New project scaffolded {scaffold_date}. Fill this in on the first "
+                            "working session._")
+            work_log_line = (f"Migrated onto the tower_crane platform (`scripts/new_consumer.py`'s "
+                              "adoption branch): replaced pasted workflow prose with `@import` "
+                              "lines. Registered in the shared consumer registry." if is_adoption else
+                              "Project scaffolded from tower_crane (`scripts/new_consumer.py`): "
+                              "`.claude/settings.json`, `CLAUDE.md` with protocol imports, this "
+                              "file, and `FIRST_RUN.md`. Registered in the shared consumer registry.")
             progress = f"""# Project Progress
 
 ## Current Status
-_New project scaffolded {scaffold_date}. Fill this in on the first working session._
+{status_line}
 
 ## Next Up
 - [ ] Complete the `FIRST_RUN.md` checklist (git init, accept import dialog, fill overview).
@@ -516,9 +596,7 @@ _New project scaffolded {scaffold_date}. Fill this in on the first working sessi
 
 ## Work Log (newest first - say "archive" anytime to move old, settled entries into project_progress_archive.md)
 ### {scaffold_date}
-Project scaffolded from tower_crane (`scripts/new_consumer.py`): `.claude/settings.json`,
-`CLAUDE.md` with protocol imports, this file, and `FIRST_RUN.md`. Registered in the shared
-consumer registry.
+{work_log_line}
 """
             write_utf8(progress_path, progress)
             print(f"  wrote  {progress_path}")
@@ -536,16 +614,21 @@ consumer registry.
         # Checklist is built from actually-detected state, not assumed from scratch
         # (design\disconnect.md "Reconnect-after-disconnect gap") - a reconnecting project (real
         # history) or a never-connected one someone already set up by hand may already have git
-        # and/or a remote. needs_overview is False only for reconnect: the real overview already
-        # exists and was left untouched above.
+        # and/or a remote. needs_overview is False for reconnect and adoption alike: both preserve
+        # a real pre-existing overview untouched above.
         has_git, remote = detect_git_state(target_path)
         first_run_path = target_path / 'FIRST_RUN.md'
         if first_run_path.exists() and not args.force:
             print("  skip   FIRST_RUN.md exists (use --force to overwrite)")
         else:
-            needs_overview = not is_reconnect
+            needs_overview = not (is_reconnect or is_adoption)
             checklist = build_first_run_checklist(has_git, remote, needs_overview)
-            heading = "Reconnected via tower_crane on" if is_reconnect else "Scaffolded from tower_crane on"
+            if is_reconnect:
+                heading = "Reconnected via tower_crane on"
+            elif is_adoption:
+                heading = "Adopted onto tower_crane on"
+            else:
+                heading = "Scaffolded from tower_crane on"
             first_run = (
                 f"# First Run - one-time setup for {project_name}\n\n"
                 f"{heading} {scaffold_date}. Do these once, then delete this file.\n\n"

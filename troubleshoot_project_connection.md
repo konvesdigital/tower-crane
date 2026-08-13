@@ -19,29 +19,23 @@ after those are ruled out, and only with the user's explicit go-ahead, per the s
 
 | Error you see | Likely cause | Try first |
 |---|---|---|
-| `new_consumer.py`: "CLAUDE.md already exists... Use --force to overwrite" | `CLAUDE.md` exists but isn't in a shape `new_consumer.py` recognizes (no registry entry, no `## Tower Crane (disconnected)` marker) | See "CLAUDE.md exists but nothing recognizes it" below |
+| `new_consumer.py`: "CLAUDE.md already exists ... doesn't match a recognized shape" | Registry drift: the file already carries real Tower Crane content (a `## Tower Crane In Use` heading or a protocol-piece `@import` line), but there's no `consumers\<slug>.md` entry to explain it. (A `CLAUDE.md` with genuinely *no* Tower Crane content at all, or the `## Tower Crane (disconnected)` marker, is no longer an error — `new_consumer.py` handles both automatically now.) | See "Registry entry missing but CLAUDE.md still looks live" below |
 | `disconnect_consumer.py`: "No registry entry for '\<slug>' at \<path>" | Registry entry (`consumers\<slug>.md`) is missing entirely, but the project's `CLAUDE.md` may still show live Tower Crane content | See "Registry entry missing but CLAUDE.md still looks live" below |
 | `disconnect_consumer.py`: "'\<slug>' has no hosts.\<host> entry on this machine" | The registry file exists (other hosts may still be listed) but *this machine's* `hosts.<host_id>` block was stripped | Same remedy as above, narrower scope — restore/add just this host's block |
 | `disconnect_consumer.py`: "\<registry_path> isn't parseable" | The registry entry's yaml block is corrupted (bad hand-edit, merge conflict markers left in, etc.) | Fix the yaml by hand, or restore the whole file from git history (same technique as below) |
 | `new_consumer.py`: "git clone of '\<remote>' into \<path> failed" | The registry's recorded `remote:` is stale, private without this machine's credentials, or deleted | Confirm the remote URL still resolves (`git ls-remote <url>`); if not, ask the user for the current one, or fall back to `--no-clone` + manual copy |
 
-## CLAUDE.md exists but nothing recognizes it
+## CLAUDE.md exists and nothing recognizes it — this is registry drift
 
-`new_consumer.py` only auto-handles two shapes of an existing `CLAUDE.md`: no registry entry *and*
-no Tower Crane content at all (brand new), or no registry entry *and* the
-`## Tower Crane (disconnected)` marker (reconnect). Anything else — hand-written prose that was
-never Tower-Crane-shaped, or live Tower Crane content with no registry entry to explain it — falls
-through to the `--force` guard.
-
-**First, figure out which of the two it actually is** — read the `CLAUDE.md`:
-- **No Tower Crane content at all** (no `## Tower Crane In Use`, no `@import` lines, no
-  disconnected marker): this is `register.md`'s actual target case, not a `new_consumer.py` gap.
-  Copy `templates\register.md` into the project root and follow it from a session running *in that
-  project* — it inventories whatever's there, adds imports non-destructively, and files a
-  registration ticket back here. Don't reach for `--force`.
-- **Live `## Tower Crane In Use` / `@import` lines already present, but no registry entry**: this
-  is registry drift, not a missing-conversion problem — see the next section. The local content is
-  probably already correct; it's the registry that's out of sync, not `CLAUDE.md`.
+`new_consumer.py` auto-handles three shapes of an existing `CLAUDE.md`, no `--force` needed for
+any of them: no registry entry *and* no Tower Crane content at all (adoption — register.md's old
+target case, subsumed 2026-08-12), no registry entry *and* the `## Tower Crane (disconnected)`
+marker (reconnect), and a registered consumer connecting another host (host-merge). Anything else
+— live `## Tower Crane In Use` / protocol-piece `@import` lines already present, but no
+`consumers\<slug>.md` entry to explain them — is registry drift, not a missing-conversion problem,
+and falls through to the `--force` guard rather than being auto-resolved: the local content is
+probably already correct, it's the registry that's out of sync, and guessing wrong here risks
+silently adopting content from an unrelated project. See the next section.
 
 ## Registry entry missing but CLAUDE.md still looks live
 
@@ -78,11 +72,8 @@ Once a registry entry with the right `hosts.<host_id>` block exists:
 between what was hand-authored and what's really there surfaces as a deviation finding, which
 serves as a free correctness check on the repair.
 
-## Not built yet
+## Wired in (2026-08-12)
 
-Nothing currently detects these situations automatically or points here on its own — this file has
-to be found and read manually today. A future pass could wire `new_consumer.py`'s and
-`disconnect_consumer.py`'s fatal-error messages to name this file directly ("...see
-`troubleshoot_project_connection.md`"), or add a `"fix connection"` trigger that reads it
-proactively. Deliberately not built now (scoped as a documentation-only pass) — tracked in
-`project_progress.md`'s Next Up.
+`new_consumer.py`'s and `disconnect_consumer.py`'s fatal-error messages now name this file
+directly. Not yet built: a `"fix connection"` trigger that reads it proactively before an error is
+even hit.

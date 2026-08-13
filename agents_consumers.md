@@ -17,16 +17,23 @@ repo's HEAD.
    `consistency_check`, imports `filing` + `compliance` + `continuity`. Flags: `-Tools @()` for no
    hooks, `-NoContinuity` to skip, `-Force` to overwrite. Does NOT run git — the new project's first
    session does that via its `FIRST_RUN.md`.
-2. **Existing (hand-copied) project** — the human copies `templates\register.md` into that
-   project's root and tells its agent to follow it; that agent swaps pasted workflow prose for
-   `@import` lines and files a `register` ticket here (per `agents_change_requests.md`'s
-   "Registration tickets" section — that's where the local/multi_machine question actually gets
-   asked and recorded, since the consumer-side session filing the ticket has no `config.local.json`
-   access to know its own `host_id`). **Routing check first:** if the target `CLAUDE.md` already
-   contains `## Tower Crane (disconnected)`, this is NOT this case — it's a previously
-   disconnected project, not a project that was never Tower-Crane-shaped. Route through item 4
-   below instead (direct `new_consumer.py` invocation from this hub session), never through
-   `register.md`.
+2. **Existing (hand-copied) project, never Tower-Crane-shaped** — same `scripts\new_consumer.py`
+   invocation as #1, pointed at the project's existing local folder, run directly from this hub
+   session (register.md's old courier-and-ticket detour is retired — this used to require copying
+   that file into the target project and filing a ticket back here from a separate session).
+   `new_consumer.py` detects a `CLAUDE.md` with no `## Tower Crane In Use`
+   heading and no protocol-piece `@import` line and treats it as a recognized, safe-to-automate
+   shape: the entire existing file (project overview, any hand-added content) is left untouched
+   and the live "Tower Crane In Use" / "Shared Workflow Protocol" sections are appended, the same
+   way item 4's reconnect branch works. Before invoking it, inventory the project by hand first:
+   read `.claude\settings.json` for any hook already pointing at `tower_crane\hooks\` and pass
+   those tool names via `--tools` so they land in the registry's `opted_in:` list. Also ask **local
+   to this machine only, or available to all connected machines?** the same as #1 (`--scope`).
+   **Routing check first:** if the target `CLAUDE.md` already contains `## Tower Crane
+   (disconnected)`, this is NOT this case — it's a previously disconnected project; route through
+   item 4 instead. If it already carries live Tower Crane content but no registry entry, that's
+   registry drift, not adoption — `new_consumer.py` refuses to guess and points at
+   `troubleshoot_project_connection.md` instead of silently forcing a match.
 3. **Already registered, connecting another machine** — same `new_consumer.py` invocation as #1,
    pointed at wherever this project lives on THIS machine. The slug collision is detected
    automatically and routes into an additive `hosts.<this_host_id>` merge instead of erroring or
