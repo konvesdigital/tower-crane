@@ -105,7 +105,8 @@ def replace_prose_sections(text, date, mode):
 
 
 def write_disconnect_notes(target_path, date, mode, host_id, n_imports, removed_hooks,
-                            had_read_rule, removed_skills, sections_replaced, log):
+                            had_read_rule, removed_skills, sections_replaced, log,
+                            original_registered=None):
     """Write TOWER_CRANE_DISCONNECT_NOTES.md - designed so reading THIS FILE ALONE gives a 100%
     complete list of every trace Tower Crane leaves behind in a consumer project after a
     this-machine disconnect, including a cross-reference back to CLAUDE.md's own short pointer
@@ -166,12 +167,15 @@ def write_disconnect_notes(target_path, date, mode, host_id, n_imports, removed_
                       f"untouched rather than guessed at. This file is therefore the only place "
                       f"this disconnect is recorded at a glance - check `CLAUDE.md` by hand too.")
 
+    registered_note = f" Originally registered with Tower Crane: **{original_registered}**." \
+        if original_registered else ""
+
     text = (
         f"# Tower Crane — Disconnect Notes\n\n"
         f"Generated automatically by `disconnect_consumer.py` on {date} (mode: {mode}, host: "
         f"`{host_id}`). This file is meant to be the complete index of every trace Tower Crane "
         f"left behind in this project after disconnecting — read this file alone and you "
-        f"have the full picture; nothing else needs following to find more.\n\n"
+        f"have the full picture; nothing else needs following to find more.{registered_note}\n\n"
         f"## Removed by this disconnect\n\n"
         + "\n".join(removed_lines) + "\n\n"
         f"## Left behind deliberately (not touched by this command)\n\n"
@@ -273,7 +277,8 @@ def strip_local_references(target_path, consumer, config, mode, log):
             log(f"  removed {skill_dir}")
 
     write_disconnect_notes(target_path, date, mode, config['host_id'], n_imports, removed_hooks,
-                            had_read_rule, removed_skills, sections_replaced, log)
+                            had_read_rule, removed_skills, sections_replaced, log,
+                            original_registered=consumer.get('registered'))
 
     commit_msg = f"Tower Crane: disconnected via 'disconnect project' (mode: {mode})"
     result = commit_consumer_changes(target_path, commit_msg, log=log)

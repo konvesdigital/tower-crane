@@ -63,21 +63,32 @@ repo's HEAD.
    — everything else in `CLAUDE.md` (the real project overview, any hand-added content) is left
    untouched, and the stale `TOWER_CRANE_DISCONNECT_NOTES.md` is deleted (superseded — the
    connection is live again). Never needs `--force`; this is a recognized shape, not the ambiguous
-   collision that gate exists to protect against. A fresh registry entry is written (new
-   `registered:`/`since:` date — not a restore of the old one, matching `design\connect_disconnect.md`'s
-   "not a true undo" framing). `FIRST_RUN.md`'s checklist (see below) only lists what a project in
-   this position actually still needs — usually just re-accepting the import-approval dialog, since
-   git/a remote/the overview are almost always already there.
+   collision that gate exists to protect against. A fresh registry entry is written, but the
+   original `registered:` date is recovered where possible rather than always stamped with today
+   (`design\connect_disconnect.md`'s "per-file principle reframe" — read from a surviving
+   `TOWER_CRANE_DISCONNECT_NOTES.md`, else the oldest hub-git-log commit touching
+   `consumers\<slug>.md`, else today as a last resort). The per-host `since:` date is still always
+   today, since that genuinely reflects when *this host* connected. `FIRST_RUN.md`'s checklist (see
+   below) only lists what a project in this position actually still needs — usually just
+   re-accepting the import-approval dialog, since git/a remote/the overview are almost always
+   already there.
 
-**`FIRST_RUN.md`'s checklist adapts to what's actually detected**, for item 1 and item 4 alike —
-never assumed from scratch (design\connect_disconnect.md "Reconnect-after-disconnect gap"). It checks for
-an existing `.git\` and an existing `origin` remote at the target path before writing the
-checklist: a `git init` line is only included if `.git\` is genuinely missing, a remote-setup line
-is offered as optional only if none is configured, and the overview-placeholder line is included
-only for a genuinely brand-new project (item 4 preserves the real overview, so it's skipped there).
-This covers every combination honestly — a never-connected project someone already `git init`'d and
-pushed to GitHub by hand gets a checklist with almost nothing left to do; a reconnecting project
-with git removed for some reason gets told to reinitialize it, same as a brand-new one would.
+**Every file `new_consumer.py` touches decides its own fate from its own most-direct signal — a
+per-file model, not a shared classification tied to specific numbered items above**
+(`design\connect_disconnect.md`'s "per-file principle reframe"): `.claude\settings.json` and
+`.claude\skills\*` key off their own path's existence; `CLAUDE.md` decides its own content from
+its own signal chain (does *this file* carry the disconnected marker, or does a surviving
+`TOWER_CRANE_DISCONNECT_NOTES.md` prove it was connected before); `project_progress.md` keys on
+its own presence alone (present → always preserved with a dated note, absent → skeleton built);
+`TOWER_CRANE_DISCONNECT_NOTES.md` is deleted unconditionally the moment a connection succeeds,
+regardless of which branch fired; `FIRST_RUN.md`'s overview-placeholder line asks whether
+`CLAUDE.md` itself existed before this run, not the reconnect/adoption classification. It also
+checks for an existing `.git\` and an existing `origin` remote at the target path before writing
+the checklist: a `git init` line is only included if `.git\` is genuinely missing, a remote-setup
+line is offered as optional only if none is configured. This covers every combination honestly —
+a never-connected project someone already `git init`'d and pushed to GitHub by hand gets a
+checklist with almost nothing left to do; a reconnecting project with git removed for some reason
+gets told to reinitialize it, same as a brand-new one would.
 
 Either path: run `scripts\check_tower_crane.py` to confirm the consumer validates clean.
 

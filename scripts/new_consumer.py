@@ -151,6 +151,24 @@ def strip_disconnected_section(text):
     return text[:idx_start] + text[idx_end:], True
 
 
+def find_oldest_registry_commit_date(slug):
+    """Best-effort: date of the OLDEST commit touching consumers/<slug>.md in the hub's own git
+    history - fallback when the notes file doesn't carry the field. Local to new_consumer.py, not
+    reused from check_tower_crane.py's --diagnose (design\\connect_disconnect.md's rejected-
+    alternatives note: importing that tool would pull its whole import graph into every plain
+    scaffold invocation). Returns None on any failure (no git, empty history, never registered,
+    shallow clone) - never raises."""
+    try:
+        proc = subprocess.run(
+            ['git', '-C', str(PROJECT_ROOT), 'log', '--format=%ci', '--', f'consumers/{slug}.md'],
+            capture_output=True, text=True)
+    except OSError:
+        return None
+    if proc.returncode != 0 or not proc.stdout.strip():
+        return None
+    return proc.stdout.strip().splitlines()[-1][:10]  # oldest is last (git log is newest-first)
+
+
 def build_first_run_checklist(has_git, remote, needs_overview):
     """Only lists what's actually still needed, based on detected state - a reconnecting project
     (real history, usually real git/remote already) and a never-connected one someone already set
@@ -400,14 +418,27 @@ def main():
     claude_md_path = target_path / 'CLAUDE.md'
     protocol_imports = '\n'.join(f"@{import_base}/{p}.md" for p in import_pieces)
 
+    # Per-file principle reframe (design\connect_disconnect.md): claude_md_existed is captured
+    # ONCE, before any write, and is the one signal other files below should consult about
+    # CLAUDE.md's prior state - never is_reconnect/is_adoption themselves, which are CLAUDE.md's
+    # own content-driven classification and can legitimately be True even when CLAUDE.md itself
+    # doesn't exist (a hand-removed DISCONNECTED_HEADING with the notes file still present).
+    claude_md_existed = claude_md_path.exists()
+    notes_path = target_path / DISCONNECT_NOTES_FILENAME
+    notes_existed = notes_path.exists()
+
     # Reconnect detection (design\connect_disconnect.md "Reconnect-after-disconnect gap"): a previously
     # disconnected project has no registry entry (existing_consumer is None, same as brand new)
-    # but its CLAUDE.md still carries the DISCONNECTED_HEADING pointer disconnect_consumer.py
-    # wrote. That's a recognized, safe-to-automate shape - not the ambiguous collision the
-    # --force gate below exists to protect against.
+    # but either still carries the DISCONNECTED_HEADING pointer in CLAUDE.md, or - if that marker
+    # was hand-removed - the surviving TOWER_CRANE_DISCONNECT_NOTES.md is itself durable evidence
+    # of a prior connection (fixes the orphan bug: without this OR, a hand-stripped marker with the
+    # notes file intact misrouted into the adoption branch and the notes file was never cleaned
+    # up). Either way this is a recognized, safe-to-automate shape - not the ambiguous collision
+    # the --force gate below exists to protect against.
     is_reconnect = False
-    if claude_md_path.exists() and existing_consumer is None:
-        is_reconnect = DISCONNECTED_HEADING in claude_md_path.read_text(encoding='utf-8')
+    if existing_consumer is None:
+        has_marker = claude_md_existed and DISCONNECTED_HEADING in claude_md_path.read_text(encoding='utf-8')
+        is_reconnect = has_marker or notes_existed
 
     # Adoption detection (register.md's subsumption, 2026-08-12 - design\connect_disconnect.md's deferred
     # "register.md's fate" note): an existing hand-copied project that was never put through
@@ -464,10 +495,6 @@ def main():
         if is_reconnect:
             print(f"  wrote  {claude_md_path} (reconnected: removed disconnected-pointer section, "
                   f"re-added Tower Crane In Use / Shared Workflow Protocol sections)")
-            notes_path = target_path / DISCONNECT_NOTES_FILENAME
-            if notes_path.exists():
-                notes_path.unlink()
-                print(f"  removed {notes_path} (superseded - connection is live again)")
         else:
             print(f"  wrote  {claude_md_path} (adopted: appended Tower Crane In Use / Shared "
                   f"Workflow Protocol sections to existing content - register.md's former "
@@ -501,6 +528,25 @@ def main():
                      .replace('{{PROTOCOL_IMPORTS}}', protocol_imports))
         write_utf8(claude_md_path, claude_md)
         print(f"  wrote  {claude_md_path}")
+
+    # --- 3a. recover original registered: date on reconnect, then clean up the stale notes file --
+    # Per-file principle reframe (design\connect_disconnect.md): TOWER_CRANE_DISCONNECT_NOTES.md
+    # needs no classification of its own - if present at the moment a connection succeeds, its
+    # contents are stale by definition, regardless of which CLAUDE.md branch fired above (covers
+    # host-merge too). The date recovery must run BEFORE the delete below, since it reads the file.
+    recovered_registered_date = None
+    if is_reconnect:
+        if notes_existed:
+            m = re.search(r'Originally registered with Tower Crane:\s*\*\*([\d-]+)\*\*',
+                           notes_path.read_text(encoding='utf-8'))
+            if m:
+                recovered_registered_date = m.group(1)
+        if recovered_registered_date is None:
+            recovered_registered_date = find_oldest_registry_commit_date(slug)
+
+    if notes_path.exists():
+        notes_path.unlink()
+        print(f"  removed {notes_path} (stale as of this connection - superseded)")
 
     # --- 3b. Track-1 skill stubs (toolkit-governed pieces only) ------------------------------
     for p in pieces:
@@ -548,15 +594,27 @@ def main():
     # --- 4. project_progress.md skeleton (continuity only) -----------------------------------
     if not args.no_continuity:
         progress_path = target_path / 'project_progress.md'
-        if progress_path.exists() and is_adoption:
-            # register.md's own Step 3: if project_progress.md already exists, leave it - just
-            # note the migration. Insert right after the "## Work Log" heading (newest-first
-            # convention); if that heading is missing (an unusual pre-existing file), fall back to
-            # appending a new section rather than guessing at unfamiliar structure.
-            note = (f"### {scaffold_date}\n"
-                    "Migrated onto the tower_crane platform (`scripts/new_consumer.py`'s adoption "
-                    "branch - register.md's former target case): replaced pasted workflow prose "
-                    "with `@import` lines, no ticket round-trip needed.\n\n")
+        # Per-file principle reframe (design\connect_disconnect.md): gated on progress_path's OWN
+        # presence alone, not on is_adoption - present always preserves + notes (Principle B, no
+        # --force override escape hatch here, a deliberate behavior narrowing versus the old
+        # is_adoption-only condition); absent always builds the skeleton (Principle A). Wording is
+        # tri-state and purely cosmetic.
+        if progress_path.exists():
+            if is_reconnect:
+                note_text = ("Reconnected via the tower_crane platform (`scripts/new_consumer.py`'s "
+                              "reconnect branch): re-added the live Tower Crane In Use / Shared "
+                              "Workflow Protocol sections, no ticket round-trip needed.")
+            elif is_adoption:
+                note_text = ("Migrated onto the tower_crane platform (`scripts/new_consumer.py`'s "
+                              "adoption branch - register.md's former target case): replaced pasted "
+                              "workflow prose with `@import` lines, no ticket round-trip needed.")
+            else:
+                note_text = ("Re-scaffolded via `scripts/new_consumer.py` - existing "
+                              "`project_progress.md` content preserved as-is.")
+            # Insert right after the "## Work Log" heading (newest-first convention); if that
+            # heading is missing (an unusual pre-existing file), fall back to appending a new
+            # section rather than guessing at unfamiliar structure.
+            note = f"### {scaffold_date}\n{note_text}\n\n"
             text = progress_path.read_text(encoding='utf-8')
             marker = '## Work Log'
             idx = text.find(marker)
@@ -570,9 +628,7 @@ def main():
             else:
                 text = text.rstrip('\n') + '\n\n## Work Log\n' + note
             write_utf8(progress_path, text)
-            print(f"  updated {progress_path} (prepended migration note to Work Log)")
-        elif progress_path.exists() and not args.force:
-            print("  skip   project_progress.md exists (use --force to overwrite)")
+            print(f"  updated {progress_path} (prepended dated note to Work Log)")
         else:
             status_line = (f"_Migrated onto tower_crane {scaffold_date} via "
                             "`scripts/new_consumer.py`'s adoption branch. Fill in on the next "
@@ -617,14 +673,17 @@ def main():
         # Checklist is built from actually-detected state, not assumed from scratch
         # (design\connect_disconnect.md "Reconnect-after-disconnect gap") - a reconnecting project (real
         # history) or a never-connected one someone already set up by hand may already have git
-        # and/or a remote. needs_overview is False for reconnect and adoption alike: both preserve
-        # a real pre-existing overview untouched above.
+        # and/or a remote. needs_overview asks CLAUDE.md's own pre-run existence directly
+        # (claude_md_existed), not the is_reconnect/is_adoption flags alone (per-file principle
+        # reframe, design\connect_disconnect.md) - is_reconnect can be True purely from the notes
+        # file surviving even when CLAUDE.md itself is genuinely gone, in which case a real
+        # overview WAS lost and this checklist line must still appear.
         has_git, remote = detect_git_state(target_path)
         first_run_path = target_path / 'FIRST_RUN.md'
         if first_run_path.exists() and not args.force:
             print("  skip   FIRST_RUN.md exists (use --force to overwrite)")
         else:
-            needs_overview = not (is_reconnect or is_adoption)
+            needs_overview = not (claude_md_existed and (is_reconnect or is_adoption))
             checklist = build_first_run_checklist(has_git, remote, needs_overview)
             if is_reconnect:
                 heading = "Reconnected via tower_crane on"
@@ -685,7 +744,7 @@ name: {project_name}
 scope: {args.scope}
 {remote_line}{hosts_yaml}
 owner: {config['identity']['git_user_name']}
-registered: {scaffold_date}
+registered: {recovered_registered_date or scaffold_date}
 {opted_in_yaml}
 {imported_yaml}
 {private_opted_in_yaml}
