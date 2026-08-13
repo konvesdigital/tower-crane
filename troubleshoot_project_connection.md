@@ -68,7 +68,7 @@ table would have shown: Category A — heading present, no live import, no marke
 unrecognized combination); Category B — a `"Tower Crane: disconnected"` commit in the consumer's
 own repo. Reasoning from B: this project *was* disconnected via the real command, and the marker
 mechanism just didn't exist yet at the time that disconnect ran (it was built *from* this exact
-incident afterward — `design\disconnect.md`'s post-disconnect legibility fix). Once you know that,
+incident afterward — `design\connect_disconnect.md`'s post-disconnect legibility fix). Once you know that,
 the remedy is obvious and safe: treat it as a reconnect (strip the stale heading pair, let
 `new_consumer.py --force` — or, after the legibility fix landed, an ordinary reconnect run —
 re-append live sections), never a blind `--force` overwrite from scratch.

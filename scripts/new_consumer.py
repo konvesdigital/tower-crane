@@ -27,7 +27,7 @@ template" section below): a registered consumer connecting another host (host-me
 re-appends the live sections), and an unregistered hand-copied project with no Tower Crane content
 at all (adoption - appends the live sections to whatever's already there). This third shape used to
 require copying templates\\register.md into the target project and filing a ticket back here from
-a separate session; that courier is retired (2026-08-12, design\\disconnect.md's deferred
+a separate session; that courier is retired (2026-08-12, design\\connect_disconnect.md's deferred
 "register.md's fate" note) now that this script can just be run directly from a hub session, the
 same as every other shape.
 
@@ -128,7 +128,7 @@ def try_capture_remote(target_path):
 
 
 def detect_git_state(target_path):
-    """(has_git, remote) at target_path - design\\disconnect.md's "Reconnect-after-disconnect gap":
+    """(has_git, remote) at target_path - design\\connect_disconnect.md's "Reconnect-after-disconnect gap":
     a reconnecting project (or a never-connected one someone already set up by hand) may already
     have git, or a remote, or both - never assume a consumer starts from nothing. Drives
     build_first_run_checklist() so the checklist only ever lists what's actually still missing."""
@@ -155,7 +155,7 @@ def build_first_run_checklist(has_git, remote, needs_overview):
     """Only lists what's actually still needed, based on detected state - a reconnecting project
     (real history, usually real git/remote already) and a never-connected one someone already set
     up by hand both deserve an accurate checklist, not a blanket "start from scratch" one
-    (design\\disconnect.md "Reconnect-after-disconnect gap")."""
+    (design\\connect_disconnect.md "Reconnect-after-disconnect gap")."""
     items = []
     if not has_git:
         items.append("- [ ] `git init` and make an initial commit. (The scaffolder does NOT run "
@@ -400,7 +400,7 @@ def main():
     claude_md_path = target_path / 'CLAUDE.md'
     protocol_imports = '\n'.join(f"@{import_base}/{p}.md" for p in import_pieces)
 
-    # Reconnect detection (design\disconnect.md "Reconnect-after-disconnect gap"): a previously
+    # Reconnect detection (design\connect_disconnect.md "Reconnect-after-disconnect gap"): a previously
     # disconnected project has no registry entry (existing_consumer is None, same as brand new)
     # but its CLAUDE.md still carries the DISCONNECTED_HEADING pointer disconnect_consumer.py
     # wrote. That's a recognized, safe-to-automate shape - not the ambiguous collision the
@@ -409,7 +409,7 @@ def main():
     if claude_md_path.exists() and existing_consumer is None:
         is_reconnect = DISCONNECTED_HEADING in claude_md_path.read_text(encoding='utf-8')
 
-    # Adoption detection (register.md's subsumption, 2026-08-12 - design\disconnect.md's deferred
+    # Adoption detection (register.md's subsumption, 2026-08-12 - design\connect_disconnect.md's deferred
     # "register.md's fate" note): an existing hand-copied project that was never put through
     # new_consumer.py/register.md at all has a CLAUDE.md with no TC_IN_USE_HEADING and no
     # protocol-piece @import line - troubleshoot_project_connection.md's "no Tower Crane content at
@@ -615,7 +615,7 @@ def main():
                   "before your first session here.")
     else:
         # Checklist is built from actually-detected state, not assumed from scratch
-        # (design\disconnect.md "Reconnect-after-disconnect gap") - a reconnecting project (real
+        # (design\connect_disconnect.md "Reconnect-after-disconnect gap") - a reconnecting project (real
         # history) or a never-connected one someone already set up by hand may already have git
         # and/or a remote. needs_overview is False for reconnect and adoption alike: both preserve
         # a real pre-existing overview untouched above.

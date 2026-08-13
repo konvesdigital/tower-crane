@@ -64,13 +64,13 @@ repo's HEAD.
    untouched, and the stale `TOWER_CRANE_DISCONNECT_NOTES.md` is deleted (superseded — the
    connection is live again). Never needs `--force`; this is a recognized shape, not the ambiguous
    collision that gate exists to protect against. A fresh registry entry is written (new
-   `registered:`/`since:` date — not a restore of the old one, matching `design\disconnect.md`'s
+   `registered:`/`since:` date — not a restore of the old one, matching `design\connect_disconnect.md`'s
    "not a true undo" framing). `FIRST_RUN.md`'s checklist (see below) only lists what a project in
    this position actually still needs — usually just re-accepting the import-approval dialog, since
    git/a remote/the overview are almost always already there.
 
 **`FIRST_RUN.md`'s checklist adapts to what's actually detected**, for item 1 and item 4 alike —
-never assumed from scratch (design\disconnect.md "Reconnect-after-disconnect gap"). It checks for
+never assumed from scratch (design\connect_disconnect.md "Reconnect-after-disconnect gap"). It checks for
 an existing `.git\` and an existing `origin` remote at the target path before writing the
 checklist: a `git init` line is only included if `.git\` is genuinely missing, a remote-setup line
 is offered as optional only if none is configured, and the overview-placeholder line is included
@@ -98,7 +98,7 @@ that isn't actually there. Only proceed once the user has clearly said yes.
 Then run `scripts\disconnect_consumer.py --slug <slug> --mode this-only|all-but-this|all` from
 inside `toolkit\`. Deliberately NOT touched (say so in the summary, don't just skip silently): any
 `shared_resources\` adopted stub (its `hub-rel:` marker goes stale, doesn't break) and
-`COMPLIANCE_GUIDANCE.md`'s broadcast section. Full design: `design\disconnect.md`.
+`COMPLIANCE_GUIDANCE.md`'s broadcast section. Full design: `design\connect_disconnect.md`.
 
 ## Removing this machine
 **Trigger: "remove" / "uninstall"** — reciprocal with `setup_machine`. Reverses this machine's
@@ -116,4 +116,4 @@ run again on this machine, then reconnecting whichever consumers are wanted via 
 project"` — a rebuild, not a restore.
 
 Then run `scripts\remove_hub.py` (no args — operates on this machine via its own
-`config.local.json`) from inside `toolkit\`. Full design: `design\disconnect.md`.
+`config.local.json`) from inside `toolkit\`. Full design: `design\connect_disconnect.md`.

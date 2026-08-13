@@ -233,7 +233,7 @@ def add_host_to_text(raw_text, host_id, path_str, registered_date):
 
 
 def remove_host_from_text(raw_text, host_id):
-    """Inverse of add_host_to_text() - design\\disconnect.md's host-removal primitive. Removes a
+    """Inverse of add_host_to_text() - design\\connect_disconnect.md's host-removal primitive. Removes a
     `hosts.<host_id>` entry from a registry file's raw text. Also re-applies the 2-host floor in
     reverse: if this removal brings the host count below 2, `scope:` auto-reverts to `local`
     (symmetric with add_host_to_text's floor-up behavior) - a consumer that's no longer actually
@@ -241,7 +241,7 @@ def remove_host_from_text(raw_text, host_id):
 
     Returns (new_text, was_present, host_count_after). `host_count_after` of 0 means the caller
     should hard-delete the registry file instead of writing new_text back (an entry with an empty
-    hosts: block is not a valid end state - disconnect.md's "hard delete, git history is the
+    hosts: block is not a valid end state - connect_disconnect.md's "hard delete, git history is the
     record" decision, 2026-08-12). Raises ValueError if the file has no parseable yaml block or no
     `hosts:` key.
     """

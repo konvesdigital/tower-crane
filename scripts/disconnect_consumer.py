@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 disconnect_consumer.py - reverse of new_consumer.py's host-connect: removes a host's connection to
-a registered consumer (design\\disconnect.md).
+a registered consumer (design\\connect_disconnect.md).
 
 Three modes (--mode):
   this-only     - remove only the current machine's connection to this consumer.
@@ -78,7 +78,7 @@ def local_skill_names(consumer):
 def replace_prose_sections(text, date, mode):
     """Replace the '## Tower Crane In Use' / '## Shared Workflow Protocol' sections (each
     heading through the end of its content) with a short, honest pointer to NOTES_FILENAME -
-    fixes the gap found live 2026-08-12 (design\\disconnect.md): leaving that prose in place made
+    fixes the gap found live 2026-08-12 (design\\connect_disconnect.md): leaving that prose in place made
     a disconnected project's CLAUDE.md still read as if the connection were live, which is what
     sent a fresh session in that project looking for an explanation. Returns (new_text, replaced)
     - replaced is False if the standard heading isn't found (e.g. hand-edited CLAUDE.md), in
@@ -201,7 +201,7 @@ def strip_local_references(target_path, consumer, config, mode, log):
     with a short honest pointer, strip hook/permission entries and scaffolded skill dirs, write
     TOWER_CRANE_DISCONNECT_NOTES.md as the single complete breadcrumb index, then commit
     everything in the consumer's own repo (commit_consumer_changes()) so nothing is left
-    uncommitted/unexplained - the gap a live 2026-08-12 test found (design\\disconnect.md).
+    uncommitted/unexplained - the gap a live 2026-08-12 test found (design\\connect_disconnect.md).
     Never touches project_progress.md or FIRST_RUN.md - those are the consumer's own content."""
     target_path = Path(target_path)
     if not target_path.exists():
@@ -329,7 +329,7 @@ def disconnect_host(slug, host_id, config, mode, log, do_local_cleanup=True):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Disconnect a consumer from Tower Crane (design\\disconnect.md).")
+    parser = argparse.ArgumentParser(description="Disconnect a consumer from Tower Crane (design\\connect_disconnect.md).")
     parser.add_argument('--slug', required=True, help="Registry slug (consumers\\<slug>.md).")
     parser.add_argument('--mode', required=True, choices=['this-only', 'all-but-this', 'all'],
                          help="this-only: disconnect just this machine. all-but-this: disconnect every "

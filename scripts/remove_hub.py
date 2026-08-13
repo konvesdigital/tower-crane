@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-remove_hub.py - reverses setup_machine.md for THIS machine (design\\disconnect.md). Disconnects
+remove_hub.py - reverses setup_machine.md for THIS machine (design\\connect_disconnect.md). Disconnects
 every consumer connected on this machine (this-only mode, so any OTHER machine's connection to the
 same consumer is left alone), then clears this machine's own gitignored per-machine hub state, so
 a later setup_machine.md run here starts genuinely clean - no consumer thinks this machine is

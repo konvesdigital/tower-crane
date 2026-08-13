@@ -398,7 +398,7 @@ def fix_adopted_stub_paths(consumer_path, hub_root, dry_run=False, log=None):
 
 
 # Shared markers between disconnect_consumer.py (writer) and new_consumer.py (reader, for the
-# reconnect branch - design\\disconnect.md "Reconnect-after-disconnect gap"): the two live sections
+# reconnect branch - design\\connect_disconnect.md "Reconnect-after-disconnect gap"): the two live sections
 # a disconnect replaces, the pointer heading it replaces them with, and the breadcrumb notes file
 # that heading points to. Centralized here (rather than defined in disconnect_consumer.py alone) so
 # the two scripts can't drift out of sync on what marker text means "disconnected".
