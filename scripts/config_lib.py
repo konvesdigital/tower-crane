@@ -475,3 +475,27 @@ def commit_consumer_changes(consumer_path, message, log=None):
             log(f"  [warn] push failed in {consumer_path}: {push.stderr.strip() or push.stdout.strip()}")
         return 'push-failed'
     return 'committed-pushed'
+
+
+def print_diagnose_inline(config, path=None, slug=None, log=print):
+    """Best-effort inline invocation of `check_tower_crane.py --diagnose` (design\\
+    connection_diagnostics.md): shells out rather than importing, matching update_toolkit.py's own
+    existing pattern of invoking check_tower_crane.py as a subprocess (also sidesteps an import
+    cycle, since check_tower_crane.py itself imports from this module). Called from
+    new_consumer.py's/disconnect_consumer.py's failure paths right before they raise, so the fact
+    table prints inline ahead of the error instead of a bare error string. Never raises: a diagnose
+    failure here must never mask the original fatal error it exists to add context to.
+    """
+    if not path and not slug:
+        return
+    script = Path(config['shared_root']) / 'scripts' / 'check_tower_crane.py'
+    cmd = [config['python_launcher'], str(script), '--diagnose']
+    if path:
+        cmd += ['--path', str(path)]
+    if slug:
+        cmd += ['--slug', str(slug)]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        log(proc.stdout + proc.stderr)
+    except OSError:
+        pass

@@ -47,7 +47,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config_lib import (
-    commit_consumer_changes, get_shared_config,
+    commit_consumer_changes, get_shared_config, print_diagnose_inline,
     TC_IN_USE_HEADING, WORKFLOW_HEADING, DISCONNECTED_HEADING,
     DISCONNECT_NOTES_FILENAME as NOTES_FILENAME,
 )
@@ -341,15 +341,18 @@ def main():
 
     registry_path = CONSUMERS_DIR / f"{args.slug}.md"
     if not registry_path.exists():
+        print_diagnose_inline(config, slug=args.slug)
         raise SystemExit(f"No registry entry for '{args.slug}' at {registry_path}. See "
                           "toolkit\\troubleshoot_project_connection.md if the project's CLAUDE.md "
                           "still looks like it's connected.")
     consumer = registry_lib.parse_registry(registry_path)
     if consumer is None:
+        print_diagnose_inline(config, slug=args.slug)
         raise SystemExit(f"{registry_path} isn't parseable. See "
                           "toolkit\\troubleshoot_project_connection.md.")
 
     if args.mode in ('this-only', 'all-but-this') and this_host not in consumer['hosts']:
+        print_diagnose_inline(config, slug=args.slug)
         raise SystemExit(f"'{args.slug}' has no hosts.{this_host} entry on this machine - "
                           f"'{args.mode}' requires this machine to be connected. Known hosts: "
                           f"{', '.join(consumer['hosts']) or '(none)'}. See "

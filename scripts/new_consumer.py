@@ -51,7 +51,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config_lib import (
     get_shared_config, get_expanded_optin, materialize_skill_stub,
-    build_new_cmd_map, apply_hook_command_fixes,
+    build_new_cmd_map, apply_hook_command_fixes, print_diagnose_inline,
     TC_IN_USE_HEADING, WORKFLOW_HEADING, DISCONNECTED_HEADING, DISCONNECT_NOTES_FILENAME,
 )
 from relocate import fix_imports
@@ -251,6 +251,7 @@ def main():
     if registry_path.exists():
         existing_consumer = registry_lib.parse_registry(registry_path)
         if existing_consumer is None:
+            print_diagnose_inline(config, path=target_path, slug=slug)
             raise RuntimeError(
                 f"Consumer '{slug}' already registered ({registry_path}) but its yaml block "
                 "isn't parseable - fix it by hand before scaffolding here. See "
@@ -275,6 +276,7 @@ def main():
             target_path.mkdir(parents=True, exist_ok=True)
             result = subprocess.run(['git', 'clone', remote, str(target_path)], capture_output=True, text=True)
             if result.returncode != 0:
+                print_diagnose_inline(config, path=target_path, slug=slug)
                 raise RuntimeError(
                     f"git clone of '{remote}' into {target_path} failed:\n{result.stderr}\n"
                     "See toolkit\\troubleshoot_project_connection.md's 'git clone ... failed' row."
@@ -471,6 +473,7 @@ def main():
                   f"Workflow Protocol sections to existing content - register.md's former "
                   f"target case, now handled directly)")
     elif claude_md_path.exists() and not args.force:
+        print_diagnose_inline(config, path=target_path, slug=slug)
         raise RuntimeError(
             f"CLAUDE.md already exists at {claude_md_path} but doesn't match a recognized shape "
             "(no registry entry, not the disconnected-project marker, and it already carries some "

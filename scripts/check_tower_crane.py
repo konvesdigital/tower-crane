@@ -45,6 +45,15 @@ Two passes, plus an optional compliance-guidance writer:
     writers sharing that file: broadcast_guidance.py owns the sibling '## Broadcast' section -
     see design\\broadcast_guidance.md.
 
+  --diagnose (design\\connection_diagnostics.md) - fact-reporting only mode for a non-standard
+    connect_project/disconnect_consumer.py state that doesn't fit either script's deterministic
+    branches. Prints a flat present/absent fact list from two source categories (Tower-Crane-
+    specific current-state files, and durable git-history signals that survive hand-deletion or
+    corruption) - never a verdict, never a fix, mirroring hooks\\consistency_check.py's own
+    report-don't-fix split. Standalone-reachable (--path and/or --slug) and auto-invoked inline by
+    new_consumer.py's/disconnect_consumer.py's fatal-error paths via config_lib.print_diagnose_inline.
+    Runs standalone - does not touch Pass A/B's PASS/WARN/FAIL counters or exit code.
+
 Exit code: 0 if no FAILs, 1 otherwise. WARNs never fail the build.
 
 OS-reach Tier 2 port of check_tower_crane.ps1 (design\\portability.md, "OS-reach Tier 2: full
@@ -563,6 +572,211 @@ def check_hub_self_use_skills(config):
         print("  (no optin declares a 'skills' key yet)")
 
 
+# ==================================================================================================
+# --diagnose - fact-reporting only, no verdict (design\connection_diagnostics.md)
+# ==================================================================================================
+# Tower-Crane-authored commit-message patterns, matched against a consumer's own git log (Category
+# B - durable, survives hand-deletion of the files those commits touched).
+DIAGNOSE_COMMIT_PATTERNS = [
+    ('disconnect', re.compile(r'^Tower Crane: disconnected')),
+    ('checkpoint', re.compile(r'^Checkpoint:')),
+    ('archive', re.compile(r'^Archive:')),
+]
+
+# The four protocol-piece @import targets a live CLAUDE.md carries - mirrors SKILL_PIECES'
+# companion values above plus 'compliance' (the one piece that stays flat, never Track-1).
+DIAGNOSE_IMPORT_NAMES = ('filing_resume_check', 'compliance', 'shared_resources_resume_check',
+                          'continuity_resume_check')
+
+
+def diagnose_fact(present, label, indent):
+    tag = '[present]' if present else '[absent] '
+    print(f"{indent}{tag} {label}")
+
+
+def diagnose_git_log(repo_dir, pathspec=None):
+    """(sha, date, subject) tuples, newest first, for `repo_dir`'s git log (optionally scoped to
+    `pathspec`). Returns [] for anything short of success (no .git, empty history, git missing) -
+    every check in --diagnose is best-effort and must never itself raise."""
+    cmd = ['git', '-C', str(repo_dir), 'log', '--format=%H%x1f%ci%x1f%s']
+    if pathspec:
+        cmd += ['--', pathspec]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+    except OSError:
+        return []
+    if proc.returncode != 0:
+        return []
+    out = []
+    for line in proc.stdout.splitlines():
+        parts = line.split('\x1f')
+        if len(parts) == 3:
+            out.append((parts[0], parts[1], parts[2]))
+    return out
+
+
+def diagnose_consumer_git_history(consumer_repo):
+    print("  consumer's own repo - Tower-Crane-authored commit patterns:")
+    if not (consumer_repo / '.git').exists():
+        print("    [absent]  no .git\\ at this path - can't check history here.")
+        return
+    commits = diagnose_git_log(consumer_repo)
+    if not commits:
+        print("    [absent]  no git history readable (empty repo, or git unavailable).")
+        return
+    for label, pattern in DIAGNOSE_COMMIT_PATTERNS:
+        matches = [c for c in commits if pattern.search(c[2])]
+        if matches:
+            sha, dt, subj = matches[0]
+            print(f"    [present] {len(matches)} '{label}'-shaped commit(s) - most recent "
+                  f"{dt[:10]} ({sha[:8]}): \"{subj}\"")
+        else:
+            print(f"    [absent]  no '{label}'-shaped commit found.")
+
+
+def diagnose_hub_registry_history(slug):
+    print(f"  hub's own repo - consumers/{slug}.md history:")
+    commits = diagnose_git_log(PROJECT_ROOT, pathspec=f"consumers/{slug}.md")
+    if not commits:
+        print(f"    [absent]  no commits touching consumers/{slug}.md (never registered under "
+              f"this slug, or this hub clone's history doesn't reach back far enough).")
+        return
+    sha, dt, subj = commits[0]
+    print(f"    [present] {len(commits)} commit(s) - most recent {dt[:10]} ({sha[:8]}): \"{subj}\"")
+
+
+def diagnose_consumer_files(path):
+    cpath = Path(path)
+    print("  consumer's own project files (Category A - unreliable if hand-edited/corrupted):")
+    if not cpath.exists():
+        print(f"    [absent]  path does not exist on disk: {cpath}")
+        return
+
+    claude_md_path = cpath / 'CLAUDE.md'
+    if claude_md_path.exists():
+        text = claude_md_path.read_text(encoding='utf-8')
+        diagnose_fact(True, "CLAUDE.md exists", '    ')
+        diagnose_fact('## Tower Crane In Use' in text, "'## Tower Crane In Use' heading", '    ')
+        diagnose_fact('## Shared Workflow Protocol' in text, "'## Shared Workflow Protocol' heading", '    ')
+        diagnose_fact('## Tower Crane (disconnected)' in text, "'## Tower Crane (disconnected)' marker", '    ')
+        live_imports = sorted(set(re.findall(r'(?m)^@\S+/(\w+)\.md\s*$', text)) & set(DIAGNOSE_IMPORT_NAMES))
+        if live_imports:
+            print(f"    [present] live @import line(s) for: {', '.join(live_imports)}")
+        else:
+            print("    [absent]  no live @import line for any protocol piece")
+    else:
+        diagnose_fact(False, "CLAUDE.md exists", '    ')
+
+    settings_path = cpath / '.claude' / 'settings.json'
+    if settings_path.exists():
+        try:
+            settings = json.loads(settings_path.read_text(encoding='utf-8'))
+            diagnose_fact(True, ".claude/settings.json exists (valid JSON)", '    ')
+            hook_names = set()
+            for groups in (settings.get('hooks') or {}).values():
+                for grp in groups:
+                    for h in grp.get('hooks', []):
+                        m = re.search(r'hooks[\\/](\w+)\.py', h.get('command', ''))
+                        if m:
+                            hook_names.add(m.group(1))
+            if hook_names:
+                print(f"    [present] hook entry/entries: {', '.join(sorted(hook_names))}")
+            else:
+                print("    [absent]  no tower_crane hook entries")
+            allow = (settings.get('permissions') or {}).get('allow') or []
+            has_read_rule = any(a.startswith('Read(') and 'templates' in a for a in allow)
+            diagnose_fact(has_read_rule, "a Read(.../templates/**) permission rule", '    ')
+        except json.JSONDecodeError:
+            print("    [present] .claude/settings.json exists but is NOT valid JSON")
+    else:
+        diagnose_fact(False, ".claude/settings.json exists", '    ')
+
+    skills_dir = cpath / '.claude' / 'skills'
+    if skills_dir.is_dir():
+        names = sorted(d.name for d in skills_dir.iterdir() if d.is_dir())
+        if names:
+            print(f"    [present] .claude/skills/ subdirectories: {', '.join(names)}")
+        else:
+            print("    [absent]  .claude/skills/ exists but is empty")
+    else:
+        diagnose_fact(False, ".claude/skills/ directory", '    ')
+
+    diagnose_fact((cpath / 'FIRST_RUN.md').exists(), "FIRST_RUN.md", '    ')
+    diagnose_fact((cpath / 'TOWER_CRANE_DISCONNECT_NOTES.md').exists(), "TOWER_CRANE_DISCONNECT_NOTES.md", '    ')
+
+    progress_path = cpath / 'project_progress.md'
+    if progress_path.exists():
+        text = progress_path.read_text(encoding='utf-8')
+        work_log_idx = text.find('## Work Log')
+        work_log_text = text[work_log_idx:] if work_log_idx != -1 else text
+        n_mentions = len(re.findall(r'Tower Crane|Checkpoint:|Archive:', work_log_text))
+        print(f"    [present] project_progress.md exists (Work Log mentions Tower Crane/"
+              f"Checkpoint/Archive: {n_mentions} time(s))")
+    else:
+        diagnose_fact(False, "project_progress.md", '    ')
+
+
+def diagnose_hub_side(slug):
+    registry_path = CONSUMERS_DIR / f"{slug}.md"
+    print("  hub's own state (Category A):")
+    if registry_path.exists():
+        c = parse_registry(registry_path)
+        if c is None:
+            print(f"    [present] consumers/{slug}.md exists but is NOT parseable")
+        else:
+            hosts = ', '.join(sorted(c['hosts'])) or '(none)'
+            print(f"    [present] consumers/{slug}.md - scope: {effective_scope(c)}, hosts: {hosts}")
+    else:
+        print(f"    [absent]  consumers/{slug}.md (no registry entry)")
+    change_requests_dir = PROJECT_ROOT / 'change_requests'
+    if change_requests_dir.is_dir():
+        tickets = sorted(p.name for p in change_requests_dir.glob(f"*{slug}*"))
+        if tickets:
+            print(f"    [present] change_requests\\ ticket(s) naming '{slug}': {', '.join(tickets)}")
+        else:
+            print(f"    [absent]  no change_requests\\ ticket naming '{slug}'")
+
+
+def run_diagnose(path, slug):
+    print("=== check_tower_crane.py --diagnose ===")
+    print("Fact-reporting only - present/absent, no verdict. See troubleshoot_project_connection.md")
+    print("for how to read these.")
+    if not path and not slug:
+        print("  (neither --path nor --slug given - nothing to check.)")
+        return
+    print()
+    print(f"path: {path or '(not given)'}")
+    print(f"slug: {slug or '(not given)'}")
+
+    # Priority principle (design\connection_diagnostics.md): durable git history survives hand-
+    # deletion/corruption of the current-state files Category A reads, so it's checked - and shown
+    # - first, not after.
+    print()
+    print("--- Category B: durable git history (checked first - survives file deletion) ---")
+    if path:
+        diagnose_consumer_git_history(Path(path))
+    else:
+        print("  consumer's own repo: (skipped - no --path given)")
+    if slug:
+        diagnose_hub_registry_history(slug)
+    else:
+        print("  hub's own repo: (skipped - no --slug given)")
+
+    print()
+    print("--- Category A: Tower-Crane-specific current-state files ---")
+    if path:
+        diagnose_consumer_files(path)
+    else:
+        print("  consumer's own project files: (skipped - no --path given)")
+    if slug:
+        diagnose_hub_side(slug)
+    else:
+        print("  hub's own state: (skipped - no --slug given)")
+
+    print()
+    print("=== end diagnose ===")
+
+
 def get_head_sha():
     try:
         result = subprocess.run(
@@ -586,9 +800,21 @@ def main():
                          help="Write COMPLIANCE_GUIDANCE.md for audited consumers with actionable FAILs.")
     parser.add_argument('--skip-golden', action='store_true', help="Skip pass A.")
     parser.add_argument('--skip-reference', action='store_true', help="Skip pass B (and guidance writing).")
+    parser.add_argument('--diagnose', action='store_true',
+                         help="Fact-reporting mode for a non-standard connect/disconnect state "
+                              "(design\\connection_diagnostics.md) - present/absent facts only, "
+                              "no verdict or fix. Combine with --path and/or --slug. Runs "
+                              "standalone; ignores every other flag above.")
+    parser.add_argument('--path', default=None, help="--diagnose: consumer project path to inspect.")
+    parser.add_argument('--slug', default=None, help="--diagnose: registry slug to inspect.")
     args = parser.parse_args()
 
     config = get_shared_config(SHARED_ROOT)
+
+    if args.diagnose:
+        run_diagnose(args.path, args.slug)
+        sys.exit(0)
+
     this_host = str(config.get('host_id', ''))
     head_sha = get_head_sha()
     today = date.today().isoformat()
