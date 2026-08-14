@@ -222,14 +222,195 @@ def get_expanded_optin(optin_path, config):
     return optin
 
 
+# design\consumer_reference_indirection.md: the fixed, host-invariant wrapper form of a hook
+# command, used for any NEW connection (a brand-new consumer, or a not-yet-connected host joining
+# an already-registered one) from this build forward. An already-connected host's existing
+# settings.json keeps the direct-path form from get_expanded_optin() above untouched - no forced
+# migration - so both forms must stay independently valid canonical shapes; see
+# HUB_DISPATCH_RELPATH's docstring for how check_tower_crane.py's Pass B accepts either.
+HUB_POINTER_RELPATH = '.claude/hub_pointer.md'
+HUB_POINTER_IMPORT_LINE = f'@{HUB_POINTER_RELPATH}'
+HUB_DISPATCH_RELPATH = '.claude/hooks/_hub_dispatch.py'
+HUB_DISPATCH_TEMPLATE = 'hooks/_hub_dispatch.py'  # under templates\, the canonical tracked source
+
+
+def get_dispatch_optin(optin_path, tool_name, config):
+    """Same hooks event/matcher SHAPE as get_expanded_optin() (read from the same canonical
+    templates\\optins\\<tool>.json - one file, no duplicated second canonical source), but every
+    hook's command replaced with the fixed dispatch-wrapper invocation:
+    '<launcher> "$CLAUDE_PROJECT_DIR/.claude/hooks/_hub_dispatch.py" <tool_name>'. This command
+    string never contains the hub's real path, so it never needs per-host regeneration - only
+    python_launcher varies, same narrow axis get_expanded_optin() already substitutes today.
+    """
+    with open(optin_path, 'r', encoding='utf-8') as f:
+        optin = json.load(f)
+    launcher = str(config.get('python_launcher', ''))
+    command = f'{launcher} "$CLAUDE_PROJECT_DIR/{HUB_DISPATCH_RELPATH}" {tool_name}'
+    if 'hooks' in optin:
+        for evt, groups in optin['hooks'].items():
+            for grp in groups:
+                if 'hooks' in grp:
+                    for h in grp['hooks']:
+                        if 'command' in h:
+                            h['command'] = command
+    return optin
+
+
+def build_dispatch_cmd_map(tools, private_tools, config, optins_dir, private_optins_dir):
+    """Dispatch-wrapper analog of build_new_cmd_map() above: tool name -> its dispatch-wrapper
+    command (get_dispatch_optin() instead of get_expanded_optin()). Used for a NEW connection only
+    (design\\consumer_reference_indirection.md) - new_consumer.py's host-merge branch, when the
+    joining host is genuinely new."""
+    new_cmd = {}
+    for t in tools:
+        optin_path = Path(optins_dir) / f"{t}.json"
+        if not optin_path.exists():
+            continue
+        optin = get_dispatch_optin(optin_path, t, config)
+        for evt, groups in optin.get('hooks', {}).items():
+            for grp in groups:
+                for h in grp.get('hooks', []):
+                    if 'command' in h:
+                        new_cmd[t] = h['command']
+    for t in private_tools:
+        optin_path = Path(private_optins_dir) / f"{t}.json"
+        if not optin_path.exists():
+            continue
+        optin = get_dispatch_optin(optin_path, t, config)
+        for evt, groups in optin.get('hooks', {}).items():
+            for grp in groups:
+                for h in grp.get('hooks', []):
+                    if 'command' in h:
+                        new_cmd[t] = h['command']
+    return new_cmd
+
+
+def build_hub_pointer_content(config, import_pieces):
+    """Renders .claude\\hub_pointer.md's full content for THIS host, right now
+    (design\\consumer_reference_indirection.md): a fenced yaml block carrying the raw
+    shared_root:/import_base: values config_lib.get_shared_config() just computed, followed by the
+    literal @import lines for every mandatory/imported protocol piece this consumer has - the exact
+    lines that used to live directly in CLAUDE.md. Gitignored, one per consumer, one value per
+    host - regenerated fresh by new_consumer.py (scaffold/host-merge) and relocate.py, never
+    hand-edited.
+    """
+    import_base = config['import_base']
+    lines = [
+        '<!-- Tower Crane hub pointer - auto-regenerated per host, never hand-edit or commit',
+        '     (this file is gitignored). See design\\consumer_reference_indirection.md. -->',
+        '',
+        '```yaml',
+        f"shared_root: {config['shared_root']}",
+        f"import_base: {import_base}",
+        '```',
+        '',
+    ]
+    lines.extend(f"@{import_base}/{p}.md" for p in import_pieces)
+    return '\n'.join(lines) + '\n'
+
+
+def fix_hub_pointer(consumer_path, config, import_pieces, dry_run=False, log=None):
+    """Regenerates .claude\\hub_pointer.md for THIS host, but ONLY for a consumer whose CLAUDE.md
+    already carries the HUB_POINTER_IMPORT_LINE indirection (design\\
+    consumer_reference_indirection.md) - an old-style, not-yet-migrated consumer is left
+    completely untouched (no unrequested file appears in its working tree). Called by relocate.py
+    on every regeneration pass, same as fix_imports()/fix_skill_stubs() above. Returns True if
+    written (or would be, under dry_run)."""
+    consumer_path = Path(consumer_path)
+    claude_path = consumer_path / 'CLAUDE.md'
+    if not claude_path.exists() or HUB_POINTER_IMPORT_LINE not in claude_path.read_text(encoding='utf-8'):
+        return False
+    pointer_path = consumer_path / HUB_POINTER_RELPATH
+    expected = build_hub_pointer_content(config, import_pieces)
+    current = pointer_path.read_text(encoding='utf-8') if pointer_path.exists() else None
+    if current == expected:
+        return False
+    if log:
+        verb = 'would regenerate' if dry_run else 'regenerate'
+        log(f"  [{verb}] {HUB_POINTER_RELPATH}")
+    if not dry_run:
+        pointer_path.parent.mkdir(parents=True, exist_ok=True)
+        pointer_path.write_text(expected, encoding='utf-8', newline='\n')
+    return True
+
+
+def fix_hub_dispatch_wrapper(consumer_path, templates_dir, dry_run=False, log=None):
+    """Refreshes .claude\\hooks\\_hub_dispatch.py against the canonical
+    templates\\hooks\\_hub_dispatch.py source, but ONLY for a consumer that already has this file
+    (i.e. already migrated - design\\consumer_reference_indirection.md) - never introduces it to a
+    not-yet-migrated consumer. Content is host-invariant (no substitution), same drift shape as
+    fix_skill_stubs() above. Returns True if written (or would be, under dry_run)."""
+    dst = Path(consumer_path) / HUB_DISPATCH_RELPATH
+    if not dst.exists():
+        return False
+    src = Path(templates_dir) / HUB_DISPATCH_TEMPLATE
+    if not src.exists():
+        return False
+    expected = src.read_text(encoding='utf-8')
+    if dst.read_text(encoding='utf-8') == expected:
+        return False
+    if log:
+        verb = 'would regenerate' if dry_run else 'regenerate'
+        log(f"  [{verb}] {HUB_DISPATCH_RELPATH}")
+    if not dry_run:
+        dst.write_text(expected, encoding='utf-8', newline='\n')
+    return True
+
+
+HUB_POINTER_YAML_RE = re.compile(r'```yaml\s*\r?\n(.*?)\r?\n```', re.DOTALL)
+
+
+def parse_hub_pointer(path):
+    """Reads a consumer's own .claude\\hub_pointer.md (this host's copy) and returns
+    {'shared_root':.., 'import_base':.., 'imports': [piece_name, ...]}, or None if the file
+    doesn't exist or has no parseable yaml block. `imports` is derived from the literal @import
+    lines below the yaml block (the same piece-name extraction CLAUDE.md's own scan already used
+    before this indirection existed)."""
+    path = Path(path)
+    if not path.exists():
+        return None
+    text = path.read_text(encoding='utf-8')
+    m = HUB_POINTER_YAML_RE.search(text)
+    if not m:
+        return None
+    yaml_text = m.group(1)
+    result = {'shared_root': None, 'import_base': None, 'imports': []}
+    sr = re.search(r'(?m)^shared_root:\s*(.+?)\s*$', yaml_text)
+    if sr:
+        result['shared_root'] = sr.group(1)
+    ib = re.search(r'(?m)^import_base:\s*(.+?)\s*$', yaml_text)
+    if ib:
+        result['import_base'] = ib.group(1)
+    result['imports'] = re.findall(r'(?m)^@.*?templates/(\w+)\.md\s*$', text)
+    return result
+
+
 _LEADING_COMMENT_RE = re.compile(r'^\s*<!--.*?-->\s*', re.DOTALL)
+_READ_INSTRUCTION_RE = re.compile(r'\{\{READ_INSTRUCTION:([\w.]+)\}\}')
 
 
-def materialize_skill_stub(canon_path, import_base=None):
+def _render_read_instruction(target, import_base, use_pointer):
+    """The one sentence fragment design\\consumer_reference_indirection.md's skill-stub fix
+    actually changes: for a new-connection consumer (use_pointer=True), points the agent at this
+    project's own .claude\\hub_pointer.md instead of a baked import_base path - for a
+    not-yet-migrated consumer (use_pointer=False, the default - no forced migration), the
+    original direct-substitution wording is unchanged. Both forms are independently valid
+    canonical shapes; check_tower_crane.py's Pass B accepts either."""
+    if use_pointer:
+        return (f"Read this project's `.claude/hub_pointer.md`, take its `import_base:` value, "
+                 f"and read `<that value>/{target}` in full")
+    return f"Read `{import_base}/{target}` in full"
+
+
+def materialize_skill_stub(canon_path, import_base=None, use_pointer=False):
     """Read a canonical templates\\skills\\<name>\\SKILL.md source and return the content that
     should actually be installed (scaffolded to a consumer, self-hooked into the hub, or applied
-    by update_consumers.py): the leading maintainer HTML-comment header stripped, and
-    {{IMPORT_BASE}} substituted if import_base is given (omit for a private, copy-only stub).
+    by update_consumers.py): the leading maintainer HTML-comment header stripped, {{IMPORT_BASE}}
+    substituted if import_base is given (omit for a private, copy-only stub), and any
+    {{READ_INSTRUCTION:<target>}} placeholder rendered per use_pointer (design\\
+    consumer_reference_indirection.md - defaults False, i.e. the pre-existing direct-substitution
+    wording, so every existing caller that doesn't pass this explicitly keeps its current
+    behavior unchanged).
 
     The header strip matters, not just tidiness: every canonical stub carries that comment BEFORE
     the YAML frontmatter, which breaks the harness's name/description parsing on the installed
@@ -239,6 +420,8 @@ def materialize_skill_stub(canon_path, import_base=None):
     """
     text = Path(canon_path).read_text(encoding='utf-8')
     text = _LEADING_COMMENT_RE.sub('', text, count=1)
+    text = _READ_INSTRUCTION_RE.sub(
+        lambda m: _render_read_instruction(m.group(1), import_base, use_pointer), text)
     if import_base is not None:
         text = text.replace('{{IMPORT_BASE}}', str(import_base))
     return text
@@ -307,14 +490,17 @@ def apply_hook_command_fixes(settings, new_cmd, all_tools, dry_run=False, log=No
     return changed
 
 
-def fix_skill_stubs(consumer_path, templates_dir, import_base, dry_run=False, log=None):
+def fix_skill_stubs(consumer_path, templates_dir, import_base, dry_run=False, log=None, use_pointer=False):
     """Regenerate every installed .claude\\skills\\<name>\\SKILL.md stub whose content doesn't
     match what materialize_skill_stub() would produce right now from the canonical
     templates\\skills\\<name>\\SKILL.md source (design\\consumer_reconnect.md - closes a
     pre-existing gap: stubs are baked with {{IMPORT_BASE}} at scaffold time and were never
     revisited by anything, even on a single-machine rename). Skips a skill dir with no matching
-    canonical source (e.g. a private-tool-managed skill). Returns True if anything changed (or
-    would, under dry_run).
+    canonical source (e.g. a private-tool-managed skill). `use_pointer` (design\\
+    consumer_reference_indirection.md) selects which of the two valid renderings to regenerate
+    TO - the caller decides per-consumer (a migrated consumer's CLAUDE.md already carries
+    HUB_POINTER_IMPORT_LINE; an un-migrated one doesn't, and stays on the direct-substitution
+    form, the default). Returns True if anything changed (or would, under dry_run).
     """
     skills_dir = Path(consumer_path) / '.claude' / 'skills'
     if not skills_dir.is_dir():
@@ -327,7 +513,7 @@ def fix_skill_stubs(consumer_path, templates_dir, import_base, dry_run=False, lo
         canon_path = Path(templates_dir) / 'skills' / skill_dir.name / 'SKILL.md'
         if not stub_path.exists() or not canon_path.exists():
             continue
-        expected = materialize_skill_stub(canon_path, import_base)
+        expected = materialize_skill_stub(canon_path, import_base, use_pointer=use_pointer)
         current = stub_path.read_text(encoding='utf-8')
         if current != expected:
             if log:
@@ -413,9 +599,12 @@ DISCONNECT_NOTES_FILENAME = 'TOWER_CRANE_DISCONNECT_NOTES.md'
 # fix_skill_stubs/fix_adopted_stub_paths/apply_skill/apply_piece/apply_private -> .claude/skills/).
 # disconnect_consumer.py additionally writes DISCONNECT_NOTES_FILENAME (the generated breadcrumb
 # manifest a this-only local cleanup leaves behind) - harmless no-op for the other two writers,
-# which never touch that filename.
+# which never touch that filename. HUB_DISPATCH_RELPATH (design\consumer_reference_indirection.md)
+# is tracked, host-invariant content - a real committable path, unlike HUB_POINTER_RELPATH, which
+# is gitignored and must NEVER appear here (an explicit `git add` of a gitignored path stages it
+# anyway, bypassing .gitignore).
 CONSUMER_OWNED_PATHS = ('CLAUDE.md', '.claude/settings.json', '.claude/skills',
-                         DISCONNECT_NOTES_FILENAME)
+                         HUB_DISPATCH_RELPATH, '.gitignore', DISCONNECT_NOTES_FILENAME)
 
 
 def commit_consumer_changes(consumer_path, message, log=None):

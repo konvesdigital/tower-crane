@@ -53,6 +53,8 @@ from config_lib import (
     get_shared_config, get_expanded_optin, materialize_skill_stub,
     build_new_cmd_map, apply_hook_command_fixes, print_diagnose_inline,
     TC_IN_USE_HEADING, WORKFLOW_HEADING, DISCONNECTED_HEADING, DISCONNECT_NOTES_FILENAME,
+    HUB_POINTER_IMPORT_LINE, HUB_POINTER_RELPATH, HUB_DISPATCH_RELPATH, HUB_DISPATCH_TEMPLATE,
+    get_dispatch_optin, build_hub_pointer_content, build_dispatch_cmd_map,
 )
 from relocate import fix_imports
 import registry_lib
@@ -277,6 +279,15 @@ def main():
             )
         already_connected_here = config['host_id'] in existing_consumer['hosts']
 
+    # design\consumer_reference_indirection.md: a "new connection" is any brand-new consumer,
+    # reconnect, adoption, or a genuinely NEW host joining an already-registered consumer
+    # (existing_consumer is not None and NOT already_connected_here) - every one of those gets the
+    # new hub_pointer.md/_hub_dispatch.py indirection. Re-scaffolding a host that's ALREADY
+    # connected is deliberately excluded (no forced migration of an existing, working connection -
+    # see design\consumer_reference_indirection.md's "Migrate all 3 existing consumers now vs.
+    # opportunistically" decision) - that one case keeps today's direct-path behavior untouched.
+    is_new_connection = existing_consumer is None or not already_connected_here
+
     # Blank-folder bootstrap (design\consumer_reconnect.md): connecting an already-registered
     # consumer whose target folder is genuinely empty and whose registry carries a remote: -
     # clone before any scaffolding touches the folder. Ordering matters: cloning AFTER scaffolding
@@ -349,6 +360,31 @@ def main():
     claude_dir = target_path / '.claude'
     claude_dir.mkdir(parents=True, exist_ok=True)
 
+    # --- 1a. hub_pointer.md / _hub_dispatch.py / .gitignore (new connections only) -----------
+    # design\consumer_reference_indirection.md: written BEFORE settings.json below, since that
+    # step's own tool-merge loop needs is_new_connection to already be decidable (it is - computed
+    # above) to choose get_dispatch_optin() over get_expanded_optin().
+    if is_new_connection:
+        pointer_path = claude_dir / 'hub_pointer.md'
+        write_utf8(pointer_path, build_hub_pointer_content(config, import_pieces))
+        print(f"  wrote  {pointer_path} (gitignored, this host only)")
+
+        dispatch_src = TEMPLATES_DIR / HUB_DISPATCH_TEMPLATE
+        dispatch_dst = target_path / HUB_DISPATCH_RELPATH
+        dispatch_content = dispatch_src.read_text(encoding='utf-8')
+        if not dispatch_dst.exists() or dispatch_dst.read_text(encoding='utf-8') != dispatch_content:
+            dispatch_dst.parent.mkdir(parents=True, exist_ok=True)
+            write_utf8(dispatch_dst, dispatch_content)
+            print(f"  wrote  {dispatch_dst}")
+
+        gitignore_path = target_path / '.gitignore'
+        gi_text = gitignore_path.read_text(encoding='utf-8') if gitignore_path.exists() else ''
+        gi_lines = [l.rstrip('\r') for l in gi_text.split('\n')]
+        if HUB_POINTER_RELPATH not in gi_lines:
+            new_gi = (gi_text.rstrip('\n') + '\n' if gi_text.strip() else '') + HUB_POINTER_RELPATH + '\n'
+            write_utf8(gitignore_path, new_gi)
+            print(f"  wrote  {gitignore_path} (added {HUB_POINTER_RELPATH})")
+
     # --- 2. settings.json (merge opt-in snippets) -------------------------------------------
     settings_path = claude_dir / 'settings.json'
     settings_existed = settings_path.exists()
@@ -360,6 +396,14 @@ def main():
         settings = {}
     settings.setdefault('hooks', {})
 
+    def _get_optin(optins_dir, tool_name):
+        # design\consumer_reference_indirection.md: a new connection gets the fixed dispatch-
+        # wrapper command form; an already-connected host's re-scaffold keeps today's direct-path
+        # form untouched (no forced migration).
+        if is_new_connection:
+            return get_dispatch_optin(Path(optins_dir) / f"{tool_name}.json", tool_name, config)
+        return get_expanded_optin(Path(optins_dir) / f"{tool_name}.json", config)
+
     if settings_existed and existing_consumer is not None:
         # host-merge branch (design\consumer_reconnect.md): repoint any ALREADY-PRESENT hook
         # command (from a physically-copied settings.json) for tools the registry already lists
@@ -368,7 +412,13 @@ def main():
         # never match as duplicates under the exact-JSON dedup the append loop uses.
         existing_tool_names = [o['name'] for o in existing_consumer['opted_in']]
         existing_private_names = [o['name'] for o in existing_consumer['private_opted_in']]
-        stale_cmd = build_new_cmd_map(existing_tool_names, existing_private_names, config, OPTINS_DIR, PRIVATE_OPTINS_DIR)
+        if is_new_connection:
+            # design\consumer_reference_indirection.md: a genuinely new host joining an
+            # already-registered consumer gets the dispatch-wrapper command form here too, same as
+            # the fresh-tool-merge loop below - one command shape per settings.json, never mixed.
+            stale_cmd = build_dispatch_cmd_map(existing_tool_names, existing_private_names, config, OPTINS_DIR, PRIVATE_OPTINS_DIR)
+        else:
+            stale_cmd = build_new_cmd_map(existing_tool_names, existing_private_names, config, OPTINS_DIR, PRIVATE_OPTINS_DIR)
         if apply_hook_command_fixes(settings, stale_cmd, existing_tool_names + existing_private_names,
                                      dry_run=False, log=print):
             print(f"  patched stale hook command(s) in {settings_path}")
@@ -384,8 +434,9 @@ def main():
         allow_list.append(read_rule)
 
     for t in tools:
-        # Expand config placeholders ({{PYTHON_LAUNCHER}}, {{SHARED_ROOT}}) into the concrete command.
-        optin = get_expanded_optin(OPTINS_DIR / f"{t}.json", config)
+        # Expand config placeholders into the concrete command - dispatch-wrapper form for a new
+        # connection, direct-path form otherwise (design\consumer_reference_indirection.md).
+        optin = _get_optin(OPTINS_DIR, t)
         if 'hooks' in optin:
             for evt, groups in optin['hooks'].items():
                 existing = settings['hooks'].setdefault(evt, [])
@@ -402,7 +453,7 @@ def main():
         if kind != 'hook':
             continue
         # {{PRIVATE_ROOT}} expands the same way {{SHARED_ROOT}} does above.
-        optin = get_expanded_optin(PRIVATE_OPTINS_DIR / f"{t}.json", config)
+        optin = _get_optin(PRIVATE_OPTINS_DIR, t)
         if 'hooks' in optin:
             for evt, groups in optin['hooks'].items():
                 existing = settings['hooks'].setdefault(evt, [])
@@ -416,7 +467,12 @@ def main():
 
     # --- 3. CLAUDE.md from template ----------------------------------------------------------
     claude_md_path = target_path / 'CLAUDE.md'
-    protocol_imports = '\n'.join(f"@{import_base}/{p}.md" for p in import_pieces)
+    # design\consumer_reference_indirection.md: a new connection gets the single, host-invariant
+    # indirection line; only reachable when existing_consumer is None (reconnect/adoption/brand
+    # new), which is always is_new_connection - the direct-lines join stays here only as a
+    # defensive fallback, never actually exercised.
+    protocol_imports = HUB_POINTER_IMPORT_LINE if is_new_connection else '\n'.join(
+        f"@{import_base}/{p}.md" for p in import_pieces)
 
     # Per-file principle reframe (design\connect_disconnect.md): claude_md_existed is captured
     # ONCE, before any write, and is the one signal other files below should consult about
@@ -456,16 +512,51 @@ def main():
             r'continuity_resume_check)\.md\s*$', existing_text))
         is_adoption = TC_IN_USE_HEADING not in existing_text and not has_import_line
 
-    if claude_md_path.exists() and existing_consumer is not None:
-        # host-merge branch (design\consumer_reconnect.md): patch only the @import lines in place
-        # via relocate.py's fix_imports(), instead of the old error-or-`--force` gate - `--force`
-        # used to be the only way past this check, and it also unconditionally reset
-        # project_progress.md to the blank skeleton. The project overview and everything else in
-        # CLAUDE.md is left untouched.
+    if claude_md_path.exists() and existing_consumer is not None and not is_new_connection:
+        # already-connected-here re-scaffold: patch only the @import lines in place via
+        # relocate.py's fix_imports(), instead of the old error-or-`--force` gate - `--force` used
+        # to be the only way past this check, and it also unconditionally reset project_progress.md
+        # to the blank skeleton. The project overview and everything else in CLAUDE.md is left
+        # untouched. No forced migration to the pointer-indirection form here
+        # (design\consumer_reference_indirection.md) - this host's connection already works.
         if fix_imports(target_path, import_pieces, import_base, dry_run=False):
             print(f"  patched {claude_md_path} (@import lines only)")
         else:
             print(f"  skip   {claude_md_path} already current (@import lines match)")
+    elif claude_md_path.exists() and existing_consumer is not None and is_new_connection:
+        # host-merge branch, genuinely new host (design\consumer_reconnect.md +
+        # design\consumer_reference_indirection.md): collapse whatever direct-form @import lines
+        # are already present (however many hosts wrote them before this one) into the single
+        # host-invariant pointer line - this host's own hub_pointer.md (written above) is what
+        # actually resolves it. A piece with no existing line just isn't found; not an error, since
+        # the single pointer line covers every piece once hub_pointer.md exists.
+        text = claude_md_path.read_text(encoding='utf-8')
+        lines = text.split('\n')
+        already_collapsed = HUB_POINTER_IMPORT_LINE in (l.rstrip('\r') for l in lines)
+        if already_collapsed:
+            print(f"  skip   {claude_md_path} already current (pointer import line present)")
+        else:
+            kept = []
+            inserted = False
+            any_matched = False
+            for line in lines:
+                stripped = line.rstrip('\r')
+                is_piece_line = any(
+                    re.match(r'^@.*/' + re.escape(piece) + r'\.md\s*$', stripped) for piece in import_pieces
+                )
+                if is_piece_line:
+                    any_matched = True
+                    if not inserted:
+                        kept.append(HUB_POINTER_IMPORT_LINE)
+                        inserted = True
+                else:
+                    kept.append(line)
+            if any_matched:
+                write_utf8(claude_md_path, '\n'.join(kept))
+                print(f"  patched {claude_md_path} (collapsed @import lines to {HUB_POINTER_IMPORT_LINE})")
+            else:
+                print(f"  note   {claude_md_path} has no recognized @import lines to collapse - "
+                      f"add '{HUB_POINTER_IMPORT_LINE}' to its Shared Workflow Protocol section by hand.")
     elif claude_md_path.exists() and (is_reconnect or is_adoption):
         # Reconnect: strip the disconnected-pointer section first, preserving everything else.
         # Adoption: no marker to strip, just append to the existing content as-is. Either way,
@@ -560,7 +651,7 @@ def main():
             if stub_path.exists() and not args.force and existing_consumer is None:
                 print(f"  skip   {stub_path} exists (use --force to overwrite)")
                 continue
-            stub_content = materialize_skill_stub(stub_src, import_base)
+            stub_content = materialize_skill_stub(stub_src, import_base, use_pointer=is_new_connection)
             write_utf8(stub_path, stub_content)
             print(f"  wrote  {stub_path}")
 
@@ -573,7 +664,7 @@ def main():
         if stub_path.exists() and not args.force and existing_consumer is None:
             print(f"  skip   {stub_path} exists (use --force to overwrite)")
             continue
-        stub_content = materialize_skill_stub(stub_src, import_base)
+        stub_content = materialize_skill_stub(stub_src, import_base, use_pointer=is_new_connection)
         write_utf8(stub_path, stub_content)
         print(f"  wrote  {stub_path}")
 

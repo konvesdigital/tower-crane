@@ -50,6 +50,7 @@ from config_lib import (
     commit_consumer_changes, get_shared_config, print_diagnose_inline,
     TC_IN_USE_HEADING, WORKFLOW_HEADING, DISCONNECTED_HEADING,
     DISCONNECT_NOTES_FILENAME as NOTES_FILENAME,
+    HUB_POINTER_IMPORT_LINE, HUB_POINTER_RELPATH, HUB_DISPATCH_RELPATH,
 )
 import registry_lib
 from new_consumer import SKILL_PIECES, STANDALONE_SKILLS
@@ -106,7 +107,8 @@ def replace_prose_sections(text, date, mode):
 
 def write_disconnect_notes(target_path, date, mode, host_id, n_imports, removed_hooks,
                             had_read_rule, removed_skills, sections_replaced, log,
-                            original_registered=None):
+                            original_registered=None, is_last_host=True,
+                            hub_pointer_removed=False, dispatch_removed=False):
     """Write TOWER_CRANE_DISCONNECT_NOTES.md - designed so reading THIS FILE ALONE gives a 100%
     complete list of every trace Tower Crane leaves behind in a consumer project after a
     this-machine disconnect, including a cross-reference back to CLAUDE.md's own short pointer
@@ -132,9 +134,22 @@ def write_disconnect_notes(target_path, date, mode, host_id, n_imports, removed_
             f"- `{TC_IN_USE_HEADING}` / `{WORKFLOW_HEADING}` in `CLAUDE.md` replaced with a "
             f"short pointer under `{DISCONNECTED_HEADING}` - that pointer links back to this "
             f"file.")
+    if hub_pointer_removed:
+        removed_lines.append(
+            f"- `{HUB_POINTER_RELPATH}` deleted (gitignored, per-host only - had zero effect on "
+            f"any other host's own connection).")
+    if dispatch_removed:
+        removed_lines.append(f"- `{HUB_DISPATCH_RELPATH}` deleted (last host disconnecting).")
     if not removed_lines:
         removed_lines.append("- (nothing local was present to remove - this host's connection "
                               "existed only in the registry.)")
+    if not is_last_host:
+        removed_lines.append(
+            "- **Left in place on purpose:** shared, git-tracked Tower Crane content (the "
+            f"`@import`/`{HUB_POINTER_IMPORT_LINE}` line, hook entries, `{HUB_DISPATCH_RELPATH}`, "
+            "`.claude/skills/` stubs) was NOT touched - another host is still connected to this "
+            "consumer and depends on it (design\\consumer_reference_indirection.md's host-count-"
+            "aware split). Only this host's own per-host state was cleaned up.")
 
     left_lines = [
         "- `project_progress.md` - this project's own continuity file; any historical Work Log "
@@ -199,11 +214,17 @@ def write_disconnect_notes(target_path, date, mode, host_id, n_imports, removed_
     log(f"  wrote  {notes_path}")
 
 
-def strip_local_references(target_path, consumer, config, mode, log):
-    """Undo what new_consumer.py wrote at target_path for THIS hub connection: strip @import
-    lines and replace the now-inaccurate 'Tower Crane In Use'/'Shared Workflow Protocol' prose
-    with a short honest pointer, strip hook/permission entries and scaffolded skill dirs, write
-    TOWER_CRANE_DISCONNECT_NOTES.md as the single complete breadcrumb index, then commit
+def strip_local_references(target_path, consumer, config, mode, log, is_last_host=True):
+    """Undo what new_consumer.py wrote at target_path for THIS hub connection. Host-count-aware
+    split (design\\consumer_reference_indirection.md, fixing a confirmed pre-existing bug this
+    design's own per-host/shared distinction made newly obvious): ALWAYS strips this host's own
+    per-host state (hub_pointer.md, this host's own Read(...) permission entry) regardless of how
+    many other hosts remain connected; only strips SHARED, git-tracked content (@import/pointer
+    line, hook entries, _hub_dispatch.py, skill-stub dirs) when is_last_host - doing so with
+    another host still connected would break that host's live connection, since those are the same
+    tracked file synced to every host. Replaces the now-inaccurate 'Tower Crane In Use'/'Shared
+    Workflow Protocol' prose with a short honest pointer (last-host only, for the same reason),
+    writes TOWER_CRANE_DISCONNECT_NOTES.md as the single complete breadcrumb index, then commits
     everything in the consumer's own repo (commit_consumer_changes()) so nothing is left
     uncommitted/unexplained - the gap a live 2026-08-12 test found (design\\connect_disconnect.md).
     Never touches project_progress.md or FIRST_RUN.md - those are the consumer's own content."""
@@ -215,14 +236,25 @@ def strip_local_references(target_path, consumer, config, mode, log):
     date = datetime.date.today().isoformat()
     import_base = str(config['import_base'])
 
-    # CLAUDE.md: strip every @{import_base}/... line, then replace the prose sections.
+    # .claude\hub_pointer.md: ALWAYS safe to delete - gitignored, genuinely per-host, zero effect
+    # on any other host's own (separately-regenerated) copy.
+    pointer_path = target_path / HUB_POINTER_RELPATH
+    hub_pointer_removed = pointer_path.exists()
+    if hub_pointer_removed:
+        pointer_path.unlink()
+        log(f"  removed {pointer_path}")
+
+    # CLAUDE.md: strip @import lines / the pointer line, then replace the prose sections - SHARED,
+    # tracked content, so only on the last host disconnecting.
     claude_md_path = target_path / 'CLAUDE.md'
     n_imports = 0
     sections_replaced = False
-    if claude_md_path.exists():
+    if is_last_host and claude_md_path.exists():
         text = claude_md_path.read_text(encoding='utf-8')
         escaped_base = re.escape(import_base)
-        text, n_imports = re.subn(rf'(?m)^@{escaped_base}/\S+\.md\s*\r?\n?', '', text)
+        text, n_direct = re.subn(rf'(?m)^@{escaped_base}/\S+\.md\s*\r?\n?', '', text)
+        text, n_pointer = re.subn(rf'(?m)^{re.escape(HUB_POINTER_IMPORT_LINE)}\s*\r?\n?', '', text)
+        n_imports = n_direct + n_pointer
         text, sections_replaced = replace_prose_sections(text, date, mode)
         if n_imports or sections_replaced:
             claude_md_path.write_text(text, encoding='utf-8', newline='\n')
@@ -232,28 +264,33 @@ def strip_local_references(target_path, consumer, config, mode, log):
             log(f"  note   {claude_md_path} doesn't contain the standard '{TC_IN_USE_HEADING}' "
                 f"section (hand-edited?) - prose left untouched, clean up manually if desired.")
 
-    # settings.json: strip this hub's hook entries + the Read(import_base/**) permission rule.
+    # settings.json: hook entries are SHARED tracked content (last host only); this host's own
+    # Read(...) permission entry is per-host-distinct (each host appends its own import_base-keyed
+    # entry - design\consumer_reference_indirection.md's decision 4) so it's always removed.
     settings_path = target_path / '.claude' / 'settings.json'
     removed_hooks = 0
     had_read_rule = False
     if settings_path.exists():
         settings = json.loads(settings_path.read_text(encoding='utf-8'))
-        tools = [o['name'] for o in consumer['opted_in']] + [o['name'] for o in consumer['private_opted_in']]
-        for evt, groups in list(settings.get('hooks', {}).items()):
-            new_groups = []
-            for grp in groups:
-                kept = [h for h in grp.get('hooks', [])
-                        if not any(re.search(r'hooks[\\/]' + re.escape(t) + r'\.(ps1|py)', h.get('command', ''))
-                                   for t in tools)]
-                removed_hooks += len(grp.get('hooks', [])) - len(kept)
-                if kept:
-                    new_grp = dict(grp)
-                    new_grp['hooks'] = kept
-                    new_groups.append(new_grp)
-            if new_groups:
-                settings['hooks'][evt] = new_groups
-            else:
-                del settings['hooks'][evt]
+        if is_last_host:
+            tools = [o['name'] for o in consumer['opted_in']] + [o['name'] for o in consumer['private_opted_in']]
+            for evt, groups in list(settings.get('hooks', {}).items()):
+                new_groups = []
+                for grp in groups:
+                    kept = [h for h in grp.get('hooks', [])
+                            if not any(
+                                re.search(r'hooks[\\/]' + re.escape(t) + r'\.(ps1|py)', h.get('command', '')) or
+                                re.search(r'_hub_dispatch\.py"?\s+' + re.escape(t) + r'\b', h.get('command', ''))
+                                for t in tools)]
+                    removed_hooks += len(grp.get('hooks', [])) - len(kept)
+                    if kept:
+                        new_grp = dict(grp)
+                        new_grp['hooks'] = kept
+                        new_groups.append(new_grp)
+                if new_groups:
+                    settings['hooks'][evt] = new_groups
+                else:
+                    del settings['hooks'][evt]
 
         allow = settings.setdefault('permissions', {}).setdefault('allow', [])
         read_rule = f"Read({import_base}/**)"
@@ -266,19 +303,30 @@ def strip_local_references(target_path, consumer, config, mode, log):
             log(f"  wrote  {settings_path} (removed {removed_hooks} hook entry/entries"
                 f"{', removed Read permission rule' if had_read_rule else ''})")
 
-    # .claude\skills\<name>\ - every skill this hub scaffolded.
-    skills_dir = target_path / '.claude' / 'skills'
+    # .claude\hooks\_hub_dispatch.py - tracked, shared, host-invariant content (last host only).
+    dispatch_removed = False
+    if is_last_host:
+        dispatch_path = target_path / HUB_DISPATCH_RELPATH
+        if dispatch_path.exists():
+            dispatch_path.unlink()
+            dispatch_removed = True
+            log(f"  removed {dispatch_path}")
+
+    # .claude\skills\<name>\ - every skill this hub scaffolded (SHARED tracked content - last host only).
     removed_skills = []
-    for name in sorted(local_skill_names(consumer)):
-        skill_dir = skills_dir / name
-        if skill_dir.exists():
-            shutil.rmtree(skill_dir)
-            removed_skills.append(name)
-            log(f"  removed {skill_dir}")
+    if is_last_host:
+        skills_dir = target_path / '.claude' / 'skills'
+        for name in sorted(local_skill_names(consumer)):
+            skill_dir = skills_dir / name
+            if skill_dir.exists():
+                shutil.rmtree(skill_dir)
+                removed_skills.append(name)
+                log(f"  removed {skill_dir}")
 
     write_disconnect_notes(target_path, date, mode, config['host_id'], n_imports, removed_hooks,
                             had_read_rule, removed_skills, sections_replaced, log,
-                            original_registered=consumer.get('registered'))
+                            original_registered=consumer.get('registered'), is_last_host=is_last_host,
+                            hub_pointer_removed=hub_pointer_removed, dispatch_removed=dispatch_removed)
 
     commit_msg = f"Tower Crane: disconnected via 'disconnect project' (mode: {mode})"
     result = commit_consumer_changes(target_path, commit_msg, log=log)
@@ -312,8 +360,15 @@ def disconnect_host(slug, host_id, config, mode, log, do_local_cleanup=True):
         log(f"  skip   '{slug}' has no hosts.{host_id} entry - already disconnected there.")
         return False
 
+    # design\consumer_reference_indirection.md's host-count-aware split: computed BEFORE removal
+    # (host_id is confirmed present above) since strip_local_references() needs to know, for a
+    # multi_machine consumer, whether any OTHER host will still depend on the shared tracked
+    # content it's deciding whether to strip.
+    is_last_host = len(consumer['hosts']) == 1
+
     if do_local_cleanup:
-        strip_local_references(consumer['hosts'][host_id]['path'], consumer, config, mode, log)
+        strip_local_references(consumer['hosts'][host_id]['path'], consumer, config, mode, log,
+                                is_last_host=is_last_host)
     else:
         log(f"  note   registry-only: this machine can't reach '{host_id}''s files at "
             f"{consumer['hosts'][host_id]['path']} - clean up its @import lines/settings.json/"
@@ -373,6 +428,14 @@ def main():
     if not targets:
         print(f"Nothing to do for '{args.slug}' under mode '{args.mode}'.")
         return
+
+    # design\consumer_reference_indirection.md: disconnect_host() computes its own
+    # is_last_host from the registry's LIVE state at call time (never from this loop's
+    # precomputed target set), so this-host's own removal must run LAST under mode 'all' -
+    # otherwise it would see other still-present hosts.<host> entries and wrongly conclude shared
+    # tracked content should be left in place, even though every host is being removed this run.
+    if args.mode == 'all' and this_host in targets:
+        targets = [h for h in targets if h != this_host] + [this_host]
 
     print(f"Disconnecting '{args.slug}' (mode: {args.mode}) - target host(s): {', '.join(targets)}")
     for host_id in targets:

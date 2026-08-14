@@ -10,7 +10,10 @@ Substitution tokens the scaffolder replaces:
   {{PROJECT_NAME}}        - full title in Title Case (e.g. "My Cool Project")
   {{DATE}}                - scaffold date, YYYY-MM-DD
   {{SHARED_TOOLS_LIST}}   - bullet list of opted-in tools (or a "none yet" line)
-  {{PROTOCOL_IMPORTS}}    - @import lines for the selected protocol pieces
+  {{PROTOCOL_IMPORTS}}    - the single @.claude/hub_pointer.md indirection line
+                            (design\consumer_reference_indirection.md) - that gitignored,
+                            per-host file carries the real @import lines for the selected
+                            protocol pieces, regenerated fresh by "connect project"/relocate.py
 The scaffolder strips this comment block from the materialized copy.
 -->
 
@@ -22,10 +25,12 @@ _Project overview goes here (see `FIRST_RUN.md`)._
 
 ## Tower Crane In Use
 
-This project opts into reusable Claude Code tooling from the tower_crane repo at
-`~\Documents\Claude\tower_crane\`. These are referenced (float-on-HEAD), not
-copied — an update ratified in tower_crane reaches this project the next time it runs. Do not
-edit the shared files; to report a bug or request an improvement, follow the filing protocol
+This project opts into reusable Claude Code tooling from the Tower Crane hub. These are
+referenced (float-on-HEAD), not copied — an update ratified in the hub reaches this project the
+next time it runs. This machine's copy of the hub lives wherever `.claude/hub_pointer.md` (this
+project's own gitignored, per-host pointer file) currently records — see that file's
+`shared_root:` value for the real path, or the hub's own `MENU.md` there for the full catalog. Do
+not edit the shared files; to report a bug or request an improvement, follow the filing protocol
 imported below.
 
 Opted-in tools (wired {{DATE}}):
@@ -34,9 +39,14 @@ Opted-in tools (wired {{DATE}}):
 
 ## Shared Workflow Protocol
 
-The following operating conventions are imported from tower_crane and float on HEAD — edits
-ratified there reach this project automatically. The first launch triggers a one-time
-import-approval dialog; accept it (see `FIRST_RUN.md`). To opt a piece out, remove its import
-line — a clean, per-piece choice (the shared checker will note the drift, but it is not blocked).
+The following operating conventions are imported from the Tower Crane hub and float on HEAD —
+edits ratified there reach this project automatically. The first launch triggers a one-time
+import-approval dialog; accept it (see `FIRST_RUN.md`). The one line below indirects through this
+project's own `.claude/hub_pointer.md` (gitignored, regenerated per host — never hand-edit it) to
+the real per-piece import lines, so this file itself never bakes in an absolute path to the hub.
+To opt a piece out, edit its line inside `.claude/hub_pointer.md` (the shared checker will note
+the drift, but it is not blocked) — that file is regenerated wholesale on the next `"connect
+project"`/`relocate.py` pass, so a manual opt-out there is not durable across a hub move; file a
+registry-update note if it needs to stick.
 
 {{PROTOCOL_IMPORTS}}

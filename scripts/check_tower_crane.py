@@ -77,7 +77,11 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from config_lib import get_shared_config, get_expanded_optin, materialize_skill_stub
+from config_lib import (
+    get_shared_config, get_expanded_optin, get_dispatch_optin, materialize_skill_stub,
+    HUB_POINTER_IMPORT_LINE, HUB_POINTER_RELPATH, HUB_DISPATCH_RELPATH, HUB_DISPATCH_TEMPLATE,
+    parse_hub_pointer,
+)
 from guidance_lib import read_sections, write_section, SECTION_CHECKER
 from registry_lib import parse_registry, effective_scope, host_path, reconcile_scope_floor
 
@@ -283,7 +287,12 @@ def test_consumer(c, config, this_host):
                                                  f"opt-in '{tool}' references a missing hook file: {hook_file}",
                                                  None))
 
-        # consumer's settings.json must still contain the canonical snippet (drift)
+        # consumer's settings.json must still contain the canonical snippet (drift) - EITHER the
+        # direct-path form (optin, computed above) OR the dispatch-wrapper form (design\
+        # consumer_reference_indirection.md: a new-connection consumer's settings.json legitimately
+        # contains this shape instead, and both are equally compliant, never mixed-and-matched
+        # tolerance for an actually-wrong command).
+        dispatch_optin = get_dispatch_optin(optin_path, tool, config)
         if consumer_settings is not None:
             missing = False
             if 'hooks' in optin:
@@ -293,8 +302,12 @@ def test_consumer(c, config, this_host):
                     # compressed JSON a Windows separator is escaped to '\\', so collapsing
                     # '\\' -> '/' makes the two forms compare equal without masking any
                     # non-separator drift (path text, launcher, matcher still compared).
-                    canon = [
+                    canon_direct = [
                         json.dumps(g, separators=(',', ':')).replace('\\\\', '/') for g in groups
+                    ]
+                    canon_dispatch = [
+                        json.dumps(g, separators=(',', ':')).replace('\\\\', '/')
+                        for g in dispatch_optin.get('hooks', {}).get(evt, [])
                     ]
                     have = []
                     consumer_hooks = consumer_settings.get('hooks') if isinstance(consumer_settings, dict) else None
@@ -303,9 +316,10 @@ def test_consumer(c, config, this_host):
                             json.dumps(g, separators=(',', ':')).replace('\\\\', '/')
                             for g in consumer_hooks[evt]
                         ]
-                    for entry in canon:
-                        if entry not in have:
-                            missing = True
+                    direct_ok = all(entry in have for entry in canon_direct)
+                    dispatch_ok = bool(canon_dispatch) and all(entry in have for entry in canon_dispatch)
+                    if not (direct_ok or dispatch_ok):
+                        missing = True
             if missing:
                 devs.append(Dev('FAIL', 'consumer',
                                  f"settings.json no longer contains the canonical opt-in snippet for '{tool}'.",
@@ -319,6 +333,28 @@ def test_consumer(c, config, this_host):
         # only newlines, and an @import line is always exactly one line, so this can't
         # over-match into the next line.
         md_imports = re.findall(r'@.*?templates/(\w+)\.md', md)
+
+        # design\consumer_reference_indirection.md: a new-connection consumer's CLAUDE.md carries
+        # only the single @.claude/hub_pointer.md line - the real per-piece imports live one hop
+        # deeper, in that gitignored, per-host file. Resolve through it so every check below
+        # (mandatory-piece glance, import-drift tripwire) keeps working transparently for either
+        # shape, old or new.
+        if HUB_POINTER_IMPORT_LINE in md:
+            pointer = parse_hub_pointer(cpath / HUB_POINTER_RELPATH)
+            if pointer is None:
+                devs.append(Dev('FAIL', 'consumer',
+                                 f"CLAUDE.md imports '{HUB_POINTER_IMPORT_LINE}' but "
+                                 f"{HUB_POINTER_RELPATH} doesn't exist (or isn't parseable) on this "
+                                 "host - every protocol-piece import is broken here.",
+                                 "Re-run \"connect project\" (or scripts\\relocate.py) from the hub "
+                                 "to regenerate it."))
+            else:
+                md_imports = list(md_imports) + pointer['imports']
+                if pointer['shared_root'] != config['shared_root'] or pointer['import_base'] != config['import_base']:
+                    devs.append(Dev('FAIL', 'consumer',
+                                     f"{HUB_POINTER_RELPATH} is stale on this host (doesn't match "
+                                     "this machine's live shared_root/import_base).",
+                                     "Re-run scripts\\relocate.py (or \"connect project\") from the hub."))
     elif c['imported']:
         names = ', '.join(p['name'] for p in c['imported'])
         devs.append(Dev('FAIL', 'consumer', "No CLAUDE.md but registry lists imported protocol piece(s).",
@@ -379,14 +415,33 @@ def test_consumer(c, config, this_host):
                              f"Consumer has a '{name}' skill stub but tower_crane has no canonical source "
                              f"at templates/skills/{name}/SKILL.md.", None))
             continue
-        expected = materialize_skill_stub(canon_path, config['import_base'])
+        # design\consumer_reference_indirection.md: a stub matching EITHER the direct-substitution
+        # rendering (not-yet-migrated consumer) OR the .claude/hub_pointer.md-indirected rendering
+        # (new connection) is compliant - both are independently valid canonical shapes.
+        expected_direct = materialize_skill_stub(canon_path, config['import_base'], use_pointer=False)
+        expected_pointer = materialize_skill_stub(canon_path, config['import_base'], use_pointer=True)
         actual = stub_path.read_text(encoding='utf-8')
-        if actual != expected:
+        if actual not in (expected_direct, expected_pointer):
             devs.append(Dev('FAIL', 'consumer',
                              f"'{name}' skill stub (.claude/skills/{name}/SKILL.md) has drifted from the "
                              f"canonical source.",
                              f"Re-copy {canon_path} into .claude/skills/{name}/SKILL.md, replacing "
                              f"{{{{IMPORT_BASE}}}} with '{config['import_base']}'."))
+
+    # --- _hub_dispatch.py drift (design\consumer_reference_indirection.md) -------------------
+    # Tracked, host-invariant content - byte-identical on every host, forever, so this is a plain
+    # verbatim compare (no substitution), same shape as the skill-stub drift check above.
+    dispatch_path = cpath / HUB_DISPATCH_RELPATH
+    if dispatch_path.exists():
+        canon_dispatch_path = TEMPLATES_DIR / HUB_DISPATCH_TEMPLATE
+        if not canon_dispatch_path.exists():
+            devs.append(Dev('FAIL', 'shared',
+                             f"Consumer has {HUB_DISPATCH_RELPATH} but tower_crane has no canonical "
+                             f"source at templates/{HUB_DISPATCH_TEMPLATE}.", None))
+        elif dispatch_path.read_text(encoding='utf-8') != canon_dispatch_path.read_text(encoding='utf-8'):
+            devs.append(Dev('FAIL', 'consumer',
+                             f"{HUB_DISPATCH_RELPATH} has drifted from the canonical source.",
+                             f"Re-copy {canon_dispatch_path} into {HUB_DISPATCH_RELPATH} verbatim."))
 
     # --- private_opted_in: (design\private_tools.md, decision 4) ----------------------------
     # Each entry is either a private hook (has a canonical snippet in PRIVATE_OPTINS_DIR) or a
@@ -659,6 +714,9 @@ def diagnose_consumer_files(path):
         diagnose_fact('## Tower Crane In Use' in text, "'## Tower Crane In Use' heading", '    ')
         diagnose_fact('## Shared Workflow Protocol' in text, "'## Shared Workflow Protocol' heading", '    ')
         diagnose_fact('## Tower Crane (disconnected)' in text, "'## Tower Crane (disconnected)' marker", '    ')
+        diagnose_fact(HUB_POINTER_IMPORT_LINE in text,
+                      f"'{HUB_POINTER_IMPORT_LINE}' indirection line (design\\consumer_reference_indirection.md)",
+                      '    ')
         live_imports = sorted(set(re.findall(r'(?m)^@\S+/(\w+)\.md\s*$', text)) & set(DIAGNOSE_IMPORT_NAMES))
         if live_imports:
             print(f"    [present] live @import line(s) for: {', '.join(live_imports)}")
@@ -666,6 +724,9 @@ def diagnose_consumer_files(path):
             print("    [absent]  no live @import line for any protocol piece")
     else:
         diagnose_fact(False, "CLAUDE.md exists", '    ')
+
+    diagnose_fact((cpath / HUB_POINTER_RELPATH).exists(), f"{HUB_POINTER_RELPATH} (gitignored, this host)", '    ')
+    diagnose_fact((cpath / HUB_DISPATCH_RELPATH).exists(), f"{HUB_DISPATCH_RELPATH}", '    ')
 
     settings_path = cpath / '.claude' / 'settings.json'
     if settings_path.exists():
@@ -676,7 +737,11 @@ def diagnose_consumer_files(path):
             for groups in (settings.get('hooks') or {}).values():
                 for grp in groups:
                     for h in grp.get('hooks', []):
-                        m = re.search(r'hooks[\\/](\w+)\.py', h.get('command', ''))
+                        cmd = h.get('command', '')
+                        m = re.search(r'hooks[\\/](\w+)\.py', cmd)
+                        if m:
+                            hook_names.add(m.group(1))
+                        m = re.search(r'_hub_dispatch\.py"?\s+(\w+)', cmd)
                         if m:
                             hook_names.add(m.group(1))
             if hook_names:

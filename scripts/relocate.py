@@ -33,7 +33,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config_lib import (get_shared_config, build_new_cmd_map, apply_hook_command_fixes,
-                         fix_skill_stubs, fix_adopted_stub_paths, commit_consumer_changes)
+                         fix_skill_stubs, fix_adopted_stub_paths, commit_consumer_changes,
+                         fix_hub_pointer, fix_hub_dispatch_wrapper, HUB_POINTER_IMPORT_LINE)
 from registry_lib import parse_registry, host_path, reconcile_scope_floor
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
@@ -177,12 +178,23 @@ def main():
             continue
 
         imports_changed = fix_imports(this_path, c['imports'], config['import_base'], args.dry_run)
-        skills_changed = fix_skill_stubs(this_path, TEMPLATES_DIR, config['import_base'], args.dry_run, log=print)
+        # design\consumer_reference_indirection.md: regenerate stubs to whichever form this
+        # consumer already uses - a migrated consumer's CLAUDE.md carries the pointer indirection
+        # line; an un-migrated one doesn't and stays on the direct-substitution form.
+        claude_md_this = Path(this_path) / 'CLAUDE.md'
+        use_pointer_here = claude_md_this.exists() and HUB_POINTER_IMPORT_LINE in claude_md_this.read_text(encoding='utf-8')
+        skills_changed = fix_skill_stubs(this_path, TEMPLATES_DIR, config['import_base'], args.dry_run,
+                                          log=print, use_pointer=use_pointer_here)
         # design\directive_economy.md's "Adopted-stub path portability" - a private
         # shared_resources\-adopted stub has no canonical source, so it regenerates from its own
         # marker's hub-rel: anchor instead of a diff against templates\skills\.
         adopted_changed = fix_adopted_stub_paths(this_path, PROJECT_ROOT, args.dry_run, log=print)
-        skills_changed = skills_changed or adopted_changed
+        # design\consumer_reference_indirection.md - both are no-ops for a not-yet-migrated
+        # consumer (fix_hub_pointer/fix_hub_dispatch_wrapper each check for their own file's prior
+        # presence before touching anything, so an old-style consumer never gets these introduced).
+        pointer_changed = fix_hub_pointer(this_path, config, c['imports'], args.dry_run, log=print)
+        dispatch_changed = fix_hub_dispatch_wrapper(this_path, TEMPLATES_DIR, args.dry_run, log=print)
+        skills_changed = skills_changed or adopted_changed or pointer_changed or dispatch_changed
 
         all_tools = c['tools'] + c['private_tools']
         if not all_tools:
