@@ -193,7 +193,7 @@ def main():
         # consumer (fix_hub_pointer/fix_hub_dispatch_wrapper each check for their own file's prior
         # presence before touching anything, so an old-style consumer never gets these introduced).
         pointer_changed = fix_hub_pointer(this_path, config, c['imports'], args.dry_run, log=print)
-        dispatch_changed = fix_hub_dispatch_wrapper(this_path, TEMPLATES_DIR, args.dry_run, log=print)
+        dispatch_changed = fix_hub_dispatch_wrapper(this_path, SHARED_ROOT, args.dry_run, log=print)
         skills_changed = skills_changed or adopted_changed or pointer_changed or dispatch_changed
 
         all_tools = c['tools'] + c['private_tools']

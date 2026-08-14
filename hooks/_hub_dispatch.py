@@ -3,7 +3,9 @@
 # command invokes (design\consumer_reference_indirection.md, toolkit\design\ in the hub). Copied
 # verbatim into every consumer that connects from this build forward, at .claude\hooks\
 # _hub_dispatch.py - its content never changes, ever, regardless of host, so it is never
-# regenerated once scaffolded (unlike everything else this design touches).
+# regenerated once scaffolded (unlike everything else this design touches). Canonical source lives
+# here in hooks\ (same category as consistency_check.py) rather than templates\, since templates\
+# is reserved for non-code content - check_file_surface.py's file-surface convention.
 #
 # At run time: reads THIS project's own .claude\hub_pointer.md (gitignored, regenerated per host
 # by "connect project" / scripts\relocate.py) for shared_root, builds the real target hub tool's

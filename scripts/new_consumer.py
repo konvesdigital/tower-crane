@@ -369,7 +369,7 @@ def main():
         write_utf8(pointer_path, build_hub_pointer_content(config, import_pieces))
         print(f"  wrote  {pointer_path} (gitignored, this host only)")
 
-        dispatch_src = TEMPLATES_DIR / HUB_DISPATCH_TEMPLATE
+        dispatch_src = SHARED_ROOT / HUB_DISPATCH_TEMPLATE
         dispatch_dst = target_path / HUB_DISPATCH_RELPATH
         dispatch_content = dispatch_src.read_text(encoding='utf-8')
         if not dispatch_dst.exists() or dispatch_dst.read_text(encoding='utf-8') != dispatch_content:

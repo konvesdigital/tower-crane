@@ -433,11 +433,11 @@ def test_consumer(c, config, this_host):
     # verbatim compare (no substitution), same shape as the skill-stub drift check above.
     dispatch_path = cpath / HUB_DISPATCH_RELPATH
     if dispatch_path.exists():
-        canon_dispatch_path = TEMPLATES_DIR / HUB_DISPATCH_TEMPLATE
+        canon_dispatch_path = SHARED_ROOT / HUB_DISPATCH_TEMPLATE
         if not canon_dispatch_path.exists():
             devs.append(Dev('FAIL', 'shared',
                              f"Consumer has {HUB_DISPATCH_RELPATH} but tower_crane has no canonical "
-                             f"source at templates/{HUB_DISPATCH_TEMPLATE}.", None))
+                             f"source at {HUB_DISPATCH_TEMPLATE}.", None))
         elif dispatch_path.read_text(encoding='utf-8') != canon_dispatch_path.read_text(encoding='utf-8'):
             devs.append(Dev('FAIL', 'consumer',
                              f"{HUB_DISPATCH_RELPATH} has drifted from the canonical source.",

@@ -231,7 +231,9 @@ def get_expanded_optin(optin_path, config):
 HUB_POINTER_RELPATH = '.claude/hub_pointer.md'
 HUB_POINTER_IMPORT_LINE = f'@{HUB_POINTER_RELPATH}'
 HUB_DISPATCH_RELPATH = '.claude/hooks/_hub_dispatch.py'
-HUB_DISPATCH_TEMPLATE = 'hooks/_hub_dispatch.py'  # under templates\, the canonical tracked source
+# under SHARED_ROOT (toolkit\hooks\), not templates\ - templates\ is reserved for non-code content
+# (check_file_surface.py's file-surface convention rejects a .py file there).
+HUB_DISPATCH_TEMPLATE = 'hooks/_hub_dispatch.py'
 
 
 def get_dispatch_optin(optin_path, tool_name, config):
@@ -334,16 +336,16 @@ def fix_hub_pointer(consumer_path, config, import_pieces, dry_run=False, log=Non
     return True
 
 
-def fix_hub_dispatch_wrapper(consumer_path, templates_dir, dry_run=False, log=None):
-    """Refreshes .claude\\hooks\\_hub_dispatch.py against the canonical
-    templates\\hooks\\_hub_dispatch.py source, but ONLY for a consumer that already has this file
-    (i.e. already migrated - design\\consumer_reference_indirection.md) - never introduces it to a
-    not-yet-migrated consumer. Content is host-invariant (no substitution), same drift shape as
+def fix_hub_dispatch_wrapper(consumer_path, shared_root, dry_run=False, log=None):
+    """Refreshes .claude\\hooks\\_hub_dispatch.py against the canonical toolkit\\hooks\\
+    _hub_dispatch.py source, but ONLY for a consumer that already has this file (i.e. already
+    migrated - design\\consumer_reference_indirection.md) - never introduces it to a not-yet-
+    migrated consumer. Content is host-invariant (no substitution), same drift shape as
     fix_skill_stubs() above. Returns True if written (or would be, under dry_run)."""
     dst = Path(consumer_path) / HUB_DISPATCH_RELPATH
     if not dst.exists():
         return False
-    src = Path(templates_dir) / HUB_DISPATCH_TEMPLATE
+    src = Path(shared_root) / HUB_DISPATCH_TEMPLATE
     if not src.exists():
         return False
     expected = src.read_text(encoding='utf-8')
