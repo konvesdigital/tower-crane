@@ -55,8 +55,8 @@ from config_lib import (
     TC_IN_USE_HEADING, WORKFLOW_HEADING, DISCONNECTED_HEADING, DISCONNECT_NOTES_FILENAME,
     HUB_POINTER_IMPORT_LINE, HUB_POINTER_RELPATH, HUB_DISPATCH_RELPATH, HUB_DISPATCH_TEMPLATE,
     get_dispatch_optin, build_hub_pointer_content, build_dispatch_cmd_map,
+    write_new_connection_files, collapse_imports_to_pointer, fix_imports, commit_hub_changes,
 )
-from relocate import fix_imports
 import registry_lib
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
@@ -363,27 +363,12 @@ def main():
     # --- 1a. hub_pointer.md / _hub_dispatch.py / .gitignore (new connections only) -----------
     # design\consumer_reference_indirection.md: written BEFORE settings.json below, since that
     # step's own tool-merge loop needs is_new_connection to already be decidable (it is - computed
-    # above) to choose get_dispatch_optin() over get_expanded_optin().
+    # above) to choose get_dispatch_optin() over get_expanded_optin(). Reuses
+    # write_new_connection_files() (config_lib.py) - design\grt_connectivity_audit.md item (iii)
+    # factored this out so migrate_consumer_indirection.py's one-time already-connected-host
+    # migration can call the identical write instead of a hand-copied duplicate.
     if is_new_connection:
-        pointer_path = claude_dir / 'hub_pointer.md'
-        write_utf8(pointer_path, build_hub_pointer_content(config, import_pieces))
-        print(f"  wrote  {pointer_path} (gitignored, this host only)")
-
-        dispatch_src = SHARED_ROOT / HUB_DISPATCH_TEMPLATE
-        dispatch_dst = target_path / HUB_DISPATCH_RELPATH
-        dispatch_content = dispatch_src.read_text(encoding='utf-8')
-        if not dispatch_dst.exists() or dispatch_dst.read_text(encoding='utf-8') != dispatch_content:
-            dispatch_dst.parent.mkdir(parents=True, exist_ok=True)
-            write_utf8(dispatch_dst, dispatch_content)
-            print(f"  wrote  {dispatch_dst}")
-
-        gitignore_path = target_path / '.gitignore'
-        gi_text = gitignore_path.read_text(encoding='utf-8') if gitignore_path.exists() else ''
-        gi_lines = [l.rstrip('\r') for l in gi_text.split('\n')]
-        if HUB_POINTER_RELPATH not in gi_lines:
-            new_gi = (gi_text.rstrip('\n') + '\n' if gi_text.strip() else '') + HUB_POINTER_RELPATH + '\n'
-            write_utf8(gitignore_path, new_gi)
-            print(f"  wrote  {gitignore_path} (added {HUB_POINTER_RELPATH})")
+        write_new_connection_files(target_path, config, import_pieces, SHARED_ROOT, log=print)
 
     # --- 2. settings.json (merge opt-in snippets) -------------------------------------------
     settings_path = claude_dir / 'settings.json'
@@ -519,7 +504,7 @@ def main():
         # to the blank skeleton. The project overview and everything else in CLAUDE.md is left
         # untouched. No forced migration to the pointer-indirection form here
         # (design\consumer_reference_indirection.md) - this host's connection already works.
-        if fix_imports(target_path, import_pieces, import_base, dry_run=False):
+        if fix_imports(target_path, import_pieces, import_base, dry_run=False, log=print):
             print(f"  patched {claude_md_path} (@import lines only)")
         else:
             print(f"  skip   {claude_md_path} already current (@import lines match)")
@@ -529,34 +514,15 @@ def main():
         # are already present (however many hosts wrote them before this one) into the single
         # host-invariant pointer line - this host's own hub_pointer.md (written above) is what
         # actually resolves it. A piece with no existing line just isn't found; not an error, since
-        # the single pointer line covers every piece once hub_pointer.md exists.
-        text = claude_md_path.read_text(encoding='utf-8')
-        lines = text.split('\n')
-        already_collapsed = HUB_POINTER_IMPORT_LINE in (l.rstrip('\r') for l in lines)
-        if already_collapsed:
+        # the single pointer line covers every piece once hub_pointer.md exists. Reuses
+        # collapse_imports_to_pointer() (config_lib.py) - design\grt_connectivity_audit.md item
+        # (iii) factored this out for migrate_consumer_indirection.py's identical reuse.
+        result = collapse_imports_to_pointer(claude_md_path, import_pieces, log=print)
+        if result == 'already':
             print(f"  skip   {claude_md_path} already current (pointer import line present)")
-        else:
-            kept = []
-            inserted = False
-            any_matched = False
-            for line in lines:
-                stripped = line.rstrip('\r')
-                is_piece_line = any(
-                    re.match(r'^@.*/' + re.escape(piece) + r'\.md\s*$', stripped) for piece in import_pieces
-                )
-                if is_piece_line:
-                    any_matched = True
-                    if not inserted:
-                        kept.append(HUB_POINTER_IMPORT_LINE)
-                        inserted = True
-                else:
-                    kept.append(line)
-            if any_matched:
-                write_utf8(claude_md_path, '\n'.join(kept))
-                print(f"  patched {claude_md_path} (collapsed @import lines to {HUB_POINTER_IMPORT_LINE})")
-            else:
-                print(f"  note   {claude_md_path} has no recognized @import lines to collapse - "
-                      f"add '{HUB_POINTER_IMPORT_LINE}' to its Shared Workflow Protocol section by hand.")
+        elif result == 'no-match':
+            print(f"  note   {claude_md_path} has no recognized @import lines to collapse - "
+                  f"add '{HUB_POINTER_IMPORT_LINE}' to its Shared Workflow Protocol section by hand.")
     elif claude_md_path.exists() and (is_reconnect or is_adoption):
         # Reconnect: strip the disconnected-pointer section first, preserving everything else.
         # Adoption: no marker to strip, just append to the existing content as-is. Either way,
@@ -848,11 +814,29 @@ Notes: scaffolded by `scripts/new_consumer.py` on {scaffold_date}. Registry form
         write_utf8(registry_path, registry)
         print(f"  wrote  {registry_path}")
 
+    # --- 6b. commit the registry write into the outer hub repo itself, now, not left for a later
+    # optional `checkpoint` (design\grt_connectivity_audit.md item (i)): the registry is
+    # functionality-critical state (check_tower_crane.py / every host's own resume reads it for a
+    # correct answer), not user work-in-progress - skipped entirely when already_connected_here
+    # left the registry file untouched above.
+    if not (existing_consumer is not None and already_connected_here):
+        registry_commit_msg = (
+            f"Registry: connect '{slug}' (host: {config['host_id']})" if existing_consumer is None
+            else f"Registry: add host '{config['host_id']}' to '{slug}'")
+        registry_commit_result = commit_hub_changes(
+            PROJECT_ROOT, [f"consumers/{slug}.md"], registry_commit_msg, log=print)
+        registry_commit_labels = {
+            'committed-pushed': f"  [git] {registry_path.name} committed and pushed in tower_crane's own outer repo.",
+            'committed-no-remote': f"  [git] {registry_path.name} committed in tower_crane's own outer repo (no origin remote to push to).",
+        }
+        label = registry_commit_labels.get(registry_commit_result)
+        if label:
+            print(label)
+
     # --- 7. next steps -------------------------------------------------------------------------
     print()
     print("Done. Next steps:")
-    print(f"  1. In tower_crane: review + commit the new consumers/{slug}.md.")
-    print(f"  2. Open {target_path} in a fresh Claude Code session and complete FIRST_RUN.md")
+    print(f"  1. Open {target_path} in a fresh Claude Code session and complete FIRST_RUN.md")
     print("     (git init, accept the import-approval dialog, fill the CLAUDE.md overview).")
 
 

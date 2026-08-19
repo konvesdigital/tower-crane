@@ -233,11 +233,17 @@ def do_apply(cfg, scanned, global_index, spec, today):
         names = ', '.join(f"{cat}:{name}" for cat, name in entries)
         result = commit_consumer_changes(
             scanned_by_slug[slug]['project_root'],
-            f"Tower Crane sync: applied {names}", log=print)
+            f"Tower Crane sync: applied {names}", log=print,
+            config=cfg, imports=[i['name'] for i in c['imported']], shared_root=SHARED_ROOT)
         if result == 'committed-pushed':
             print(f"  [git] {c['name']}: committed and pushed in its own repo.")
         elif result == 'committed-no-remote':
             print(f"  [git] {c['name']}: committed in its own repo (no origin remote to push to).")
+        elif result == 'reconciled-pushed':
+            # design\grt_connectivity_audit.md item (ii): a real divergence was auto-resolved by
+            # resetting and regenerating this host's own Tower-Crane-owned values.
+            print(f"  [git] {c['name']}: push conflict auto-reconciled (reset + regenerated), "
+                  f"committed and pushed.")
 
 
 def main():

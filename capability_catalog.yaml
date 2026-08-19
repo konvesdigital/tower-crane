@@ -117,6 +117,16 @@ nodes:
       from here.
     themes: []
 
+  - id: migrate_consumer_indirection
+    trigger: "migrate consumer to reference-indirection"
+    context: hub
+    description: >-
+      One-time conversion of an already-connected host from the old direct-baked-path form to the
+      pointer-indirection form connect_project already gives a brand-new connection for free.
+      Every other host already connected to the same consumer picks it up automatically on its own
+      next relocate.py/resume pass.
+    themes: []
+
   - id: remove_hub
     trigger: "remove / uninstall"
     context: hub
@@ -264,6 +274,12 @@ edges:
     b: disconnect_consumer
     conditional: false
     note: null
+
+  - type: lifecycle-sibling
+    a: connect_project
+    b: migrate_consumer_indirection
+    conditional: false
+    note: "migrate_consumer_indirection gives an already-connected host the same pointer-indirection form connect_project already writes for a brand-new connection"
 
   - type: reciprocal
     a: setup_machine

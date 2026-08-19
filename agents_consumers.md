@@ -1,8 +1,8 @@
 # Adding / removing a consumer (AGENTS.md companion)
 
-Full mechanics for the `"connect project"`, `"disconnect project"`, and `"remove"`/`"uninstall"`
-triggers named in `AGENTS.md`'s Procedures section. Read this file when any of those fire — it is
-not preloaded.
+Full mechanics for the `"connect project"`, `"disconnect project"`, `"remove"`/`"uninstall"`, and
+`"migrate consumer to reference-indirection"` triggers named in `AGENTS.md`'s Procedures section.
+Read this file when any of those fire — it is not preloaded.
 
 ## Adding a consumer
 **Trigger: "connect project".** Ask new-from-scratch vs. existing project first, then always ask
@@ -128,3 +128,24 @@ project"` — a rebuild, not a restore.
 
 Then run `scripts\remove_hub.py` (no args — operates on this machine via its own
 `config.local.json`) from inside `toolkit\`. Full design: `design\connect_disconnect.md`.
+
+## Migrating an already-connected host to reference-indirection
+**Trigger: "migrate consumer to reference-indirection"** — a one-time, explicit action, distinct
+from `"connect project"` on purpose: a command already run routinely on an already-connected
+consumer shouldn't silently start rewriting shared, tracked content that affects every other
+connected host too. Applies only to a consumer/host combination that's still on the old
+direct-baked-path form (`design\consumer_reference_indirection.md`'s original "new connections
+only" scope left an already-connected host on that form indefinitely — the recurring cross-host
+skill-stub collision this closes, `design\grt_connectivity_audit.md` item (iii)).
+
+**Before running: state exactly what will be rewritten and get explicit go-ahead** — CLAUDE.md's
+`@import` lines collapse to the single pointer line, `.claude\settings.json`'s hook command(s)
+switch to the dispatch-wrapper form, and every `.claude\skills\<name>\SKILL.md` stub regenerates to
+pointer-indirection wording. All of that is shared, tracked content — every OTHER host still
+connected to this consumer picks it up automatically on its own next `relocate.py`/`resume` pass,
+no separate action needed there.
+
+Then run `scripts\migrate_consumer_indirection.py --slug <slug>` from inside `toolkit\`. No-ops
+cleanly (prints a message, changes nothing) if this host is already on pointer form. Run
+`scripts\check_tower_crane.py` afterward to confirm the consumer still validates clean. Full
+design: `design\grt_connectivity_audit.md` item (iii).

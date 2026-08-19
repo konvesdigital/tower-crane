@@ -34,7 +34,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config_lib import (get_shared_config, build_new_cmd_map, apply_hook_command_fixes,
                          fix_skill_stubs, fix_adopted_stub_paths, commit_consumer_changes,
-                         fix_hub_pointer, fix_hub_dispatch_wrapper, HUB_POINTER_IMPORT_LINE)
+                         fix_hub_pointer, fix_hub_dispatch_wrapper, fix_imports,
+                         HUB_POINTER_IMPORT_LINE)
 from registry_lib import parse_registry, host_path, reconcile_scope_floor
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
@@ -71,33 +72,9 @@ def read_registry_entry(path):
     return obj
 
 
-# @import lines are baked into a consumer's CLAUDE.md at register/scaffold time from
-# config.local.json's import_base, same "already-baked, needs a relocate pass" situation as the
-# hook commands above - config_lib.py always recomputes import_base live, so this brings a
-# consumer's @import lines back in sync the same way the hook-command loop does for hooks/*.py.
-def fix_imports(consumer_path, imports, import_base, dry_run):
-    claude_path = Path(consumer_path) / 'CLAUDE.md'
-    if not claude_path.exists() or not imports:
-        return False
-    text = claude_path.read_text(encoding='utf-8')
-    lines = text.split('\n')
-    changed = False
-    for piece in imports:
-        pattern = re.compile(r'^@.*/' + re.escape(piece) + r'\.md\s*$')
-        expected = f"@{import_base}/{piece}.md"
-        for i, line in enumerate(lines):
-            if pattern.match(line) and line.rstrip('\r') != expected:
-                verb = 'would change' if dry_run else 'change'
-                print(f"  [{verb}] @import {piece}")
-                print(f"      from: {line.rstrip(chr(13))}")
-                print(f"      to:   {expected}")
-                lines[i] = expected
-                changed = True
-    if changed and not dry_run:
-        write_utf8(claude_path, '\n'.join(lines))
-        print(f"  wrote {claude_path}")
-    return changed
-
+# fix_imports() now lives in config_lib.py (design\grt_connectivity_audit.md item (ii), moved
+# 2026-08-19 so commit_consumer_changes()'s own push-failure reconciliation can call it
+# in-process) - imported above alongside the other Tower-Crane-owned-file regenerators.
 
 # design\resource_sharing_model.md's "Saving now propagates itself" fix, one level down
 # (project_progress.md's 2026-08-11 Work Log): this pass writes into a consumer's own repo with
@@ -110,14 +87,19 @@ COMMIT_LABELS = {
     'committed-no-remote': '  [git] committed in this consumer\'s own repo (no origin remote to push to).',
     'commit-failed': None,   # commit_consumer_changes() already logged the warn line itself
     'push-failed': None,     # ditto
+    # design\grt_connectivity_audit.md item (ii): a real divergence was auto-resolved by
+    # resetting and regenerating this host's own Tower-Crane-owned values - never a text merge.
+    # _reconcile_diverged_push() already logged the detail; this is just the summary line.
+    'reconciled-pushed': '  [git] push conflict auto-reconciled (reset + regenerated), committed and pushed.',
 }
 
 
-def report_consumer_commit(this_path, dry_run):
+def report_consumer_commit(this_path, dry_run, config, imports):
     if dry_run:
         return
     result = commit_consumer_changes(
-        this_path, "Tower Crane sync: relocate.py path/hook regeneration", log=print)
+        this_path, "Tower Crane sync: relocate.py path/hook regeneration", log=print,
+        config=config, imports=imports, shared_root=SHARED_ROOT)
     label = COMMIT_LABELS.get(result)
     if label:
         print(label)
@@ -177,7 +159,8 @@ def main():
             COUNTS['warn'] += 1
             continue
 
-        imports_changed = fix_imports(this_path, c['imports'], config['import_base'], args.dry_run)
+        imports_changed = fix_imports(this_path, c['imports'], config['import_base'], args.dry_run,
+                                       log=print)
         # design\consumer_reference_indirection.md: regenerate stubs to whichever form this
         # consumer already uses - a migrated consumer's CLAUDE.md carries the pointer indirection
         # line; an un-migrated one doesn't and stays on the direct-substitution form.
@@ -203,7 +186,7 @@ def main():
             else:
                 print("  [no-op] no opted-in tools (prose-only consumer).")
                 COUNTS['noop'] += 1
-            report_consumer_commit(this_path, args.dry_run)
+            report_consumer_commit(this_path, args.dry_run, config, c['imports'])
             continue
 
         settings_path = Path(this_path) / '.claude' / 'settings.json'
@@ -246,7 +229,7 @@ def main():
         else:
             print("  [no-op] settings already current.")
             COUNTS['noop'] += 1
-        report_consumer_commit(this_path, args.dry_run)
+        report_consumer_commit(this_path, args.dry_run, config, c['imports'])
 
     print()
     print(f"=== Summary: {COUNTS['changed']} changed, {COUNTS['noop']} no-op, {COUNTS['skipped']} off-host, {COUNTS['warn']} warning(s) ===")

@@ -47,7 +47,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config_lib import (
-    commit_consumer_changes, get_shared_config, print_diagnose_inline,
+    commit_consumer_changes, commit_hub_changes, get_shared_config, print_diagnose_inline,
     TC_IN_USE_HEADING, WORKFLOW_HEADING, DISCONNECTED_HEADING,
     DISCONNECT_NOTES_FILENAME as NOTES_FILENAME,
     HUB_POINTER_IMPORT_LINE, HUB_POINTER_RELPATH, HUB_DISPATCH_RELPATH,
@@ -329,7 +329,9 @@ def strip_local_references(target_path, consumer, config, mode, log, is_last_hos
                             hub_pointer_removed=hub_pointer_removed, dispatch_removed=dispatch_removed)
 
     commit_msg = f"Tower Crane: disconnected via 'disconnect project' (mode: {mode})"
-    result = commit_consumer_changes(target_path, commit_msg, log=log)
+    result = commit_consumer_changes(
+        target_path, commit_msg, log=log, config=config,
+        imports=[i['name'] for i in consumer['imported']], shared_root=SHARED_ROOT)
     commit_labels = {
         'not-a-repo': "  note   not a git repo - changes left uncommitted on disk.",
         'noop': None,
@@ -337,6 +339,9 @@ def strip_local_references(target_path, consumer, config, mode, log, is_last_hos
         'committed-no-remote': "  [git] committed in this consumer's own repo (no origin remote to push to).",
         'commit-failed': None,  # commit_consumer_changes() already logged the warn line itself
         'push-failed': None,
+        # design\grt_connectivity_audit.md item (ii): a real divergence was auto-resolved by
+        # resetting and regenerating this host's own Tower-Crane-owned values.
+        'reconciled-pushed': "  [git] push conflict auto-reconciled (reset + regenerated), committed and pushed.",
     }
     label = commit_labels.get(result)
     if label:
@@ -438,8 +443,28 @@ def main():
         targets = [h for h in targets if h != this_host] + [this_host]
 
     print(f"Disconnecting '{args.slug}' (mode: {args.mode}) - target host(s): {', '.join(targets)}")
+    any_removed = False
     for host_id in targets:
-        disconnect_host(args.slug, host_id, config, args.mode, print, do_local_cleanup=(host_id == this_host))
+        if disconnect_host(args.slug, host_id, config, args.mode, print, do_local_cleanup=(host_id == this_host)):
+            any_removed = True
+
+    # design\grt_connectivity_audit.md item (i): commit the registry change into the outer hub
+    # repo itself, now, not left for a later optional `checkpoint` - the registry is
+    # functionality-critical state (every host's own resume / check_tower_crane.py reads it for a
+    # correct answer), not user work-in-progress. `git add` on a since-hard-deleted registry file
+    # (0 hosts left) stages the deletion correctly, so this covers that case too.
+    if any_removed:
+        registry_commit_msg = (
+            f"Registry: disconnect '{args.slug}' (mode: {args.mode}, host(s): {', '.join(targets)})")
+        registry_commit_result = commit_hub_changes(
+            PROJECT_ROOT, [f"consumers/{args.slug}.md"], registry_commit_msg, log=print)
+        registry_commit_labels = {
+            'committed-pushed': f"  [git] consumers/{args.slug}.md committed and pushed in tower_crane's own outer repo.",
+            'committed-no-remote': f"  [git] consumers/{args.slug}.md committed in tower_crane's own outer repo (no origin remote to push to).",
+        }
+        label = registry_commit_labels.get(registry_commit_result)
+        if label:
+            print(label)
 
 
 if __name__ == '__main__':

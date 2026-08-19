@@ -359,6 +359,114 @@ def fix_hub_dispatch_wrapper(consumer_path, shared_root, dry_run=False, log=None
     return True
 
 
+def write_new_connection_files(target_path, config, import_pieces, shared_root, log=None):
+    """Writes the three files a genuinely NEW connection needs to use the pointer-indirection
+    form (design\\consumer_reference_indirection.md): this host's own gitignored
+    .claude\\hub_pointer.md, the tracked .claude\\hooks\\_hub_dispatch.py wrapper, and the
+    .gitignore entry for the pointer file. Factored out of new_consumer.py's original inline "1a"
+    block (design\\grt_connectivity_audit.md item (iii)) so migrate_consumer_indirection.py's
+    one-time already-connected-host migration reuses the identical write instead of a hand-copied
+    duplicate that could drift. Idempotent - a repeat call only rewrites _hub_dispatch.py if its
+    content actually differs, and only adds the .gitignore line if absent."""
+    target_path = Path(target_path)
+    claude_dir = target_path / '.claude'
+    claude_dir.mkdir(parents=True, exist_ok=True)
+
+    pointer_path = claude_dir / 'hub_pointer.md'
+    pointer_path.write_text(build_hub_pointer_content(config, import_pieces),
+                             encoding='utf-8', newline='\n')
+    if log:
+        log(f"  wrote  {pointer_path} (gitignored, this host only)")
+
+    dispatch_src = Path(shared_root) / HUB_DISPATCH_TEMPLATE
+    dispatch_dst = target_path / HUB_DISPATCH_RELPATH
+    dispatch_content = dispatch_src.read_text(encoding='utf-8')
+    if not dispatch_dst.exists() or dispatch_dst.read_text(encoding='utf-8') != dispatch_content:
+        dispatch_dst.parent.mkdir(parents=True, exist_ok=True)
+        dispatch_dst.write_text(dispatch_content, encoding='utf-8', newline='\n')
+        if log:
+            log(f"  wrote  {dispatch_dst}")
+
+    gitignore_path = target_path / '.gitignore'
+    gi_text = gitignore_path.read_text(encoding='utf-8') if gitignore_path.exists() else ''
+    gi_lines = [l.rstrip('\r') for l in gi_text.split('\n')]
+    if HUB_POINTER_RELPATH not in gi_lines:
+        new_gi = (gi_text.rstrip('\n') + '\n' if gi_text.strip() else '') + HUB_POINTER_RELPATH + '\n'
+        gitignore_path.write_text(new_gi, encoding='utf-8', newline='\n')
+        if log:
+            log(f"  wrote  {gitignore_path} (added {HUB_POINTER_RELPATH})")
+
+
+def collapse_imports_to_pointer(claude_md_path, import_pieces, log=None):
+    """Collapses whatever direct-form @import lines are present in a consumer's CLAUDE.md into
+    the single host-invariant HUB_POINTER_IMPORT_LINE (design\\consumer_reference_indirection.md).
+    Factored out of new_consumer.py's host-merge branch (design\\grt_connectivity_audit.md item
+    (iii)) so migrate_consumer_indirection.py's one-time already-connected-host migration reuses
+    the identical collapse logic. Returns 'already' (pointer line already present - nothing to
+    do), 'collapsed' (rewrote the file), or 'no-match' (no recognized @import line found to
+    collapse - caller should leave CLAUDE.md untouched and tell a human to add the pointer line
+    by hand)."""
+    claude_md_path = Path(claude_md_path)
+    text = claude_md_path.read_text(encoding='utf-8')
+    lines = text.split('\n')
+    if HUB_POINTER_IMPORT_LINE in (l.rstrip('\r') for l in lines):
+        return 'already'
+    kept = []
+    inserted = False
+    any_matched = False
+    for line in lines:
+        stripped = line.rstrip('\r')
+        is_piece_line = any(
+            re.match(r'^@.*/' + re.escape(piece) + r'\.md\s*$', stripped) for piece in import_pieces)
+        if is_piece_line:
+            any_matched = True
+            if not inserted:
+                kept.append(HUB_POINTER_IMPORT_LINE)
+                inserted = True
+        else:
+            kept.append(line)
+    if not any_matched:
+        return 'no-match'
+    claude_md_path.write_text('\n'.join(kept), encoding='utf-8', newline='\n')
+    if log:
+        log(f"  patched {claude_md_path} (collapsed @import lines to {HUB_POINTER_IMPORT_LINE})")
+    return 'collapsed'
+
+
+# @import lines are baked into a consumer's CLAUDE.md at register/scaffold time from
+# config.local.json's import_base, same "already-baked, needs a relocate pass" situation as a hook
+# command - config_lib.py always recomputes import_base live, so this brings a consumer's @import
+# lines back in sync the same way apply_hook_command_fixes() does for hooks. Moved here 2026-08-19
+# from relocate.py (design\\grt_connectivity_audit.md item (ii)) - the one Tower-Crane-owned-file
+# regenerator not yet centralized alongside fix_skill_stubs/fix_hub_pointer/
+# fix_hub_dispatch_wrapper/fix_adopted_stub_paths above, needed here so
+# commit_consumer_changes()'s own push-failure reconciliation (below) can call it in-process.
+def fix_imports(consumer_path, imports, import_base, dry_run=False, log=None):
+    claude_path = Path(consumer_path) / 'CLAUDE.md'
+    if not claude_path.exists() or not imports:
+        return False
+    text = claude_path.read_text(encoding='utf-8')
+    lines = text.split('\n')
+    changed = False
+    for piece in imports:
+        pattern = re.compile(r'^@.*/' + re.escape(piece) + r'\.md\s*$')
+        expected = f"@{import_base}/{piece}.md"
+        for i, line in enumerate(lines):
+            if pattern.match(line) and line.rstrip('\r') != expected:
+                if log:
+                    verb = 'would change' if dry_run else 'change'
+                    log(f"  [{verb}] @import {piece}")
+                    log(f"      from: {line.rstrip(chr(13))}")
+                    log(f"      to:   {expected}")
+                lines[i] = expected
+                changed = True
+    if changed and not dry_run:
+        claude_path.write_text('\n'.join(lines), encoding='utf-8', newline='\n')
+        if log:
+            log(f"  wrote {claude_path}")
+    return changed
+
+
 HUB_POINTER_YAML_RE = re.compile(r'```yaml\s*\r?\n(.*?)\r?\n```', re.DOTALL)
 
 
@@ -609,7 +717,158 @@ CONSUMER_OWNED_PATHS = ('CLAUDE.md', '.claude/settings.json', '.claude/skills',
                          HUB_DISPATCH_RELPATH, '.gitignore', DISCONNECT_NOTES_FILENAME)
 
 
-def commit_consumer_changes(consumer_path, message, log=None):
+def _commit_scoped(repo_path, candidate_paths, message, log=None):
+    """Shared git add/commit/push body for commit_consumer_changes()/commit_hub_changes() below -
+    scoped add (candidate_paths only, never `-A`) so an unrelated in-progress edit elsewhere in
+    that repo (the user's own client work, mid-edit; an unrelated design-doc draft in the hub's
+    own outer repo) is never swept in. `candidate_paths` are checked via `git status --porcelain`
+    directly rather than filtered by Path.exists() first, so a path this call deleted (e.g. a
+    hard-deleted registry file, a disconnect's removed skill dir) is still committed correctly -
+    git reports and stages a deletion for a path that no longer exists on disk just fine.
+
+    Returns one of: 'not-a-repo' (no .git\\ here - nothing this function can do), 'noop' (nothing
+    changed under candidate_paths), 'committed-pushed', 'committed-no-remote' (committed locally;
+    no 'origin' remote configured to push to), 'commit-failed', 'push-failed'. Never raises on a
+    git failure - reports it via the return value / `log` instead, so one repo's git trouble can't
+    abort a batch run touching several."""
+    repo_path = Path(repo_path)
+    if not (repo_path / '.git').is_dir():
+        return 'not-a-repo'
+
+    candidate_paths = list(candidate_paths)
+
+    def _git(git_args):
+        return subprocess.run(['git', '-C', str(repo_path)] + git_args,
+                               capture_output=True, text=True)
+
+    status = _git(['status', '--porcelain', '--'] + candidate_paths)
+    if not status.stdout.strip():
+        return 'noop'
+
+    # `git add --` errors out and stages NOTHING AT ALL (even paths that DO exist) the moment any
+    # single pathspec matches nothing - a real risk here since candidate_paths is a fixed set that
+    # legitimately doesn't exist in full for every repo (e.g. a pre-indirection consumer has no
+    # .claude/hooks/_hub_dispatch.py; commit_hub_changes() callers pass just one file, which may
+    # since be deleted). `git ls-files --` is lenient about a missing pathspec and still reports an
+    # already-tracked-but-now-deleted path (needed for the deletion case, and git add on that exact
+    # path correctly stages the removal); union that with what's currently on disk to get exactly
+    # what `git add` can safely be pointed at.
+    tracked = _git(['ls-files', '--'] + candidate_paths).stdout.splitlines()
+    on_disk = [p for p in candidate_paths if (repo_path / p).exists()]
+    addable = sorted(set(tracked) | set(on_disk))
+    if not addable:
+        return 'noop'
+
+    _git(['add', '--'] + addable)
+    commit = _git(['commit', '-m', message])
+    if commit.returncode != 0:
+        if log:
+            log(f"  [warn] commit failed in {repo_path}: {commit.stderr.strip() or commit.stdout.strip()}")
+        return 'commit-failed'
+
+    remotes = _git(['remote'])
+    if 'origin' not in remotes.stdout.split():
+        return 'committed-no-remote'
+
+    push = _git(['push'])
+    if push.returncode != 0:
+        if log:
+            log(f"  [warn] push failed in {repo_path}: {push.stderr.strip() or push.stdout.strip()}")
+        return 'push-failed'
+    return 'committed-pushed'
+
+
+def _consumer_owned_prefix_match(f):
+    """True if changed-file f (forward-slash, repo-relative) falls inside CONSUMER_OWNED_PATHS -
+    exact match for a file entry, prefix match for the '.claude/skills' directory entry."""
+    return any(f == p or f.startswith(p.rstrip('/') + '/') for p in CONSUMER_OWNED_PATHS)
+
+
+def _reconcile_diverged_push(consumer_path, message, log, config, imports, shared_root):
+    """Real reconciliation for a rejected consumer push, replacing the old dead end
+    (design\\grt_connectivity_audit.md item (ii)) - confirmed in code before this was built:
+    commit_consumer_changes() previously just logged 'push-failed' and stopped, with no fetch,
+    retry, or reconciliation of any kind, even though CONSUMER_OWNED_PATHS content is entirely
+    regenerable (not hand-authored), so a divergence confined to it never needs a real text merge.
+
+    Only attempted when `config`/`shared_root` are given (not every caller passes them yet -
+    backward compatible, callers that don't get today's plain push-failed report unchanged).
+    Never raises; never touches the working tree unless BOTH safety conditions below hold. Returns
+    'reconciled-pushed' on success, or None (caller falls through to reporting 'push-failed' as
+    before) otherwise."""
+    if shared_root is None:
+        return None
+    consumer_path = Path(consumer_path)
+    shared_root = Path(shared_root)
+
+    def _git(git_args):
+        return subprocess.run(['git', '-C', str(consumer_path)] + git_args,
+                               capture_output=True, text=True)
+
+    if _git(['fetch', 'origin']).returncode != 0:
+        return None
+    branch = _git(['rev-parse', '--abbrev-ref', 'HEAD']).stdout.strip()
+    if not branch or branch == 'HEAD':
+        return None
+    origin_tip = _git(['rev-parse', f'origin/{branch}']).stdout.strip()
+    merge_base = _git(['merge-base', 'HEAD', f'origin/{branch}']).stdout.strip()
+    if not origin_tip or not merge_base:
+        return None
+    if origin_tip == merge_base:
+        # origin hasn't actually moved since our own base - the push failure wasn't caused by a
+        # real divergence (network/auth/permissions instead), so there's nothing to reconcile and
+        # resetting here would just discard the commit we're trying to push for no reason.
+        return None
+
+    # Safety gate: nothing outside what commit_consumer_changes() just committed may be dirty -
+    # git reset --hard below would otherwise destroy unrelated in-progress work sitting elsewhere
+    # in this same consumer repo (a risk the design doc's mechanism section named but didn't
+    # spell out a guard for).
+    if _git(['status', '--porcelain']).stdout.strip():
+        if log:
+            log(f"  [warn] not auto-reconciling {consumer_path}: unrelated uncommitted changes "
+                f"present in this repo - resolve the push conflict by hand.")
+        return None
+
+    origin_changed = [f for f in _git(['diff', '--name-only', f'{merge_base}..origin/{branch}'])
+                       .stdout.splitlines() if f.strip()]
+    outside = [f for f in origin_changed if not _consumer_owned_prefix_match(f)]
+    if outside:
+        if log:
+            log(f"  [warn] not auto-reconciling {consumer_path}: origin's new commit(s) touch "
+                f"{', '.join(outside)}, outside Tower-Crane-owned paths - needs a human merge.")
+        return None
+
+    if log:
+        log(f"  [git] {consumer_path}: push rejected by a real divergence, but origin's side is "
+            f"confined to Tower-Crane-owned paths ({', '.join(origin_changed) or '(none)'}) - "
+            f"resetting to origin/{branch} and regenerating this host's own values instead of "
+            f"merging.")
+    if _git(['reset', '--hard', f'origin/{branch}']).returncode != 0:
+        return None
+
+    import_base = config.get('import_base')
+    fix_imports(consumer_path, imports, import_base, dry_run=False, log=log)
+    templates_dir = shared_root / 'templates'
+    claude_md = consumer_path / 'CLAUDE.md'
+    use_pointer = (claude_md.exists()
+                   and HUB_POINTER_IMPORT_LINE in claude_md.read_text(encoding='utf-8'))
+    fix_skill_stubs(consumer_path, templates_dir, import_base, dry_run=False, log=log,
+                     use_pointer=use_pointer)
+    fix_adopted_stub_paths(consumer_path, shared_root.parent, dry_run=False, log=log)
+    fix_hub_pointer(consumer_path, config, imports, dry_run=False, log=log)
+    fix_hub_dispatch_wrapper(consumer_path, shared_root, dry_run=False, log=log)
+
+    result = _commit_scoped(consumer_path, CONSUMER_OWNED_PATHS, message, log=log)
+    if result in ('committed-pushed', 'noop'):
+        # 'noop' here means regeneration reproduced exactly what origin already had - already
+        # reconciled, nothing further to push.
+        return 'reconciled-pushed'
+    return None
+
+
+def commit_consumer_changes(consumer_path, message, log=None, config=None, imports=None,
+                             shared_root=None):
     """Commit (and push, if a remote is configured) any pending change under a consumer
     project's OWN Tower-Crane-owned paths, into THAT PROJECT'S OWN git repo - never the hub's.
 
@@ -623,49 +882,42 @@ def commit_consumer_changes(consumer_path, message, log=None):
     remembering to push later - make the routine pass close its own loop, every time, as its own
     last step for that consumer.
 
-    Scoped add (CONSUMER_OWNED_PATHS only, never `-A`) so an unrelated in-progress edit elsewhere
-    in that project (the user's own client work, mid-edit) is never swept in - same discipline as
-    `shared_resources\\`'s own scoped `git add shared_resources`.
+    `config`/`imports`/`shared_root` (design\\grt_connectivity_audit.md item (ii), optional and
+    backward-compatible - a caller that omits them gets exactly today's behavior): when given, a
+    rejected push is followed by one real reconciliation attempt via _reconcile_diverged_push()
+    above, instead of a dead end. `imports` is the consumer's own list of imported piece names
+    (registry `imported:` entries).
 
-    Returns one of: 'not-a-repo' (no .git\\ here - nothing this function can do), 'noop' (nothing
-    changed under the owned paths), 'committed-pushed', 'committed-no-remote' (committed locally;
-    no 'origin' remote configured to push to), 'commit-failed', 'push-failed'. Never raises on a
-    git failure - reports it via the return value / `log` instead, so one consumer's git trouble
-    can't abort a batch run touching several.
+    Returns one of: 'not-a-repo', 'noop', 'committed-pushed', 'committed-no-remote',
+    'commit-failed', 'push-failed', or 'reconciled-pushed' (a push conflict was auto-resolved by
+    resetting and regenerating this host's own Tower-Crane-owned values - never a text merge).
+    Never raises on a git failure - reports it via the return value / `log` instead.
     """
-    consumer_path = Path(consumer_path)
-    if not (consumer_path / '.git').is_dir():
-        return 'not-a-repo'
+    result = _commit_scoped(consumer_path, CONSUMER_OWNED_PATHS, message, log=log)
+    if result == 'push-failed' and config is not None:
+        reconciled = _reconcile_diverged_push(consumer_path, message, log, config, imports or [],
+                                               shared_root)
+        if reconciled:
+            return reconciled
+    return result
 
-    owned = [p for p in CONSUMER_OWNED_PATHS if (consumer_path / p).exists()]
-    if not owned:
-        return 'noop'
 
-    def _git(git_args):
-        return subprocess.run(['git', '-C', str(consumer_path)] + git_args,
-                               capture_output=True, text=True)
+def commit_hub_changes(project_root, paths, message, log=None):
+    """Outer-repo analog of commit_consumer_changes() above (design\\grt_connectivity_audit.md
+    item (i)): commits (and pushes, if 'origin' is configured) a registry-mutating routine's own
+    write(s) into the outer hub repo itself, immediately at the point of mutation, instead of
+    leaving it for a later, optional `checkpoint` to find - `checkpoint` exists to save the user's
+    OWN in-progress work; skipping it should only ever cost the user their own unsaved work, never
+    leave the registry (functionality-critical state every host's `resume`/check_tower_crane.py
+    depends on for a correct answer) silently wrong for anyone else reading it. `paths` is
+    whatever specific file(s) that routine touched (e.g. ['consumers/<slug>.md']) - never a blanket
+    add, same discipline as commit_consumer_changes()'s own CONSUMER_OWNED_PATHS scoping. Commit
+    messages from this function use a distinct 'Registry: ...' prefix so hub git history stays
+    legible about which commits were automatic vs. a human-authored 'Checkpoint: ...'.
 
-    status = _git(['status', '--porcelain', '--'] + owned)
-    if not status.stdout.strip():
-        return 'noop'
-
-    _git(['add', '--'] + owned)
-    commit = _git(['commit', '-m', message])
-    if commit.returncode != 0:
-        if log:
-            log(f"  [warn] commit failed in {consumer_path}: {commit.stderr.strip() or commit.stdout.strip()}")
-        return 'commit-failed'
-
-    remotes = _git(['remote'])
-    if 'origin' not in remotes.stdout.split():
-        return 'committed-no-remote'
-
-    push = _git(['push'])
-    if push.returncode != 0:
-        if log:
-            log(f"  [warn] push failed in {consumer_path}: {push.stderr.strip() or push.stdout.strip()}")
-        return 'push-failed'
-    return 'committed-pushed'
+    Returns the same result vocabulary as _commit_scoped() (no reconciliation path - the outer
+    repo has only ever one writer at a time, this operator's own machine)."""
+    return _commit_scoped(project_root, paths, message, log=log)
 
 
 def print_diagnose_inline(config, path=None, slug=None, log=print):

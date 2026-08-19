@@ -89,8 +89,11 @@ none of these are resident in this file.
   every other machine / everywhere). **"remove"** / **"uninstall"** — reverses `setup_machine` for
   this whole machine (disconnects every consumer connected here, then clears this machine's own
   hub state). Both require explicit confirmation before running — see `agents_consumers.md`.
+- **"migrate consumer to reference-indirection"** — one-time conversion of an already-connected
+  host from the old direct-baked-path form to the pointer-indirection form. Requires explicit
+  confirmation before running (rewrites shared, tracked content). Full: `agents_consumers.md`.
 - Change-request tickets (filing round-trip, registration tickets, applying a fix, reverts) — the
-  inbox is scanned every `"resume"` (step 7 below); full mechanics: `agents_change_requests.md`.
+  inbox is scanned every `"resume"` (step 8 below); full mechanics: `agents_change_requests.md`.
 - **"checkpoint"**, **"archive"**, **"update"**, **"propose upstream"**, **"curate shared
   resources"**, **"update consumers"** — the rest of session continuity (`"resume"`/`"quick
   resume"` stay below, since they fire at session start and gain nothing from deferral). Full:
@@ -120,12 +123,17 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
    `python toolkit\scripts\check_multi_machine.py` — notify-only, never mutates. Any `[NUDGE]` line
    names a `scope: multi_machine` consumer with no `hosts.<this host>` entry yet; mention it and
    offer to run "connect project". Silent output means nothing to nudge about.
-6. Read `project_progress.md`: Current Status, Next Up, Decisions table, most recent Work Log
+6. Stale hand-written-path nudge (`design\grt_connectivity_audit.md` item (iv)):
+   `python toolkit\scripts\check_stale_paths.py` — notify-only, never mutates. Any `[STALE-PATH]`
+   line names a backtick-quoted absolute path in a connected consumer's own CLAUDE.md/
+   project_progress.md that doesn't exist on this host; mention it, but don't assume it needs
+   fixing — may be intentionally single-host-only. Silent output means nothing to nudge about.
+7. Read `project_progress.md`: Current Status, Next Up, Decisions table, most recent Work Log
    entry only.
-7. Scan `change_requests\` per `agents_change_requests.md`'s "Scanning at session start" section —
+8. Scan `change_requests\` per `agents_change_requests.md`'s "Scanning at session start" section —
    this is what surfaces a Piece 3 automation PR (`design\sync_automation.md`).
-8. State status and next step in 1-3 lines, leading with the machine identity from step 1, folding
-   in anything steps 3/4/5/7 surfaced. Do not replay full history.
+9. State status and next step in 1-3 lines, leading with the machine identity from step 1, folding
+   in anything steps 3/4/5/6/8 surfaced. Do not replay full history.
 
 **"quick resume"** — a thinner `resume`, for reopening seconds after a `checkpoint` mid-session
 (the only way to flush a long context window mid-session). Skips every sync check above entirely —
