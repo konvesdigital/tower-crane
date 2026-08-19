@@ -30,14 +30,19 @@ check and the mechanical merge:
                 --approve/--reject.
   --approve [--through <n-or-sha>]
               Only valid after a --check left a pending PASS. Re-fetches to confirm origin/main
-              hasn't moved since the diff was shown, merges (fast-forward), then runs a FOURTH
-              gate: the full check_tower_crane.py (both passes, including Pass B's cross-consumer
-              drift scan) against the now-live merged content and the real consumers\\ registry -
-              something only possible post-merge, since Pass B needs consumers\\ (outer repo) and a
-              real toolkit\\ location, neither reachable from the pre-merge worktree. A FAIL here
-              automatically rolls the merge back (fast-forward makes this a clean `git reset
-              --hard`) rather than leaving a broken state landed. Only on a clean pass does
-              last_reviewed_sha actually advance.
+              hasn't moved since the diff was shown, merges (fast-forward), then runs relocate.py
+              against every locally-reachable consumer (self-heal, added 2026-08-18 -
+              run_relocate()'s docstring: relocate.py/update_consumers.py are federated by design,
+              so a canonical skill-stub/hub_pointer/dispatch-wrapper change merged here never
+              reaches this machine's own consumers until something refreshes them - without this
+              step every such change would deterministically fail the next gate on this machine),
+              then runs a FOURTH gate: the full check_tower_crane.py (both passes, including Pass
+              B's cross-consumer drift scan) against the now-live merged content and the real
+              consumers\\ registry - something only possible post-merge, since Pass B needs
+              consumers\\ (outer repo) and a real toolkit\\ location, neither reachable from the
+              pre-merge worktree. A FAIL here automatically rolls the merge back (fast-forward
+              makes this a clean `git reset --hard`) rather than leaving a broken state landed.
+              Only on a clean pass does last_reviewed_sha actually advance.
                 Without --through: approves every pending commit shown by --check (all the way to
               origin/main). With --through <n-or-sha>: partial approval, added 2026-07-27 (security
               stress-test pass, design\\security_stress_test.md) - fast-forwards only to the given
@@ -317,6 +322,33 @@ def run_file_surface_check(base_sha, target_sha, cfg):
     return proc.returncode == 0, proc.stdout + proc.stderr
 
 
+def run_relocate(cfg):
+    """Self-heal step (added 2026-08-18, found live via a real cross-machine rollback): runs the
+    now-live, just-merged relocate.py against every locally-reachable consumer BEFORE the
+    post-merge gate below. relocate.py/update_consumers.py/a consumer's own "update" skill are all
+    federated by design (design\\portability.md) - each only ever touches consumers reachable from
+    the machine running it, so a skill-stub/hub_pointer/dispatch-wrapper canonical-content change
+    merged on machine A never reaches machine B's own locally-connected consumers until something
+    runs a refresh THERE. Without this step, --approve's merge-then-gate-check was atomic with no
+    window for that refresh to happen first, so ANY pending content that changes canonical
+    skill-stub wording (not specific to any one feature) would deterministically fail the post-merge
+    Pass B stub-drift check and roll back, every time, on every second-or-later machine to review
+    it - see design\\consumer_reference_indirection.md's Decisions row, which independently hit and
+    manually cleared this same drift via a normal relocate.py pass. Invoked as a subprocess (not
+    imported) so it always runs whatever relocate.py actually does post-merge, including any repair
+    logic this very update just added to it - update_toolkit.py never needs its own knowledge of
+    what relocate.py fixes. relocate.py commits and pushes any changes it makes directly into each
+    affected consumer's own repo (its existing, documented behavior even run standalone) - printed
+    in full below so that's never silent. Returns (ran_cleanly, output); a non-zero exit here
+    (relocate.py crashing) is reported but never itself blocks the merge - run_post_merge_check
+    right after this is still the real, authoritative gate."""
+    proc = subprocess.run(
+        [cfg['python_launcher'], str(SHARED_ROOT / 'scripts' / 'relocate.py')],
+        capture_output=True, text=True, cwd=str(SHARED_ROOT),
+    )
+    return proc.returncode == 0, proc.stdout + proc.stderr
+
+
 def run_post_merge_check(cfg):
     """Runs the FULL check_tower_crane.py (both passes) against the now-live merged toolkit\\ and
     the real consumers\\ registry - only possible post-merge, since Pass B needs the outer repo's
@@ -454,7 +486,14 @@ def cmd_approve(cfg, through=None):
     pre_merge_sha = _git(['rev-parse', 'HEAD']).stdout.strip()
     _git(['merge', '--ff-only', merge_target])
 
-    print("Merged. Running the post-merge gate: full check_tower_crane.py (both passes) against "
+    print("Merged. Self-healing locally-reachable consumers via relocate.py before the post-merge "
+          "gate (clears any skill-stub/hub_pointer/dispatch-wrapper drift this content just "
+          "introduced, the same repair a manual `relocate.py` pass would make - see "
+          "run_relocate()'s docstring)...")
+    _, relocate_output = run_relocate(cfg)
+    print(relocate_output)
+
+    print("Running the post-merge gate: full check_tower_crane.py (both passes) against "
           "the now-live content and the real consumers\\ registry...")
     post_ok, post_output = run_post_merge_check(cfg)
     print(post_output)
