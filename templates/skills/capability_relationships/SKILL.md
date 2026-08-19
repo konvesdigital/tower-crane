@@ -8,19 +8,26 @@ mechanisms rather than forking into a consumer/hub pair (contrast commands/hub_c
 two separate files): scaffolded into a consumer's .claude\skills\capability_relationships\SKILL.md
 via new_consumer.py's STANDALONE_SKILLS (same copy-and-substitute pattern as commands/update), AND
 installed into THIS hub's own .claude\skills\capability_relationships\SKILL.md via self_hooks.py's
-"skills" opt-in key (templates\optins\capability_relationships.json). This only works because
-self_hooks.py resolves the substitution placeholder below the same way new_consumer.py does (using
-this same hub's own computed import_base) before writing the installed copy — extended for this
-skill rather than left unsubstituted like the earlier hub_commands precedent, since hub_commands's
-body has no such placeholder to begin with and never needed it. Drift check for either
-distribution path compares the installed copy against this file with that placeholder resolved the
-same way: check_tower_crane.py's Pass B (consumers) and its Hub self-use skill drift check (this
-hub).
+"skills" opt-in key (templates\optins\capability_relationships.json).
+
+The {{READ_INSTRUCTION:capability_relationships.md}} placeholder below renders to ONE of two forms
+depending on use_pointer (design\consumer_reference_indirection.md), same mechanism and same
+convention every other Track-1 skill stub already uses: the direct-substitution wording
+(not-yet-migrated consumers, the default) or the .claude\hub_pointer.md-indirected wording (new
+connections). Both are independently valid canonical shapes - check_tower_crane.py's Pass B accepts
+either. **This hub's own self-install via self_hooks.py is unaffected either way** - its calls into
+materialize_skill_stub() never pass use_pointer, so they always resolve to the direct-substitution
+form (using this same hub's own computed import_base), which is exactly the wording this template
+produced before this stub gained the placeholder - the hub has no hub_pointer.md concept for
+itself, and nothing here changes that. (Originally left as a permanent direct-substitution-only
+exception for this reason - design\consumer_reference_indirection.md's Decisions table, 2026-08-14
+- revisited and closed once it was confirmed the two concerns are actually independent: consumer
+distribution can use the placeholder freely without touching self_hooks.py's call site at all.)
 
 NOTE for anyone editing this file: never write the literal two-brace placeholder token as prose
-inside this comment block (like this note is carefully NOT doing) — self_hooks.py's and
-new_consumer.py's substitution is a blind whole-file string replace, so any literal occurrence
-gets substituted too, corrupting the comment. Only the one instruction line below should carry it.
+inside this comment block - materialize_skill_stub() strips this whole header comment before doing
+any substitution, so a stray literal occurrence here would survive into confusing maintainer-only
+noise rather than being resolved. Only the one instruction line below should carry it.
 -->
 ---
 name: capability_relationships
@@ -33,7 +40,7 @@ description: A structured map of every Tower Crane capability and how they relat
   broad "what can I do here"/"what's next"/"I'm new here" language — that's `commands`/
   `hub_commands`' job instead.
 ---
-Read `{{IMPORT_BASE}}/capability_relationships.md` in full and follow it exactly — matching the
-query to the capability graph, answering directly, and surfacing its nearest structural/thematic
-neighbors are all covered there. Do not paraphrase or act from memory of a previous read; the file
-floats on HEAD and may have changed since you last read it.
+{{READ_INSTRUCTION:capability_relationships.md}} and follow it exactly — matching the query to the
+capability graph, answering directly, and surfacing its nearest structural/thematic neighbors are
+all covered there. Do not paraphrase or act from memory of a previous read; the file floats on HEAD
+and may have changed since you last read it.
