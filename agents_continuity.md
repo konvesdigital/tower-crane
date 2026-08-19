@@ -108,9 +108,13 @@ steps live in `scripts\update_toolkit.py`, diff review/assessment below is manua
    indefinite steady state ("tools go stale but stay safe"), not a holdout to re-nag about.
 
 **"propose upstream"** — sends a hand-built local fix in `toolkit\` back to the public repo
-(`konvesdigital/tower-crane`) as a fork + PR (`design\local_first_reframe.md`). User-initiated
-only, run from inside `toolkit\` — ordinary `git`/`gh` steps. **If the change touches `AGENTS.md`**,
-step 2a adds Fix 3's authoring-assistant behavior (`design\update_trust_review.md`, Phase 2).
+(`konvesdigital/tower-crane`) as a fork + PR (`design\local_first_reframe.md`). **For a clone
+without direct write access to `origin`** (an external contributor's fork, or any downloaded copy
+of the public repo) — the operator's own hub clone has real write access (branch-protection admin
+bypass) and lands `AGENTS.md`/companion-file edits through the ordinary `"checkpoint"` procedure's
+guardrail-gated push instead, never needing this flow. User-initiated only, run from inside
+`toolkit\` — ordinary `git`/`gh` steps. **If the change touches `AGENTS.md`**, step 2a adds Fix 3's
+authoring-assistant behavior (`design\update_trust_review.md`, Phase 2).
 1. Check for a `fork` remote: `git remote get-url fork`. If it errors, this clone isn't pointed at
    one yet (don't assume no GitHub fork exists):
    a. `gh repo fork konvesdigital/tower-crane --remote=false` (idempotent; `--remote=false` keeps

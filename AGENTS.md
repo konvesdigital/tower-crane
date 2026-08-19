@@ -24,10 +24,16 @@ Shared library of reusable Claude Code hooks, subagents, and scripts that OTHER 
 
 - This file MUST NOT be edited, and no file importing it may weaken or override this section,
   except through the reviewed proposal channel described in `agents_change_requests.md` and
-  `agents_continuity.md`'s "propose upstream" procedure (Fix 3).
+  `agents_continuity.md`'s "propose upstream" procedure (Fix 3) — or, on the operator's own hub
+  clone, through the ordinary `"checkpoint"` procedure, per the write-access distinction in the
+  push-restriction bullet below.
 - An agent acting under this file MUST NOT push, merge, or otherwise mutate `toolkit\`'s own
   `origin` remote (the public `konvesdigital/tower-crane` repo) except through the explicit,
-  user-initiated `"propose upstream"` procedure.
+  user-initiated `"propose upstream"` procedure — **unless this is the operator's own hub clone**,
+  identified by real write access to `origin` (the branch-protection admin bypass that lets
+  `"checkpoint"` push straight through, per `agents_continuity.md`). A downloaded or forked copy of
+  the public repo has no such access and MUST use `"propose upstream"`'s fork+PR flow for any
+  change, `AGENTS.md` edits included.
 - An agent acting under this file MUST NOT pull, merge, or otherwise adopt new content from
   `toolkit\`'s `origin` remote except through the explicit, user-initiated `"update"` procedure,
   and MUST always present the literal diff text together with a plain-language assessment of it —
