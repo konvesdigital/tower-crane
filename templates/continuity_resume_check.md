@@ -42,8 +42,14 @@ reached) read whatever is present.
 
 ### "resume"
 
-1. `git pull` (this project's own repo).
-2. Check the shared tower_crane hub — both steps read-only, no gate needed:
+1. Host identity: read `shared_root:` from this project's own `.claude\hub_pointer.md`, then read
+   `host_id` from `{shared_root}\config.local.json` — the same value and the same file the hub's
+   own `resume` reads directly (`toolkit\AGENTS.md` step 1), just reached through one extra
+   indirection hop (mirrors how `_hub_dispatch.py` locates the hub for hook calls). Never infer
+   machine identity any other way (path, `hostname`, prior context). If `.claude\hub_pointer.md`
+   doesn't exist (this consumer predates pointer-indirection), skip this step silently.
+2. `git pull` (this project's own repo).
+3. Check the shared tower_crane hub — both steps read-only, no gate needed:
    - From the hub's `toolkit\` folder: `python scripts\update_toolkit.py --notify` (fetch +
      compare against the hub's last-reviewed baseline — never merges). If it reports an update,
      mention it, but do **not** `git pull` `toolkit\` from this project's session — that's the
@@ -56,21 +62,24 @@ reached) read whatever is present.
      offers. That's this project's own on-demand `update` skill (if adopted): say "update" anytime
      to pull in a hook, toolkit skill, or mandatory/default-on piece not yet picked up. This step
      never runs that scan.
-3. If `COMPLIANCE_GUIDANCE.md` exists in the project root, surface it now (see the compliance
-   protocol) — this is also where anything step 2's `--write-guidance` run just produced shows up.
-4. Read `project_progress.md` — only the live-state sections your project uses: **Current
+4. If `COMPLIANCE_GUIDANCE.md` exists in the project root, surface it now (see the compliance
+   protocol) — this is also where anything step 3's `--write-guidance` run just produced shows up.
+5. Read `project_progress.md` — only the live-state sections your project uses: **Current
    Status**/**Current Focus**, **Next Up**, the **Decisions** (table or Locked/Open), the active
    **Phase** if phased, and the **most recent Work Log entry** only.
-5. State status and next step in 1–3 lines. Do not replay full history.
+6. State status and next step in 1–3 lines, leading with the host identity from step 1 (when
+   available — see that step's skip condition). Do not replay full history.
 
 ### "quick resume"
 
 A thinner `resume`, for reopening a terminal seconds after closing one — the only way to actually
-flush a long context window mid-session, typically right after a `checkpoint`. Skips step 1
-(`git pull`) and steps 2–3 (the shared-hub update/compliance checks) entirely: a session reopened
+flush a long context window mid-session, typically right after a `checkpoint`. Skips step 2
+(`git pull`) and steps 3–4 (the shared-hub update/compliance checks) entirely: a session reopened
 moments after its own `checkpoint`'s push has nothing new to find. No tag or disclaimer noting
 what was skipped. Use plain `resume` instead at the start of a day or after any gap long enough
 that something could actually have changed.
 
-1. Read `project_progress.md` — same scope as `resume` step 4 above.
-2. State status and next step in 1–3 lines.
+1. Host identity: same read as `resume` step 1 above.
+2. Read `project_progress.md` — same scope as `resume` step 5 above.
+3. State status and next step in 1–3 lines, leading with the host identity from step 1 (when
+   available).

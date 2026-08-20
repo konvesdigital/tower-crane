@@ -328,6 +328,19 @@ This can be as small as a one-line hook plus a one-sentence summary, saved in un
 long as several separately-labeled verbatim blocks for a deep investigation — don't impose ceremony
 on the simple end.
 
+**If a verbatim block is a script/hook/command that needs to reference its own file's location**
+(not an external target — see "Per-host availability for pointer entries" above for that case),
+it must self-resolve on every host and every adopting project without any hand-filled path: use
+the runtime's own live self-location mechanism (e.g. Claude Code's `$CLAUDE_PROJECT_DIR` for a
+hook `command` field), never `<path-to-this-script>`-style fill-in-the-blank prose. An insight is
+copied by value into each adopting project with no central re-sync (see "Insights are different"
+above) — a hardcoded absolute path baked into a verbatim block is guaranteed to go stale the next
+time that project's directory moves or is renamed, and nothing in the system will ever catch it or
+fix it after the fact. This is a different case from a `tool`/pointer-`reference`'s `Hosts:`
+block: that tracks per-machine paths to *one shared external target*; a self-referencing script has
+no external target to track at all — each adopting project's own copy must resolve independently,
+so it needs no `Hosts:` block either.
+
 #### Applying an insight — routes through a destination question
 
 Triggered by something like *"shared resources — get the checkpoint insight from another project
