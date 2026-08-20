@@ -158,6 +158,32 @@ only, never triggered by `checkpoint`.
    `--consumer <slug>` for one). Confirm the drafted file with the user first.
 4. **Land** — nothing further here; the resume-time compliance check surfaces it on its own.
 
+**"register host"** — bulk-registers THIS machine into every `shared_resources\` entry it's missing
+from, instead of waiting for `check_shared_resource_refs.py`'s per-adoption `[HOST-GAP]` check to
+catch each one separately, one already-adopting consumer project at a time
+(`design\shared_resources_bulk_host_registration.md`). User-initiated, any time — also run
+automatically as `setup_machine.md` Step 8a on a newly connected machine.
+1. Run `python scripts\check_shared_resource_hosts.py` from inside `toolkit\` — notify-only,
+   catalog-wide, exit 0 always. Buckets every non-`Archived`, non-`insight` catalog row as `[OK]`
+   (already registered here — skip silently), `[UNREGISTERED]` (has a `Hosts:` block, this host
+   isn't in it), or `[NO-HOSTS-BLOCK]` (no `Hosts:` block at all — ambiguous).
+2. For every `[NO-HOSTS-BLOCK]` hit: ask the user to resolve the ambiguity. Genuinely self-contained
+   (nothing to ever register) → skip, no marker written (re-judged next pass — cheap while the
+   catalog stays small). An unmigrated pointer entry → migrate it to `Hosts:` block form first
+   (same shape as `seo_resources.md`'s 2026-08-20 fix — including a quick existence check on any
+   pre-existing flat path before trusting it, since that's exactly what caught that entry's own
+   drift), then treat it as `[UNREGISTERED]` below.
+3. For every `[UNREGISTERED]` hit (including one just migrated): ask whether this host wants/has
+   this entry. **Yes** — ask for the real path on **this** machine specifically (never assume it
+   matches another host's path), confirm it exists on disk, then write a new `hosts.<this host>`
+   entry into that entry's own `Hosts:` block. **No** — leave it unregistered; this pass re-asks
+   next time it's run (no suppression marker — on-demand, not run automatically every session).
+4. One combined propagation commit+push against the hub's own outer repo, scoped to
+   `shared_resources\` (`templates\shared_resources.md`'s "Every write here ends with the same
+   propagation step") — not one commit per entry.
+5. Report a short summary: how many entries newly registered, how many declined, how many resolved
+   as self-contained.
+
 **"update consumers"** — push-side of `update`: same scope as a consumer's own pull-side `update`
 skill (hooks, Track-1 skills, mandatory pieces; never `shared_resources`). User-initiated only.
 1. `python scripts\update_consumers.py` (optionally `--consumer <slug>`) — indexed list across

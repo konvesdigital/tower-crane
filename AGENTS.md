@@ -95,8 +95,9 @@ none of these are resident in this file.
 - Change-request tickets (filing round-trip, registration tickets, applying a fix, reverts) — the
   inbox is scanned every `"resume"` (step 8 below); full mechanics: `agents_change_requests.md`.
 - **"checkpoint"**, **"archive"**, **"update"**, **"propose upstream"**, **"curate shared
-  resources"**, **"update consumers"** — the rest of session continuity (`"resume"`/`"quick
-  resume"` stay below, since they fire at session start and gain nothing from deferral). Full:
+  resources"**, **"register host"**, **"update consumers"** — the rest of session continuity
+  (`"resume"`/`"quick resume"` stay below, since they fire at session start and gain nothing from
+  deferral). Full:
   `agents_continuity.md`.
 
 ## Session Continuity

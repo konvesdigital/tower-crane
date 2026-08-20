@@ -167,6 +167,14 @@ or `python`).
 From inside `toolkit\`, run `scripts\relocate.py` (regenerates any registered consumers' hook
 commands for this machine), then `scripts\check_tower_crane.py` to confirm a clean bill of health.
 
+## Step 8a — Register this host in shared_resources (if any exist)
+If `shared_resources\CATALOG.md` exists and has at least one non-`Archived`, non-`insight` row, run
+the `"register host"` procedure now (`agents_continuity.md`,
+`design\shared_resources_bulk_host_registration.md`) — a brand-new machine otherwise has zero
+visibility into which catalog entries it could register a local path for until something happens to
+adopt one and hit the lazy per-project `[HOST-GAP]` check. Skip silently if the catalog doesn't
+exist yet or every entry is already `Archived`/`insight`.
+
 ## Step 9 — Finish
 Confirm to the user: `config.local.json` is filled and validated. This machine is ready to
 scaffold/check consumers, or to onboard as a Federate participant on an existing hub.
