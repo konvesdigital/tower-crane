@@ -56,6 +56,7 @@ from config_lib import (
     HUB_POINTER_IMPORT_LINE, HUB_POINTER_RELPATH, HUB_DISPATCH_RELPATH, HUB_DISPATCH_TEMPLATE,
     get_dispatch_optin, build_hub_pointer_content, build_dispatch_cmd_map,
     write_new_connection_files, collapse_imports_to_pointer, fix_imports, commit_hub_changes,
+    commit_consumer_changes,
 )
 import registry_lib
 
@@ -725,7 +726,8 @@ def main():
         # replaces the file; FIRST_RUN.md is never (re)written in this branch.
         if not (target_path / '.git').exists():
             print(f"  note   no .git\\ found at {target_path} - run `git init` (or finish cloning) "
-                  "before your first session here.")
+                  "before your first session here. Setup changes are waiting there uncommitted "
+                  "until then (design\\connect_project_commit_gate.md).")
     else:
         # Checklist is built from actually-detected state, not assumed from scratch
         # (design\connect_disconnect.md "Reconnect-after-disconnect gap") - a reconnecting project (real
@@ -832,6 +834,52 @@ Notes: scaffolded by `scripts/new_consumer.py` on {scaffold_date}. Registry form
         label = registry_commit_labels.get(registry_commit_result)
         if label:
             print(label)
+
+    # --- 6c. commit into the consumer's OWN repo, now (design\connect_project_commit_gate.md):
+    # extends 6b's "commit at the point of mutation" principle one level further, to the
+    # consumer-repo side of the connect family - disconnect_consumer.py already does this via the
+    # same commit_consumer_changes() helper; this closes the missing other half of that pair.
+    # Gated on is_new_connection, same as 6b - an already-connected host re-scaffolding itself
+    # gets no new automatic commit here, matching 6b's registry-commit skip for that case.
+    # Safe exactly when has_git (a real repo exists to commit into) AND not needs_overview (the
+    # content being committed is real, not a still-needed placeholder) both hold - two
+    # independently-100%-reliable checks, no branch-identity logic needed. Host-merge never
+    # computes needs_overview at all (content is always real there by construction - the
+    # consumer's own project already exists), so its effective gate is just has_git.
+    if is_new_connection:
+        has_git_now = (target_path / '.git').exists()
+        if existing_consumer is not None:
+            needs_overview_now = False
+            commit_msg = f"Tower Crane: connected via 'connect project' (host: {config['host_id']})"
+        else:
+            needs_overview_now = not (claude_md_existed and (is_reconnect or is_adoption))
+            commit_msg = ("Tower Crane: reconnected via 'connect project'" if is_reconnect
+                          else "Tower Crane: connected via 'connect project'")
+
+        if has_git_now and not needs_overview_now:
+            result = commit_consumer_changes(
+                target_path, commit_msg, log=print, config=config,
+                imports=import_pieces, shared_root=SHARED_ROOT)
+            commit_labels = {
+                'not-a-repo': None,  # has_git_now already guards this case
+                'noop': None,
+                'committed-pushed': "  [git] committed and pushed in this consumer's own repo.",
+                'committed-no-remote': "  [git] committed in this consumer's own repo (no origin remote to push to).",
+                'commit-failed': None,  # commit_consumer_changes() already logged the warn line itself
+                'push-failed': None,
+                'reconciled-pushed': "  [git] push conflict auto-reconciled (reset + regenerated), committed and pushed.",
+            }
+            label = commit_labels.get(result)
+            if label:
+                print(label)
+        elif has_git_now and needs_overview_now:
+            # Gate correctly withholds: real git history may exist, but the content this run
+            # wrote (or the pre-existing CLAUDE.md itself) still carries an unfilled overview
+            # placeholder. Never framed as a warning - nothing is wrong, just deferred to the
+            # user's own next action in that project (FIRST_RUN.md's checklist already produces a
+            # covering commit as a side effect once completed).
+            print(f"  note   {project_name}'s setup changes are uncommitted - completing "
+                  "FIRST_RUN.md there finishes that.")
 
     # --- 7. next steps -------------------------------------------------------------------------
     print()
