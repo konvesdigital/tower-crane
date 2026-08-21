@@ -882,10 +882,28 @@ Notes: scaffolded by `scripts/new_consumer.py` on {scaffold_date}. Registry form
                   "FIRST_RUN.md there finishes that.")
 
     # --- 7. next steps -------------------------------------------------------------------------
+    # Branched, not one-size-fits-all: the import-approval dialog is a Claude Code trust decision
+    # keyed per project-directory-per-machine, not something this script can guarantee will fire
+    # (design\multi_machine_hub.md:104, design\consumer_platform.md "one-time...per consumer") -
+    # every branch below hedges with "if prompted" rather than stating it as a flat requirement.
     print()
-    print("Done. Next steps:")
-    print(f"  1. Open {target_path} in a fresh Claude Code session and complete FIRST_RUN.md")
-    print("     (git init, accept the import-approval dialog, fill the CLAUDE.md overview).")
+    if existing_consumer is not None and already_connected_here:
+        # No-op re-run against a host already connected: nothing changed, nothing to open.
+        print("Done. Nothing new to do - this host was already connected.")
+    elif existing_consumer is not None:
+        # Host-merge (genuinely new host joining an already-registered consumer): FIRST_RUN.md is
+        # never written for this branch (step 5 above) - don't tell the user to complete a file
+        # that doesn't exist. This machine has never opened this project path before, so the
+        # dialog is the likely-but-not-guaranteed first-launch step here.
+        print("Done. Next steps:")
+        print(f"  1. Open {target_path} in a fresh Claude Code session and accept the")
+        print("     CLAUDE.md import-approval dialog if prompted (this machine hasn't opened")
+        print("     this project before).")
+    else:
+        print("Done. Next steps:")
+        print(f"  1. Open {target_path} in a fresh Claude Code session and complete FIRST_RUN.md")
+        print("     (git init, accept the CLAUDE.md import-approval dialog if prompted, fill the")
+        print("     CLAUDE.md overview).")
 
 
 if __name__ == '__main__':
