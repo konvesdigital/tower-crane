@@ -252,8 +252,19 @@ def run_golden_suite_against(worktree_dir, cfg):
     scan from an ephemeral worktree location - that gap is covered separately, post-merge, by
     run_post_merge_check()). Returns (passed: bool, output: str)."""
     # get_shared_config needs a config.local.json to exist; reuse this clone's own (per-machine
-    # values are valid regardless of the temporary path - shared_root self-corrects harmlessly).
-    shutil.copy2(CONFIG_PATH, worktree_dir / 'config.local.json')
+    # values are valid regardless of the temporary path). Pre-correct the copy's shared_root AND
+    # private_root (config_lib.py computes the latter as a sibling of the former, so both move
+    # together) to the worktree's own path before writing it out, so config_lib.py's move-detection
+    # sees consistent markers here and doesn't print a "folder moved" notice about this throwaway
+    # worktree - that notice's actionable advice (offer to run relocate.py) is only correct for a
+    # real move of the real hub, never for this ephemeral review copy.
+    with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+        review_cfg = json.load(f)
+    review_cfg['shared_root'] = str(worktree_dir.resolve()).rstrip('\\/').replace('\\', '/')
+    review_cfg['private_root'] = str(worktree_dir.resolve().parent / 'toolkit_private').replace('\\', '/')
+    with open(worktree_dir / 'config.local.json', 'w', encoding='utf-8') as f:
+        json.dump(review_cfg, f, indent=2)
+        f.write('\n')
     proc = subprocess.run(
         [cfg['python_launcher'], str(worktree_dir / 'scripts' / 'check_tower_crane.py'), '--skip-reference'],
         capture_output=True, text=True,
