@@ -702,19 +702,27 @@ TC_IN_USE_HEADING = '## Tower Crane In Use'
 WORKFLOW_HEADING = '## Shared Workflow Protocol'
 DISCONNECTED_HEADING = '## Tower Crane (disconnected)'
 DISCONNECT_NOTES_FILENAME = 'TOWER_CRANE_DISCONNECT_NOTES.md'
+FIRST_RUN_FILENAME = 'FIRST_RUN.md'
 
 # The Tower-Crane-owned paths inside a consumer project's own working tree - every hub-invoked
 # writer (relocate.py, update_consumers.py) is confirmed to touch only these three (fix_imports/
 # apply_piece -> CLAUDE.md; apply_hook_command_fixes/apply_hook/apply_private -> .claude/settings.json;
 # fix_skill_stubs/fix_adopted_stub_paths/apply_skill/apply_piece/apply_private -> .claude/skills/).
 # disconnect_consumer.py additionally writes DISCONNECT_NOTES_FILENAME (the generated breadcrumb
-# manifest a this-only local cleanup leaves behind) - harmless no-op for the other two writers,
-# which never touch that filename. HUB_DISPATCH_RELPATH (design\consumer_reference_indirection.md)
+# manifest a this-only local cleanup leaves behind), and new_consumer.py additionally writes
+# FIRST_RUN_FILENAME (the one-time setup checklist, freshly written every time it's written at all,
+# wholly hub-owned like everything else in this tuple - design\connect_project_commit_gate.md's
+# addendum) - harmless no-op for the other writers, which never touch either filename.
+# project_progress.md is deliberately NOT here despite new_consumer.py also writing it: unlike
+# every path above, it's not wholly hub-owned (the hub only ever prepends one dated note to an
+# otherwise user-owned continuity doc), so it needs its own narrower, pre-checked commit path -
+# commit_consumer_progress_note() below, never this tuple. HUB_DISPATCH_RELPATH (design\consumer_reference_indirection.md)
 # is tracked, host-invariant content - a real committable path, unlike HUB_POINTER_RELPATH, which
 # is gitignored and must NEVER appear here (an explicit `git add` of a gitignored path stages it
 # anyway, bypassing .gitignore).
 CONSUMER_OWNED_PATHS = ('CLAUDE.md', '.claude/settings.json', '.claude/skills',
-                         HUB_DISPATCH_RELPATH, '.gitignore', DISCONNECT_NOTES_FILENAME)
+                         HUB_DISPATCH_RELPATH, '.gitignore', DISCONNECT_NOTES_FILENAME,
+                         FIRST_RUN_FILENAME)
 
 
 def _commit_scoped(repo_path, candidate_paths, message, log=None):
@@ -900,6 +908,47 @@ def commit_consumer_changes(consumer_path, message, log=None, config=None, impor
         if reconciled:
             return reconciled
     return result
+
+
+def path_is_clean(repo_path, rel_path):
+    """True if rel_path (forward-slash, repo-relative) has no pending changes in repo_path's
+    working tree - including the case where rel_path doesn't exist yet at all (nothing to be
+    dirty). False if repo_path has no `.git\\` (nothing this can verify, so a caller relying on
+    'was it clean before I touched it' must treat unknown as not-safe-to-assume-clean).
+
+    Built for `design\\connect_project_commit_gate.md`'s addendum: callers that are about to make
+    a hub-owned edit to a NOT-wholly-hub-owned file (project_progress.md) call this immediately
+    BEFORE making that edit, so the post-edit diff is guaranteed to be exactly their own addition
+    if (and only if) this returned True."""
+    repo_path = Path(repo_path)
+    if not (repo_path / '.git').is_dir():
+        return False
+    result = subprocess.run(['git', '-C', str(repo_path), 'status', '--porcelain', '--', rel_path],
+                             capture_output=True, text=True)
+    return not result.stdout.strip()
+
+
+def commit_consumer_progress_note(consumer_path, message, log=None):
+    """Narrow, single-path companion to commit_consumer_changes() above, for project_progress.md
+    specifically (design\\connect_project_commit_gate.md addendum). Deliberately NOT folded into
+    CONSUMER_OWNED_PATHS / commit_consumer_changes()'s all-paths-at-once commit, for two reasons:
+
+    1. project_progress.md is not wholly hub-owned like everything in CONSUMER_OWNED_PATHS - the
+       hub only ever prepends one dated note to an otherwise user-owned continuity doc. The caller
+       MUST have already confirmed (via path_is_clean(), called immediately before making the
+       edit) that this path's working tree was clean beforehand, so the diff this stages is
+       guaranteed to be exactly that one prepended note and nothing swept-in from the user's own
+       unrelated in-progress work. This function does not re-check that itself - the 'before' state
+       is gone by the time this runs.
+    2. Kept out of _reconcile_diverged_push()'s reconciliation path on purpose: that mechanism
+       resets --hard to origin and regenerates only CONSUMER_OWNED_PATHS content on a push
+       conflict, which is safe only because everything in that tuple is regenerable. A
+       project_progress.md note is NOT regenerable - bundling it into a commit that reconciliation
+       might reset away would silently discard real content with no error surfaced. A separate,
+       narrower commit (no reconciliation attempted on push failure) avoids that risk entirely.
+
+    Returns the same result vocabulary as _commit_scoped()."""
+    return _commit_scoped(consumer_path, ('project_progress.md',), message, log=log)
 
 
 def commit_hub_changes(project_root, paths, message, log=None):

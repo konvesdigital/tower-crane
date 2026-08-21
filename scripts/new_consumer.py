@@ -53,10 +53,11 @@ from config_lib import (
     get_shared_config, get_expanded_optin, materialize_skill_stub,
     build_new_cmd_map, apply_hook_command_fixes, print_diagnose_inline,
     TC_IN_USE_HEADING, WORKFLOW_HEADING, DISCONNECTED_HEADING, DISCONNECT_NOTES_FILENAME,
+    FIRST_RUN_FILENAME,
     HUB_POINTER_IMPORT_LINE, HUB_POINTER_RELPATH, HUB_DISPATCH_RELPATH, HUB_DISPATCH_TEMPLATE,
     get_dispatch_optin, build_hub_pointer_content, build_dispatch_cmd_map,
     write_new_connection_files, collapse_imports_to_pointer, fix_imports, commit_hub_changes,
-    commit_consumer_changes,
+    commit_consumer_changes, path_is_clean, commit_consumer_progress_note,
 )
 import registry_lib
 
@@ -650,8 +651,16 @@ def main():
         print(f"  wrote  {stub_path}")
 
     # --- 4. project_progress.md skeleton (continuity only) -----------------------------------
+    # progress_pre_clean (design\connect_project_commit_gate.md addendum): captured BEFORE either
+    # branch below touches project_progress.md, since it's not wholly hub-owned like the rest of
+    # what step 6c commits - only safe to auto-commit later when this path's own working tree was
+    # already clean immediately before this run's edit (so the post-edit diff is guaranteed to be
+    # exactly this run's own addition, never a user's unrelated in-progress edit swept in).
+    # Defaults False when continuity is off, since nothing was touched to (safely) commit.
+    progress_pre_clean = False
     if not args.no_continuity:
         progress_path = target_path / 'project_progress.md'
+        progress_pre_clean = path_is_clean(target_path, 'project_progress.md')
         # Per-file principle reframe (design\connect_disconnect.md): gated on progress_path's OWN
         # presence alone, not on is_adoption - present always preserves + notes (Principle B, no
         # --force override escape hatch here, a deliberate behavior narrowing versus the old
@@ -738,7 +747,7 @@ def main():
         # file surviving even when CLAUDE.md itself is genuinely gone, in which case a real
         # overview WAS lost and this checklist line must still appear.
         has_git, remote = detect_git_state(target_path)
-        first_run_path = target_path / 'FIRST_RUN.md'
+        first_run_path = target_path / FIRST_RUN_FILENAME
         if first_run_path.exists() and not args.force:
             print("  skip   FIRST_RUN.md exists (use --force to overwrite)")
         else:
@@ -846,6 +855,10 @@ Notes: scaffolded by `scripts/new_consumer.py` on {scaffold_date}. Registry form
     # independently-100%-reliable checks, no branch-identity logic needed. Host-merge never
     # computes needs_overview at all (content is always real there by construction - the
     # consumer's own project already exists), so its effective gate is just has_git.
+    # CONSUMER_OWNED_PATHS (committed below) now includes FIRST_RUN_FILENAME - wholly hub-owned,
+    # same as everything else there. project_progress.md is NOT in that tuple (not wholly
+    # hub-owned) and gets its own separate, narrower commit further down, gated additionally on
+    # progress_pre_clean (design\connect_project_commit_gate.md's addendum).
     if is_new_connection:
         has_git_now = (target_path / '.git').exists()
         if existing_consumer is not None:
@@ -872,6 +885,23 @@ Notes: scaffolded by `scripts/new_consumer.py` on {scaffold_date}. Registry form
             label = commit_labels.get(result)
             if label:
                 print(label)
+
+            # project_progress.md's dated note (design\connect_project_commit_gate.md addendum):
+            # a separate, narrower commit on purpose - see commit_consumer_progress_note()'s own
+            # docstring for why it's never folded into the commit above. Gated the same as that
+            # commit (has_git_now and not needs_overview_now) PLUS progress_pre_clean, captured at
+            # step 4 immediately before the note was prepended - withheld whenever the user had
+            # their own unrelated uncommitted edit to that file already sitting there.
+            if progress_pre_clean:
+                progress_result = commit_consumer_progress_note(
+                    target_path, commit_msg, log=print)
+                progress_labels = {
+                    'committed-pushed': "  [git] project_progress.md's note committed and pushed in this consumer's own repo.",
+                    'committed-no-remote': "  [git] project_progress.md's note committed in this consumer's own repo (no origin remote to push to).",
+                }
+                progress_label = progress_labels.get(progress_result)
+                if progress_label:
+                    print(progress_label)
         elif has_git_now and needs_overview_now:
             # Gate correctly withholds: real git history may exist, but the content this run
             # wrote (or the pre-existing CLAUDE.md itself) still carries an unfilled overview
