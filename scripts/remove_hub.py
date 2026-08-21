@@ -46,7 +46,7 @@ def main():
               f"{', '.join(connected_here)}")
         for slug in connected_here:
             print(f"- {slug}")
-            disconnect_host(slug, this_host, config, lambda m: print(f"  {m}"), do_local_cleanup=True)
+            disconnect_host(slug, this_host, config, 'this-only', lambda m: print(f"  {m}"), do_local_cleanup=True)
     else:
         print("No consumers are connected on this machine.")
     print()
