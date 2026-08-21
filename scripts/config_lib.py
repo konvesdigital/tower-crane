@@ -725,6 +725,27 @@ CONSUMER_OWNED_PATHS = ('CLAUDE.md', '.claude/settings.json', '.claude/skills',
                          FIRST_RUN_FILENAME)
 
 
+def scoped_status_paths(repo_path, candidate_paths):
+    """Parsed (forward-slash, repo-relative) paths `git status --porcelain` reports as dirty,
+    scoped to candidate_paths. Shared by _commit_scoped()'s own noop check and by a caller building
+    a post-commit "what's still left dirty" close-out report (design\\script_action_reporting.md) -
+    evidence over intent: reports what git actually shows right now, not what a code path believes
+    it just committed. [] if repo_path has no `.git\\` at all."""
+    repo_path = Path(repo_path)
+    if not (repo_path / '.git').is_dir():
+        return []
+    result = subprocess.run(
+        ['git', '-C', str(repo_path), 'status', '--porcelain', '--'] + list(candidate_paths),
+        capture_output=True, text=True)
+    paths = []
+    for line in result.stdout.splitlines():
+        p = line[3:].strip()  # porcelain: "XY <path>" (or "XY <path> -> <path>" for a rename)
+        if ' -> ' in p:
+            p = p.split(' -> ', 1)[1]
+        paths.append(p)
+    return paths
+
+
 def _commit_scoped(repo_path, candidate_paths, message, log=None):
     """Shared git add/commit/push body for commit_consumer_changes()/commit_hub_changes() below -
     scoped add (candidate_paths only, never `-A`) so an unrelated in-progress edit elsewhere in
@@ -749,8 +770,7 @@ def _commit_scoped(repo_path, candidate_paths, message, log=None):
         return subprocess.run(['git', '-C', str(repo_path)] + git_args,
                                capture_output=True, text=True)
 
-    status = _git(['status', '--porcelain', '--'] + candidate_paths)
-    if not status.stdout.strip():
+    if not scoped_status_paths(repo_path, candidate_paths):
         return 'noop'
 
     # `git add --` errors out and stages NOTHING AT ALL (even paths that DO exist) the moment any

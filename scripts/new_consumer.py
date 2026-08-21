@@ -53,11 +53,11 @@ from config_lib import (
     get_shared_config, get_expanded_optin, materialize_skill_stub,
     build_new_cmd_map, apply_hook_command_fixes, print_diagnose_inline,
     TC_IN_USE_HEADING, WORKFLOW_HEADING, DISCONNECTED_HEADING, DISCONNECT_NOTES_FILENAME,
-    FIRST_RUN_FILENAME,
+    FIRST_RUN_FILENAME, CONSUMER_OWNED_PATHS,
     HUB_POINTER_IMPORT_LINE, HUB_POINTER_RELPATH, HUB_DISPATCH_RELPATH, HUB_DISPATCH_TEMPLATE,
     get_dispatch_optin, build_hub_pointer_content, build_dispatch_cmd_map,
     write_new_connection_files, collapse_imports_to_pointer, fix_imports, commit_hub_changes,
-    commit_consumer_changes, path_is_clean, commit_consumer_progress_note,
+    commit_consumer_changes, path_is_clean, commit_consumer_progress_note, scoped_status_paths,
 )
 import registry_lib
 
@@ -195,6 +195,71 @@ def build_first_run_checklist(has_git, remote, needs_overview):
     return items
 
 
+_COMMIT_RESULT_LABELS = {
+    'noop': "nothing to commit",
+    'committed-pushed': "committed and pushed",
+    'committed-no-remote': "committed (no origin remote to push to)",
+    'commit-failed': "commit FAILED - see warning above",
+    'push-failed': "committed locally, push FAILED - see warning above",
+    'reconciled-pushed': "push conflict auto-reconciled, committed and pushed",
+}
+
+
+def print_close_out_summary(project_name, target_path, existing_consumer, already_connected_here,
+                             is_reconnect, is_adoption, consumer_commit_result,
+                             progress_commit_result, registry_commit_result, remaining_checklist):
+    """One explicit block, printed once at the very end of the run, from the same classification/
+    commit-result variables main() already computed along the way (design\\
+    script_action_reporting.md) - never re-derived a second time by whatever reads this output.
+    "Left uncommitted" is the one line NOT sourced from an already-known variable: it re-checks git
+    directly (evidence over intent), since "what's still dirty" is exactly the fact a script's own
+    belief about what it just committed can be wrong about."""
+    print()
+    print(f"=== {project_name}: connect project summary ===")
+
+    if existing_consumer is not None and already_connected_here:
+        print("Branch: already connected (re-scaffolded local files only, no new commit)")
+    elif existing_consumer is not None:
+        print("Branch: host-merge (new host joining an already-registered consumer)")
+    elif is_reconnect:
+        print("Branch: reconnect (previously disconnected)")
+    elif is_adoption:
+        print("Branch: adoption (existing hand-copied project, no prior Tower Crane content)")
+    else:
+        print("Branch: brand new")
+
+    has_git = (target_path / '.git').exists()
+    print(f"git: {'present' if has_git else 'not present - run `git init` before your first session'}")
+
+    if consumer_commit_result is not None:
+        owned_now = [p + '/*' if (target_path / p).is_dir() else p
+                     for p in CONSUMER_OWNED_PATHS if (target_path / p).exists()]
+        label = _COMMIT_RESULT_LABELS.get(consumer_commit_result, consumer_commit_result)
+        print(f"Committed to {project_name}'s own repo ({label}):")
+        print("  " + (', '.join(owned_now) if owned_now else '(none present)'))
+
+    if progress_commit_result is not None:
+        label = _COMMIT_RESULT_LABELS.get(progress_commit_result, progress_commit_result)
+        print(f"project_progress.md note: {label}")
+
+    if has_git:
+        left = scoped_status_paths(target_path, list(CONSUMER_OWNED_PATHS) + ['project_progress.md'])
+        if left:
+            print("Left uncommitted (not covered by this run's commit(s)):")
+            print("  " + ', '.join(left))
+
+    if registry_commit_result is not None:
+        label = _COMMIT_RESULT_LABELS.get(registry_commit_result, registry_commit_result)
+        print(f"Registered in the hub's own registry: {label}.")
+    elif existing_consumer is not None and already_connected_here:
+        print("Registered in the hub's own registry: unchanged (already had this host).")
+
+    if remaining_checklist:
+        print("Remaining for the user (from FIRST_RUN.md, or the equivalent for this branch):")
+        for item in remaining_checklist:
+            print(f"  {item}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Scaffold a new tower_crane consumer project.")
     parser.add_argument('--target-path', required=True, help="Absolute path to the new consumer's project root.")
@@ -233,6 +298,14 @@ def main():
     tools = args.tools
     private_tools = args.private_tools
     scaffold_date = args.date or date.today().isoformat()
+
+    # Close-out summary state (design\script_action_reporting.md): the classification/commit-result
+    # variables the script already computes below, threaded out here so the final summary block
+    # (step 8) can report them directly instead of a caller re-deriving the same facts secondhand.
+    remaining_checklist = None
+    consumer_commit_result = None
+    progress_commit_result = None
+    registry_commit_result = None
 
     config = get_shared_config(SHARED_ROOT)
     import_base = str(config['import_base'])
@@ -737,6 +810,11 @@ def main():
             print(f"  note   no .git\\ found at {target_path} - run `git init` (or finish cloning) "
                   "before your first session here. Setup changes are waiting there uncommitted "
                   "until then (design\\connect_project_commit_gate.md).")
+            remaining_checklist = ["- [ ] `git init` (or finish cloning), then commit the setup "
+                                    "changes this run made."]
+        remaining_checklist = (remaining_checklist or []) + [
+            "- [ ] Open the project in a fresh Claude Code session and accept the CLAUDE.md "
+            "import-approval dialog if prompted (this machine hasn't opened it before)."]
     else:
         # Checklist is built from actually-detected state, not assumed from scratch
         # (design\connect_disconnect.md "Reconnect-after-disconnect gap") - a reconnecting project (real
@@ -750,9 +828,11 @@ def main():
         first_run_path = target_path / FIRST_RUN_FILENAME
         if first_run_path.exists() and not args.force:
             print("  skip   FIRST_RUN.md exists (use --force to overwrite)")
+            remaining_checklist = ["- [ ] (see the existing `FIRST_RUN.md` - not overwritten this run)"]
         else:
             needs_overview = not (claude_md_existed and (is_reconnect or is_adoption))
             checklist = build_first_run_checklist(has_git, remote, needs_overview)
+            remaining_checklist = checklist
             if is_reconnect:
                 heading = "Reconnected via tower_crane on"
             elif is_adoption:
@@ -873,6 +953,7 @@ Notes: scaffolded by `scripts/new_consumer.py` on {scaffold_date}. Registry form
             result = commit_consumer_changes(
                 target_path, commit_msg, log=print, config=config,
                 imports=import_pieces, shared_root=SHARED_ROOT)
+            consumer_commit_result = result
             commit_labels = {
                 'not-a-repo': None,  # has_git_now already guards this case
                 'noop': None,
@@ -895,6 +976,7 @@ Notes: scaffolded by `scripts/new_consumer.py` on {scaffold_date}. Registry form
             if progress_pre_clean:
                 progress_result = commit_consumer_progress_note(
                     target_path, commit_msg, log=print)
+                progress_commit_result = progress_result
                 progress_labels = {
                     'committed-pushed': "  [git] project_progress.md's note committed and pushed in this consumer's own repo.",
                     'committed-no-remote': "  [git] project_progress.md's note committed in this consumer's own repo (no origin remote to push to).",
@@ -934,6 +1016,12 @@ Notes: scaffolded by `scripts/new_consumer.py` on {scaffold_date}. Registry form
         print(f"  1. Open {target_path} in a fresh Claude Code session and complete FIRST_RUN.md")
         print("     (git init, accept the CLAUDE.md import-approval dialog if prompted, fill the")
         print("     CLAUDE.md overview).")
+
+    # --- 8. close-out summary ---------------------------------------------------------------
+    print_close_out_summary(
+        project_name, target_path, existing_consumer, already_connected_here, is_reconnect,
+        is_adoption, consumer_commit_result, progress_commit_result, registry_commit_result,
+        remaining_checklist)
 
 
 if __name__ == '__main__':
