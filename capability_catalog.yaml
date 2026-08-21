@@ -196,6 +196,12 @@ nodes:
     description: "Adopts a discovered catalog entry into this project"
     themes: [efficiency-rationale]
 
+  - id: register_host
+    trigger: "register host"
+    context: hub
+    description: "Proactively registers this machine into every shared_resources catalog entry it's missing from — bringing this machine's registrations up to parity with what's already registered on other machines — so an entry's Hosts: block stays accurate everywhere instead of drifting silently. The catalog-wide counterpart to apply's own per-adoption [HOST-GAP] check. Also runs automatically as setup_machine.md's Step 8a for a newly connected machine."
+    themes: []
+
   - id: forget
     trigger: "shared resources \"Forget\""
     context: consumer
@@ -322,6 +328,12 @@ edges:
     b: browse
     conditional: false
     note: "browse already finds everything on its own; curation is a proactive nudge on top, not a requirement"
+
+  - type: accelerant
+    a: register_host
+    b: apply
+    conditional: false
+    note: "apply's own [HOST-GAP] check already catches a registration gap reactively, one adoption at a time; register_host is a proactive catalog-wide sweep for this host on top, not a requirement — same shape as curate_shared_resources's accelerant edge to browse."
 
   - type: reciprocal
     a: save
