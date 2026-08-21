@@ -51,6 +51,7 @@ from config_lib import (
     TC_IN_USE_HEADING, WORKFLOW_HEADING, DISCONNECTED_HEADING,
     DISCONNECT_NOTES_FILENAME as NOTES_FILENAME,
     HUB_POINTER_IMPORT_LINE, HUB_POINTER_RELPATH, HUB_DISPATCH_RELPATH,
+    CONSUMER_OWNED_PATHS, scoped_status_paths,
 )
 import registry_lib
 from new_consumer import SKILL_PIECES, STANDALONE_SKILLS
@@ -227,11 +228,26 @@ def strip_local_references(target_path, consumer, config, mode, log, is_last_hos
     writes TOWER_CRANE_DISCONNECT_NOTES.md as the single complete breadcrumb index, then commits
     everything in the consumer's own repo (commit_consumer_changes()) so nothing is left
     uncommitted/unexplained - the gap a live 2026-08-12 test found (design\\connect_disconnect.md).
-    Never touches project_progress.md or FIRST_RUN.md - those are the consumer's own content."""
+    Never touches project_progress.md or FIRST_RUN.md - those are the consumer's own content.
+
+    Returns a result dict (design\\script_action_reporting.md) - the same classification variables
+    this function already computes to drive its own behavior and write_disconnect_notes(), threaded
+    back out instead of discarded, so a caller's own close-out summary can relay them directly
+    rather than re-deriving them from this function's printed log. Every key is always present with
+    a safe default, even on the early target-missing return, so a caller never needs a presence
+    check before reading one."""
     target_path = Path(target_path)
+    result = {
+        'target_path': str(target_path), 'target_missing': False,
+        'hub_pointer_removed': False, 'n_imports': 0, 'sections_replaced': False,
+        'claude_prose_status': None, 'removed_hooks': 0, 'had_read_rule': False,
+        'dispatch_removed': False, 'removed_skills': [], 'notes_path': None,
+        'commit_result': None, 'left_uncommitted': [],
+    }
     if not target_path.exists():
         log(f"  note   {target_path} no longer exists on disk - nothing local to clean up.")
-        return
+        result['target_missing'] = True
+        return result
 
     date = datetime.date.today().isoformat()
     import_base = str(config['import_base'])
@@ -328,8 +344,17 @@ def strip_local_references(target_path, consumer, config, mode, log, is_last_hos
                             original_registered=consumer.get('registered'), is_last_host=is_last_host,
                             hub_pointer_removed=hub_pointer_removed, dispatch_removed=dispatch_removed)
 
+    # claude_prose_status (design\script_action_reporting.md): derived, not separately tracked -
+    # 'left-shared' when another host still depends on the tracked prose (deliberately untouched,
+    # not an anomaly), 'missing' when there was no CLAUDE.md to touch at all, 'replaced' on the
+    # normal success path, 'unrecognized' when is_last_host and CLAUDE.md exists but the standard
+    # heading wasn't found (the hand-edited case the existing log note above already flags).
+    claude_prose_status = ('left-shared' if not is_last_host else
+                            'missing' if not claude_md_path.exists() else
+                            'replaced' if sections_replaced else 'unrecognized')
+
     commit_msg = f"Tower Crane: disconnected via 'disconnect project' (mode: {mode})"
-    result = commit_consumer_changes(
+    commit_result = commit_consumer_changes(
         target_path, commit_msg, log=log, config=config,
         imports=[i['name'] for i in consumer['imported']], shared_root=SHARED_ROOT)
     commit_labels = {
@@ -343,27 +368,53 @@ def strip_local_references(target_path, consumer, config, mode, log, is_last_hos
         # resetting and regenerating this host's own Tower-Crane-owned values.
         'reconciled-pushed': "  [git] push conflict auto-reconciled (reset + regenerated), committed and pushed.",
     }
-    label = commit_labels.get(result)
+    label = commit_labels.get(commit_result)
     if label:
         log(label)
+
+    result.update({
+        'hub_pointer_removed': hub_pointer_removed, 'n_imports': n_imports,
+        'sections_replaced': sections_replaced, 'claude_prose_status': claude_prose_status,
+        'removed_hooks': removed_hooks, 'had_read_rule': had_read_rule,
+        'dispatch_removed': dispatch_removed, 'removed_skills': removed_skills,
+        'notes_path': str(target_path / NOTES_FILENAME), 'commit_result': commit_result,
+        # Evidence over intent (design\script_action_reporting.md): re-checked fresh via git rather
+        # than assumed clean from commit_result alone, since a 'noop'/'not-a-repo'/'commit-failed'
+        # result can each legitimately still leave real content dirty on disk.
+        'left_uncommitted': scoped_status_paths(target_path, CONSUMER_OWNED_PATHS),
+    })
+    return result
 
 
 def disconnect_host(slug, host_id, config, mode, log, do_local_cleanup=True):
     """Core primitive: remove ONE host from ONE consumer's registry entry, optionally cleaning up
     that host's own local files (only possible/meaningful when host_id is THIS machine's own
     config['host_id']). `mode` is recorded in the local-cleanup commit message / notes file, not
-    used for any registry logic. Returns True if the host was actually present and removed."""
+    used for any registry logic.
+
+    Returns a result dict (design\\script_action_reporting.md), not just True/False as before -
+    'removed' carries the old boolean meaning (present and actually removed from the registry) for
+    any caller still checking only that key; 'local' carries strip_local_references()'s own result
+    dict when do_local_cleanup ran, else None; 'skip_reason' names why nothing happened when
+    'removed' is False. A caller that only inspects `result['removed']` (or ignores the return value
+    entirely, as remove_hub.py's loop does today) keeps working unchanged - this is purely additive
+    over the boolean the old return value carried."""
+    base = {'slug': slug, 'host_id': host_id, 'removed': False, 'local': None,
+            'do_local_cleanup': do_local_cleanup, 'skip_reason': None, 'hosts_left': None}
     registry_path = CONSUMERS_DIR / f"{slug}.md"
     if not registry_path.exists():
         log(f"  skip   no registry entry for '{slug}' - nothing to disconnect.")
-        return False
+        base['skip_reason'] = 'no-registry'
+        return base
     consumer = registry_lib.parse_registry(registry_path)
     if consumer is None:
         log(f"  skip   {registry_path} isn't parseable - fix it by hand first.")
-        return False
+        base['skip_reason'] = 'not-parseable'
+        return base
     if host_id not in consumer['hosts']:
         log(f"  skip   '{slug}' has no hosts.{host_id} entry - already disconnected there.")
-        return False
+        base['skip_reason'] = 'not-connected'
+        return base
 
     # design\consumer_reference_indirection.md's host-count-aware split: computed BEFORE removal
     # (host_id is confirmed present above) since strip_local_references() needs to know, for a
@@ -372,17 +423,20 @@ def disconnect_host(slug, host_id, config, mode, log, do_local_cleanup=True):
     is_last_host = len(consumer['hosts']) == 1
 
     if do_local_cleanup:
-        strip_local_references(consumer['hosts'][host_id]['path'], consumer, config, mode, log,
-                                is_last_host=is_last_host)
+        base['local'] = strip_local_references(consumer['hosts'][host_id]['path'], consumer, config,
+                                                 mode, log, is_last_host=is_last_host)
     else:
         log(f"  note   registry-only: this machine can't reach '{host_id}''s files at "
             f"{consumer['hosts'][host_id]['path']} - clean up its @import lines/settings.json/"
             f".claude\\skills\\ there directly (or run this same command from that machine).")
+        base['skip_reason'] = 'remote-registry-only'
 
     raw = registry_path.read_text(encoding='utf-8')
     new_raw, was_present, host_count_after = registry_lib.remove_host_from_text(raw, host_id)
     if not was_present:
-        return False
+        return base
+    base['removed'] = True
+    base['hosts_left'] = host_count_after
     if host_count_after == 0:
         registry_path.unlink()
         log(f"  removed {registry_path} (last host disconnected - git history is the record)")
@@ -390,7 +444,84 @@ def disconnect_host(slug, host_id, config, mode, log, do_local_cleanup=True):
         registry_path.write_text(new_raw, encoding='utf-8', newline='\n')
         floor_note = ", scope -> local (below 2-host floor)" if host_count_after < 2 else ""
         log(f"  wrote  {registry_path} (removed hosts.{host_id}, {host_count_after} host(s) left{floor_note})")
-    return True
+    return base
+
+
+_COMMIT_RESULT_LABELS = {
+    'not-a-repo': "not a git repo",
+    'noop': "nothing to commit",
+    'committed-pushed': "committed and pushed",
+    'committed-no-remote': "committed (no origin remote to push to)",
+    'commit-failed': "commit FAILED - see warning above",
+    'push-failed': "committed locally, push FAILED - see warning above",
+    'reconciled-pushed': "push conflict auto-reconciled, committed and pushed",
+}
+
+
+def _print_host_summary(host_result):
+    """One host's block within the close-out summary (design\\script_action_reporting.md) -
+    entirely sourced from disconnect_host()'s/strip_local_references()'s own already-computed
+    result dicts, nothing re-derived."""
+    host_id = host_result['host_id']
+    if not host_result['removed']:
+        reason = {
+            'no-registry': "no registry entry", 'not-parseable': "registry entry not parseable",
+            'not-connected': "already had no hosts.<host> entry",
+            'remote-registry-only': "registry-only (not this machine - local files untouched here)",
+        }.get(host_result['skip_reason'], host_result['skip_reason'] or "unknown")
+        print(f"{host_id}: not removed ({reason})")
+        return
+    hosts_left_note = f", {host_result['hosts_left']} host(s) left in the registry" if host_result['hosts_left'] is not None else ""
+    print(f"{host_id}: removed from the registry{hosts_left_note}")
+    local = host_result['local']
+    if local is None:
+        return  # remote-registry-only - nothing local to report
+    if local['target_missing']:
+        print(f"  local path no longer exists on disk ({local['target_path']}) - nothing local to clean up")
+        return
+    prose_labels = {
+        'replaced': "CLAUDE.md prose replaced with disconnected-pointer",
+        'left-shared': "CLAUDE.md prose left in place (another host still depends on it)",
+        'missing': "no CLAUDE.md present to touch",
+        'unrecognized': "CLAUDE.md prose NOT replaced - standard heading not found (hand-edited?)",
+    }
+    parts = [f"{local['n_imports']} @import line(s) removed", prose_labels[local['claude_prose_status']]]
+    if local['hub_pointer_removed']:
+        parts.append("hub_pointer.md removed")
+    if local['removed_hooks'] or local['had_read_rule']:
+        detail = []
+        if local['removed_hooks']:
+            detail.append(f"{local['removed_hooks']} hook entry/entries")
+        if local['had_read_rule']:
+            detail.append("Read permission rule")
+        parts.append(f"{' and '.join(detail)} removed from settings.json")
+    if local['dispatch_removed']:
+        parts.append("_hub_dispatch.py removed")
+    if local['removed_skills']:
+        parts.append(f"skills removed: {', '.join(sorted(local['removed_skills']))}")
+    print(f"  local cleanup: {'; '.join(parts)}")
+    print(f"  notes file: {local['notes_path']}")
+    commit_label = _COMMIT_RESULT_LABELS.get(local['commit_result'], local['commit_result'])
+    print(f"  committed to this consumer's own repo: {commit_label}")
+    if local['left_uncommitted']:
+        print(f"  left uncommitted: {', '.join(local['left_uncommitted'])}")
+
+
+def print_close_out_summary(slug, mode, host_results, registry_commit_result):
+    """Close-out block, printed once at the very end of the run (design\\
+    script_action_reporting.md) - entirely built from the result dicts disconnect_host()/
+    strip_local_references() already computed and returned, never a second re-derivation of what
+    happened. Extends the same shape new_consumer.py's own close-out summary uses, adapted for the
+    one real structural difference here: a single run can touch several hosts at once, each landing
+    in a genuinely different outcome, so this reports one block per host instead of one block total."""
+    print()
+    print(f"=== {slug}: disconnect project summary ===")
+    print(f"Mode: {mode} (target host(s): {', '.join(r['host_id'] for r in host_results)})")
+    for host_result in host_results:
+        _print_host_summary(host_result)
+    if registry_commit_result is not None:
+        label = _COMMIT_RESULT_LABELS.get(registry_commit_result, registry_commit_result)
+        print(f"Registered in the hub's own registry: {label}.")
 
 
 def main():
@@ -444,8 +575,12 @@ def main():
 
     print(f"Disconnecting '{args.slug}' (mode: {args.mode}) - target host(s): {', '.join(targets)}")
     any_removed = False
+    host_results = []
     for host_id in targets:
-        if disconnect_host(args.slug, host_id, config, args.mode, print, do_local_cleanup=(host_id == this_host)):
+        host_result = disconnect_host(args.slug, host_id, config, args.mode, print,
+                                       do_local_cleanup=(host_id == this_host))
+        host_results.append(host_result)
+        if host_result['removed']:
             any_removed = True
 
     # design\grt_connectivity_audit.md item (i): commit the registry change into the outer hub
@@ -453,6 +588,7 @@ def main():
     # functionality-critical state (every host's own resume / check_tower_crane.py reads it for a
     # correct answer), not user work-in-progress. `git add` on a since-hard-deleted registry file
     # (0 hosts left) stages the deletion correctly, so this covers that case too.
+    registry_commit_result = None
     if any_removed:
         registry_commit_msg = (
             f"Registry: disconnect '{args.slug}' (mode: {args.mode}, host(s): {', '.join(targets)})")
@@ -465,6 +601,8 @@ def main():
         label = registry_commit_labels.get(registry_commit_result)
         if label:
             print(label)
+
+    print_close_out_summary(args.slug, args.mode, host_results, registry_commit_result)
 
 
 if __name__ == '__main__':
