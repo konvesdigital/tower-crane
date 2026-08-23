@@ -107,10 +107,55 @@ def replace_prose_sections(text, date, mode):
     return text[:idx_start] + pointer + text[idx_end:], True
 
 
+def _detect_shared_content(target_path, consumer, config):
+    """Read-only detection of every trace of SHARED, git-tracked Tower Crane content in this
+    consumer's local files - the same signals strip_local_references()'s apply path removes on the
+    last host, computed here without mutating anything. Used only when another host is still
+    connected, to render an exhaustive, code-derived checklist for a manual full purge
+    (design\\host_scoped_disconnect_state.md Decision 2) - never a hand-written enumeration that
+    could drift from what a real last-host removal would actually do."""
+    import_base = str(config['import_base'])
+    claude_md_path = target_path / 'CLAUDE.md'
+    n_imports = 0
+    sections_present = False
+    if claude_md_path.exists():
+        text = claude_md_path.read_text(encoding='utf-8')
+        escaped_base = re.escape(import_base)
+        n_imports = (len(re.findall(rf'(?m)^@{escaped_base}/\S+\.md\s*\r?\n?', text)) +
+                     len(re.findall(rf'(?m)^{re.escape(HUB_POINTER_IMPORT_LINE)}\s*\r?\n?', text)))
+        sections_present = TC_IN_USE_HEADING in text
+
+    settings_path = target_path / '.claude' / 'settings.json'
+    hook_count = 0
+    if settings_path.exists():
+        settings = json.loads(settings_path.read_text(encoding='utf-8'))
+        tools = [o['name'] for o in consumer['opted_in']] + [o['name'] for o in consumer['private_opted_in']]
+        for groups in settings.get('hooks', {}).values():
+            for grp in groups:
+                hook_count += sum(
+                    1 for h in grp.get('hooks', [])
+                    if any(
+                        re.search(r'hooks[\\/]' + re.escape(t) + r'\.(ps1|py)', h.get('command', '')) or
+                        re.search(r'_hub_dispatch\.py"?\s+' + re.escape(t) + r'\b', h.get('command', ''))
+                        for t in tools))
+
+    dispatch_present = (target_path / HUB_DISPATCH_RELPATH).exists()
+
+    skills_dir = target_path / '.claude' / 'skills'
+    skills_present = sorted(
+        name for name in local_skill_names(consumer) if (skills_dir / name).exists())
+
+    return {
+        'n_imports': n_imports, 'sections_present': sections_present,
+        'removed_hooks': hook_count, 'dispatch_present': dispatch_present,
+        'skills_present': skills_present,
+    }
+
+
 def write_disconnect_notes(target_path, date, mode, host_id, n_imports, removed_hooks,
                             had_read_rule, removed_skills, sections_replaced, log,
                             original_registered=None, is_last_host=True,
-                            hub_pointer_removed=False, dispatch_removed=False):
+                            hub_pointer_removed=False, dispatch_removed=False, detected=None):
     """Write TOWER_CRANE_DISCONNECT_NOTES.md - designed so reading THIS FILE ALONE gives a 100%
     complete list of every trace Tower Crane leaves behind in a consumer project after a
     this-machine disconnect, including a cross-reference back to CLAUDE.md's own short pointer
@@ -146,12 +191,39 @@ def write_disconnect_notes(target_path, date, mode, host_id, n_imports, removed_
         removed_lines.append("- (nothing local was present to remove - this host's connection "
                               "existed only in the registry.)")
     if not is_last_host:
-        removed_lines.append(
-            "- **Left in place on purpose:** shared, git-tracked Tower Crane content (the "
-            f"`@import`/`{HUB_POINTER_IMPORT_LINE}` line, hook entries, `{HUB_DISPATCH_RELPATH}`, "
-            "`.claude/skills/` stubs) was NOT touched - another host is still connected to this "
-            "consumer and depends on it (design\\consumer_reference_indirection.md's host-count-"
-            "aware split). Only this host's own per-host state was cleaned up.")
+        checklist = []
+        if detected['n_imports']:
+            checklist.append(f"- {detected['n_imports']} `@import`/pointer line(s) in `CLAUDE.md`")
+        if detected['sections_present']:
+            checklist.append(f"- the `{TC_IN_USE_HEADING}` / `{WORKFLOW_HEADING}` sections in `CLAUDE.md`")
+        if detected['removed_hooks']:
+            checklist.append(f"- {detected['removed_hooks']} hook entry/entries in `.claude/settings.json`")
+        if detected['dispatch_present']:
+            checklist.append(f"- `{HUB_DISPATCH_RELPATH}`")
+        if detected['skills_present']:
+            plural = "y" if len(detected['skills_present']) == 1 else "ies"
+            checklist.append(
+                f"- skill director{plural} in `.claude/skills/`: " +
+                ", ".join(f"`{n}`" for n in detected['skills_present']))
+        if checklist:
+            removed_lines.append(
+                "- **Left in place on purpose:** shared, git-tracked Tower Crane content was NOT "
+                "touched here - another host is still connected to this consumer and depends on it "
+                "(design\\consumer_reference_indirection.md's host-count-aware split). Only this "
+                "host's own per-host state (above) was cleaned up.\n\n"
+                "  **If you want this clone to look fully disconnected anyway**, despite another "
+                "host remaining connected elsewhere, do this by hand, in this order:\n\n"
+                "  1. Sever this clone from the shared history first - `git remote remove origin` "
+                "(or repoint it to a private fork). Nothing removed after this point can ever reach "
+                "the surviving host via a push, which is what makes step 2 safe to do at all.\n"
+                "  2. Then remove every trace below (the exact same content the last host to "
+                "disconnect would have had removed automatically):\n"
+                + "\n".join(f"     {line}" for line in checklist))
+        else:
+            removed_lines.append(
+                "- **Left in place on purpose:** shared, git-tracked Tower Crane content was "
+                "checked for and none was found present here to begin with - nothing left to purge "
+                "even by hand.")
 
     left_lines = [
         "- `project_progress.md` - this project's own continuity file; any historical Work Log "
@@ -177,6 +249,14 @@ def write_disconnect_notes(target_path, date, mode, host_id, n_imports, removed_
                       f"`{DISCONNECTED_HEADING}`. That pointer plus this file are the only two "
                       f"places Tower Crane content still surfaces at a glance in this project; "
                       f"everything else is history, listed above.")
+    elif not is_last_host and detected['sections_present']:
+        cross_ref = (f"`CLAUDE.md` does **not** carry a pointer to this file - its "
+                      f"`{TC_IN_USE_HEADING}`/`{WORKFLOW_HEADING}` sections were deliberately left "
+                      f"untouched (another host is still connected and depends on that shared, "
+                      f"tracked content), not because they're missing or hand-edited. This file is "
+                      f"therefore the only place this disconnect is recorded at a glance for this "
+                      f"host - check `CLAUDE.md` by hand too if you want the full manual-purge "
+                      f"checklist above.")
     else:
         cross_ref = (f"`CLAUDE.md` does **not** carry a pointer to this file - its "
                       f"`{TC_IN_USE_HEADING}`/`{WORKFLOW_HEADING}` sections weren't found in "
@@ -346,10 +426,16 @@ def strip_local_references(target_path, consumer, config, mode, log, is_last_hos
                 removed_skills.append(name)
                 log(f"  removed {skill_dir}")
 
+    # Read-only detection of shared content, for the not-last-host manual-purge checklist only
+    # (design\host_scoped_disconnect_state.md Decision 2) - nothing above this line was mutated by
+    # it, and it's never used to decide what the apply steps above actually did.
+    detected = None if is_last_host else _detect_shared_content(target_path, consumer, config)
+
     write_disconnect_notes(target_path, date, mode, config['host_id'], n_imports, removed_hooks,
                             had_read_rule, removed_skills, sections_replaced, log,
                             original_registered=consumer.get('registered'), is_last_host=is_last_host,
-                            hub_pointer_removed=hub_pointer_removed, dispatch_removed=dispatch_removed)
+                            hub_pointer_removed=hub_pointer_removed, dispatch_removed=dispatch_removed,
+                            detected=detected)
 
     # claude_prose_status (design\script_action_reporting.md): derived, not separately tracked -
     # 'left-shared' when another host still depends on the tracked prose (deliberately untouched,

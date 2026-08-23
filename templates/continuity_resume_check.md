@@ -47,7 +47,11 @@ reached) read whatever is present.
    own `resume` reads directly (`toolkit\AGENTS.md` step 1), just reached through one extra
    indirection hop (mirrors how `_hub_dispatch.py` locates the hub for hook calls). Never infer
    machine identity any other way (path, `hostname`, prior context). If `.claude\hub_pointer.md`
-   doesn't exist (this consumer predates pointer-indirection), skip this step silently.
+   doesn't exist, Tower Crane connection is not active on this machine for this project — do not
+   attempt to determine which machine this is by any other means (path, hostname, prior context);
+   it doesn't matter, since nothing host-specific applies while disconnected. (A consumer that
+   predates pointer-indirection and never had this file also hits this branch — same skip, same
+   reasoning.)
 2. `git pull` (this project's own repo).
 3. Check the shared tower_crane hub — both steps read-only, no gate needed:
    - From the hub's `toolkit\` folder: `python scripts\update_toolkit.py --notify` (fetch +
