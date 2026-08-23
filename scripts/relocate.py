@@ -35,7 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config_lib import (get_shared_config, build_new_cmd_map, apply_hook_command_fixes,
                          fix_skill_stubs, fix_adopted_stub_paths, commit_consumer_changes,
                          fix_hub_pointer, fix_hub_dispatch_wrapper, fix_imports,
-                         HUB_POINTER_IMPORT_LINE)
+                         sync_consumer_repo, HUB_POINTER_IMPORT_LINE)
 from registry_lib import parse_registry, host_path, reconcile_scope_floor
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
@@ -158,6 +158,13 @@ def main():
             print(f"  [warn] path not found on disk: {this_path}")
             COUNTS['warn'] += 1
             continue
+
+        # Pull this consumer's own repo current BEFORE reading/regenerating anything below, so the
+        # edit is never computed against a stale snapshot (config_lib.py's sync_consumer_repo() -
+        # the 2026-08-22 HANK/GRT push conflict this closes). No-op in a dry run - nothing
+        # downstream will be written anyway.
+        if not args.dry_run:
+            sync_consumer_repo(this_path, log=print)
 
         imports_changed = fix_imports(this_path, c['imports'], config['import_base'], args.dry_run,
                                        log=print)

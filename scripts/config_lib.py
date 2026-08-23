@@ -812,6 +812,69 @@ def _consumer_owned_prefix_match(f):
     return any(f == p or f.startswith(p.rstrip('/') + '/') for p in CONSUMER_OWNED_PATHS)
 
 
+def sync_consumer_repo(consumer_path, log=None):
+    """Fast-forward consumer_path's own git repo to its current 'origin' tip - if a clean fast-
+    forward is possible - BEFORE a caller reads/edits any CONSUMER_OWNED_PATHS file there.
+
+    Why this exists: every writer that regenerates CONSUMER_OWNED_PATHS content (relocate.py,
+    new_consumer.py's host-merge/reconnect/adoption branches, disconnect_consumer.py's
+    strip_local_references()) reads whatever happens to be on disk right now and edits it in
+    place - with no check that "on disk right now" is actually current. _reconcile_diverged_push()
+    below only reacts to that gap AFTER a commit built on stale content is already made and its
+    push already rejected, and it can only cleanly recover when EVERYTHING origin gained in the
+    interim falls inside CONSUMER_OWNED_PATHS - not when it also touches something outside that
+    tuple (project_progress.md, deliberately excluded since it's user-owned). That's exactly what
+    happened live 2026-08-22: HANK's local Geo Rank Tracker clone was 6 commits behind its own
+    origin (LOGAN's independent connect/disconnect churn plus a project_progress.md note) when
+    disconnect_consumer.py built a disconnect commit on the stale snapshot - the push was rejected
+    and reconciliation correctly declined rather than risk discarding the project_progress.md
+    content, leaving a real merge for a human. Pulling FIRST, before the edit is even computed,
+    avoids creating the staleness at all in the common case (a clean tree that's purely behind,
+    with no unpushed local work of its own) instead of trying to recover from it afterward. Full
+    incident: project_progress.md's 2026-08-22 Work Log.
+
+    Deliberately conservative - a no-op (never raises, never partially mutates) unless ALL of: a
+    real git repo, an 'origin' remote configured, a clean working tree (never pulls over
+    in-progress work - the same safety gate _reconcile_diverged_push() already applies), a
+    resolvable current branch, and the fetch itself succeeds. When behind, only ever fast-forwards
+    (`merge --ff-only`) - never a real merge, so this can never produce a conflict of its own; if
+    local has ALSO diverged (its own unpushed commits), the ff-only fails harmlessly and the
+    caller proceeds exactly as it did before this function existed - today's push-then-reconcile
+    path still catches that case unchanged.
+
+    Returns True if a fast-forward actually happened, False in every no-op/already-current case -
+    purely informational, no caller needs to branch on it."""
+    repo_path = Path(consumer_path)
+    if not (repo_path / '.git').is_dir():
+        return False
+
+    def _git(git_args):
+        return subprocess.run(['git', '-C', str(repo_path)] + git_args,
+                               capture_output=True, text=True)
+
+    if 'origin' not in _git(['remote']).stdout.split():
+        return False
+    if _git(['status', '--porcelain']).stdout.strip():
+        return False
+    branch = _git(['rev-parse', '--abbrev-ref', 'HEAD']).stdout.strip()
+    if not branch or branch == 'HEAD':
+        return False
+    if _git(['fetch', 'origin']).returncode != 0:
+        return False
+    counts = _git(['rev-list', '--left-right', '--count', f'HEAD...origin/{branch}']).stdout.split()
+    if len(counts) != 2:
+        return False
+    _ahead, behind = counts
+    if behind == '0':
+        return False
+
+    if _git(['merge', '--ff-only', f'origin/{branch}']).returncode != 0:
+        return False
+    if log:
+        log(f"  [git] {repo_path}: fast-forwarded {behind} commit(s) from origin before editing.")
+    return True
+
+
 def _reconcile_diverged_push(consumer_path, message, log, config, imports, shared_root):
     """Real reconciliation for a rejected consumer push, replacing the old dead end
     (design\\grt_connectivity_audit.md item (ii)) - confirmed in code before this was built:

@@ -48,6 +48,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config_lib import (
     commit_consumer_changes, commit_hub_changes, get_shared_config, print_diagnose_inline,
+    sync_consumer_repo,
     TC_IN_USE_HEADING, WORKFLOW_HEADING, DISCONNECTED_HEADING,
     DISCONNECT_NOTES_FILENAME as NOTES_FILENAME,
     HUB_POINTER_IMPORT_LINE, HUB_POINTER_RELPATH, HUB_DISPATCH_RELPATH,
@@ -248,6 +249,11 @@ def strip_local_references(target_path, consumer, config, mode, log, is_last_hos
         log(f"  note   {target_path} no longer exists on disk - nothing local to clean up.")
         result['target_missing'] = True
         return result
+
+    # Pull this consumer's own repo current BEFORE reading/editing CLAUDE.md/settings.json below,
+    # so the disconnect commit is never built on a stale snapshot (config_lib.py's
+    # sync_consumer_repo() - the 2026-08-22 HANK/GRT push conflict this closes).
+    sync_consumer_repo(target_path, log=log)
 
     date = datetime.date.today().isoformat()
     import_base = str(config['import_base'])

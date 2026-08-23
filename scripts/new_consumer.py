@@ -58,6 +58,7 @@ from config_lib import (
     get_dispatch_optin, build_hub_pointer_content, build_dispatch_cmd_map,
     write_new_connection_files, collapse_imports_to_pointer, fix_imports, commit_hub_changes,
     commit_consumer_changes, path_is_clean, commit_consumer_progress_note, scoped_status_paths,
+    sync_consumer_repo,
 )
 import registry_lib
 
@@ -386,6 +387,14 @@ def main():
                     "See toolkit\\troubleshoot_project_connection.md's 'git clone ... failed' row."
                 )
             print("  cloned OK")
+
+    # Pull target_path's own repo current BEFORE any of the read-and-patch-in-place steps below
+    # (host-merge, reconnect, adoption, already-connected re-scaffold all read whatever CLAUDE.md/
+    # settings.json is on disk right now) - config_lib.py's sync_consumer_repo(), the 2026-08-22
+    # HANK/GRT push conflict this closes. No-op for a brand-new scaffold (no .git yet) or a folder
+    # just cloned above (already at its origin tip).
+    if target_path.exists():
+        sync_consumer_repo(target_path, log=print)
 
     # protocol pieces: filing + compliance + shared_resources mandatory; continuity default-on
     pieces = ['filing', 'compliance', 'shared_resources']
