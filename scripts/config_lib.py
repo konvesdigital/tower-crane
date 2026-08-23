@@ -824,14 +824,14 @@ def sync_consumer_repo(consumer_path, log=None):
     push already rejected, and it can only cleanly recover when EVERYTHING origin gained in the
     interim falls inside CONSUMER_OWNED_PATHS - not when it also touches something outside that
     tuple (project_progress.md, deliberately excluded since it's user-owned). That's exactly what
-    happened live 2026-08-22: HANK's local Geo Rank Tracker clone was 6 commits behind its own
-    origin (LOGAN's independent connect/disconnect churn plus a project_progress.md note) when
-    disconnect_consumer.py built a disconnect commit on the stale snapshot - the push was rejected
-    and reconciliation correctly declined rather than risk discarding the project_progress.md
-    content, leaving a real merge for a human. Pulling FIRST, before the edit is even computed,
-    avoids creating the staleness at all in the common case (a clean tree that's purely behind,
-    with no unpushed local work of its own) instead of trying to recover from it afterward. Full
-    incident: project_progress.md's 2026-08-22 Work Log.
+    happened live 2026-08-22: a multi-machine consumer's local clone on one host was several
+    commits behind its own origin (another host's independent connect/disconnect activity plus a
+    project_progress.md note) when disconnect_consumer.py built a disconnect commit on the stale
+    snapshot - the push was rejected and reconciliation correctly declined rather than risk
+    discarding the project_progress.md content, leaving a real merge for a human. Pulling FIRST,
+    before the edit is even computed, avoids creating the staleness at all in the common case (a
+    clean tree that's purely behind, with no unpushed local work of its own) instead of trying to
+    recover from it afterward. Full incident (private): project_progress.md's 2026-08-22 Work Log.
 
     Deliberately conservative - a no-op (never raises, never partially mutates) unless ALL of: a
     real git repo, an 'origin' remote configured, a clean working tree (never pulls over

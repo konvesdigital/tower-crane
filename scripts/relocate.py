@@ -161,8 +161,8 @@ def main():
 
         # Pull this consumer's own repo current BEFORE reading/regenerating anything below, so the
         # edit is never computed against a stale snapshot (config_lib.py's sync_consumer_repo() -
-        # the 2026-08-22 HANK/GRT push conflict this closes). No-op in a dry run - nothing
-        # downstream will be written anyway.
+        # see that function's own docstring for the real 2026-08-22 push conflict this closes).
+        # No-op in a dry run - nothing downstream will be written anyway.
         if not args.dry_run:
             sync_consumer_repo(this_path, log=print)
 

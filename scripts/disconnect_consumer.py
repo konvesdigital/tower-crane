@@ -252,7 +252,8 @@ def strip_local_references(target_path, consumer, config, mode, log, is_last_hos
 
     # Pull this consumer's own repo current BEFORE reading/editing CLAUDE.md/settings.json below,
     # so the disconnect commit is never built on a stale snapshot (config_lib.py's
-    # sync_consumer_repo() - the 2026-08-22 HANK/GRT push conflict this closes).
+    # sync_consumer_repo() - a real 2026-08-22 push conflict this closes (see that function's own
+    # docstring, and project_progress.md's Work Log, for the full incident).
     sync_consumer_repo(target_path, log=log)
 
     date = datetime.date.today().isoformat()

@@ -390,9 +390,9 @@ def main():
 
     # Pull target_path's own repo current BEFORE any of the read-and-patch-in-place steps below
     # (host-merge, reconnect, adoption, already-connected re-scaffold all read whatever CLAUDE.md/
-    # settings.json is on disk right now) - config_lib.py's sync_consumer_repo(), the 2026-08-22
-    # HANK/GRT push conflict this closes. No-op for a brand-new scaffold (no .git yet) or a folder
-    # just cloned above (already at its origin tip).
+    # settings.json is on disk right now) - config_lib.py's sync_consumer_repo(), see that
+    # function's own docstring for the real 2026-08-22 push conflict this closes. No-op for a
+    # brand-new scaffold (no .git yet) or a folder just cloned above (already at its origin tip).
     if target_path.exists():
         sync_consumer_repo(target_path, log=print)
 
