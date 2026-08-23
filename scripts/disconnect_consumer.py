@@ -190,8 +190,8 @@ def write_disconnect_notes(target_path, date, mode, host_id, n_imports, removed_
     if not removed_lines:
         removed_lines.append("- (nothing local was present to remove - this host's connection "
                               "existed only in the registry.)")
+    checklist = []
     if not is_last_host:
-        checklist = []
         if detected['n_imports']:
             checklist.append(f"- {detected['n_imports']} `@import`/pointer line(s) in `CLAUDE.md`")
         if detected['sections_present']:
@@ -210,20 +210,50 @@ def write_disconnect_notes(target_path, date, mode, host_id, n_imports, removed_
                 "- **Left in place on purpose:** shared, git-tracked Tower Crane content was NOT "
                 "touched here - another host is still connected to this consumer and depends on it "
                 "(design\\consumer_reference_indirection.md's host-count-aware split). Only this "
-                "host's own per-host state (above) was cleaned up.\n\n"
-                "  **If you want this clone to look fully disconnected anyway**, despite another "
-                "host remaining connected elsewhere, do this by hand, in this order:\n\n"
-                "  1. Sever this clone from the shared history first - `git remote remove origin` "
-                "(or repoint it to a private fork). Nothing removed after this point can ever reach "
-                "the surviving host via a push, which is what makes step 2 safe to do at all.\n"
-                "  2. Then remove every trace below (the exact same content the last host to "
-                "disconnect would have had removed automatically):\n"
-                + "\n".join(f"     {line}" for line in checklist))
+                "host's own per-host state (above) was cleaned up. See \"Your options from here\" "
+                "below.")
         else:
             removed_lines.append(
                 "- **Left in place on purpose:** shared, git-tracked Tower Crane content was "
                 "checked for and none was found present here to begin with - nothing left to purge "
                 "even by hand.")
+
+    options_section = ""
+    if not is_last_host and checklist:
+        options_section = (
+            "## Your options from here (another host is still connected)\n\n"
+            "Another host is still connected to this consumer and depends on the shared, "
+            "git-tracked content listed below - none of it was touched by this disconnect, and "
+            "none of it should be hand-edited (doing so would break that other host's live "
+            "connection the next time it pulls). Four real options, and since one of them is "
+            "\"do nothing,\" none of the others is time-pressured - exercise any of them whenever "
+            "it suits you.\n\n"
+            "**1A. Manually strip this clone too, while leaving the other host(s) connected "
+            "elsewhere.**\n"
+            "1. Sever this clone from the shared history first - `git remote remove origin` (or "
+            "repoint it to a private fork). Nothing removed after this point can ever reach the "
+            "surviving host via a push, which is what makes step 2 safe to do at all.\n"
+            "2. Then remove every trace below by hand (the exact same content the last host to "
+            "disconnect would have had removed automatically):\n"
+            + "\n".join(f"   {line}" for line in checklist) + "\n\n"
+            "**1B. Let the other host(s) do it, then just `git pull` here.** Run `\"disconnect "
+            "project\"` (or `\"uninstall tower crane\"`, which runs it for every consumer that "
+            "machine has) on every OTHER machine still connected to this consumer. The LAST one to "
+            "disconnect is the one whose own run triggers the real full strip there (shared "
+            "content removed, commit pushed to `origin`) - this clone then only needs an ordinary "
+            "`git pull` to receive that same fully-stripped state. No manual edits here at all, "
+            "and it works even though this host already left the registry.\n\n"
+            "**2. Reconnect instead.** If Tower Crane isn't already set up on this machine, set it "
+            "up, then run `\"connect project\"` for this consumer - this regenerates "
+            f"`{HUB_POINTER_RELPATH}` and this host's own `Read(...)` permission entry, restoring "
+            "full functionality alongside the still-live shared content. **Not yet verified for a "
+            "clone left in exactly this shape** (a this-only disconnect while another host stays "
+            "connected) - test this path before relying on it without checking.\n\n"
+            "**3. Do nothing.** Leave this file in place - it's a reference for exercising 1A "
+            "later, and a record of exactly which files here are shared/tracked and must not be "
+            "hand-edited. This file itself is not required to be kept; deleting it loses nothing "
+            "but that record.\n\n"
+        )
 
     left_lines = [
         "- `project_progress.md` - this project's own continuity file; any historical Work Log "
@@ -256,7 +286,7 @@ def write_disconnect_notes(target_path, date, mode, host_id, n_imports, removed_
                       f"tracked content), not because they're missing or hand-edited. This file is "
                       f"therefore the only place this disconnect is recorded at a glance for this "
                       f"host - check `CLAUDE.md` by hand too if you want the full manual-purge "
-                      f"checklist above.")
+                      f"checklist under \"Your options from here\" below.")
     else:
         cross_ref = (f"`CLAUDE.md` does **not** carry a pointer to this file - its "
                       f"`{TC_IN_USE_HEADING}`/`{WORKFLOW_HEADING}` sections weren't found in "
@@ -266,30 +296,42 @@ def write_disconnect_notes(target_path, date, mode, host_id, n_imports, removed_
 
     registered_note = f" Originally registered with Tower Crane: **{original_registered}**." \
         if original_registered else ""
+    host_scope_note = (
+        f" This file describes **`{host_id}`**'s own clone specifically (mode: `{mode}`) - if "
+        f"you're reading it on a different machine (e.g. after pulling it via `git pull` "
+        f"following another host's own disconnect), it has no bearing on that machine's own Tower "
+        f"Crane connection, which is unaffected.")
+
+    tail_section = ""
+    if is_last_host:
+        tail_section = (
+            f"## If you want a clean break\n\n"
+            f"None of the above is deleted automatically. To fully purge Tower Crane from this "
+            f"project:\n"
+            f"- Delete this file and the `{DISCONNECTED_HEADING}` section in `CLAUDE.md` (if "
+            f"present).\n"
+            f"- Remove `shared_resources/` / `COMPLIANCE_GUIDANCE.md` if present and no longer "
+            f"wanted.\n"
+            f"- Rewriting git history to remove old Tower Crane commits is a manual, destructive "
+            f"git operation - not something this command does. Ask Claude Code in this project "
+            f"directly if you want help with that.\n\n"
+            f"Reconnecting later: run `\"connect project\"` again from the Tower Crane hub.\n")
 
     text = (
         f"# Tower Crane — Disconnect Notes\n\n"
         f"Generated automatically by `disconnect_consumer.py` on {date} (mode: {mode}, host: "
         f"`{host_id}`). This file is meant to be the complete index of every trace Tower Crane "
         f"left behind in this project after disconnecting — read this file alone and you "
-        f"have the full picture; nothing else needs following to find more.{registered_note}\n\n"
+        f"have the full picture; nothing else needs following to find "
+        f"more.{registered_note}{host_scope_note}\n\n"
         f"## Removed by this disconnect\n\n"
         + "\n".join(removed_lines) + "\n\n"
+        + options_section +
         f"## Left behind deliberately (not touched by this command)\n\n"
         + "\n".join(left_lines) + "\n\n"
         f"## Cross-reference\n\n"
         f"{cross_ref}\n\n"
-        f"## If you want a clean break\n\n"
-        f"None of the above is deleted automatically. To fully purge Tower Crane from this "
-        f"project:\n"
-        f"- Delete this file and the `{DISCONNECTED_HEADING}` section in `CLAUDE.md` (if "
-        f"present).\n"
-        f"- Remove `shared_resources/` / `COMPLIANCE_GUIDANCE.md` if present and no longer "
-        f"wanted.\n"
-        f"- Rewriting git history to remove old Tower Crane commits is a manual, destructive git "
-        f"operation - not something this command does. Ask Claude Code in this project directly "
-        f"if you want help with that.\n\n"
-        f"Reconnecting later: run `\"connect project\"` again from the Tower Crane hub.\n"
+        + tail_section
     )
     notes_path = target_path / NOTES_FILENAME
     notes_path.write_text(text, encoding='utf-8', newline='\n')
