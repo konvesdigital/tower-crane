@@ -8,6 +8,20 @@ actually invoked.
 
 **"checkpoint"**
 1. Update `project_progress.md`:
+   - **`## Current Status` and `## Next Up` are two distinct headings, not one blended section.**
+     Current Status is a dashboard: recent state deltas (not true at the start of last session),
+     work genuinely in progress (designed-not-built, built-not-tested, tested-and-found-buggy), and
+     known standing defects a session needs to not trip over — even ones with no plan yet. Next Up
+     is a queue: work identified but not yet started, deferred until its time comes. An item
+     graduates Next Up → Current Status the session someone actually starts it, and out of Current
+     Status → Work Log the session it's done — never sideways.
+   - **Inclusion test, applied to every line in both headings**: would a session miss this fact by
+     re-deriving it itself (reading the code, running the action, reading a design doc), and would
+     missing it degrade this session's decisions? If Claude would learn it anyway by doing the thing
+     the fact describes, or it's inspectable in seconds (e.g. who's registered — read `consumers\`,
+     don't restate the roster), it doesn't belong here. Neither heading is a capability inventory —
+     a fully-built feature with no open caveat belongs in `README.md`; a settled call belongs in the
+     Decisions table. Point to the canonical source instead of duplicating it.
    - Update Current Status and Next Up in two passes: (1) **fold in what changed** — edit the
      existing text in place to match what's true right now, never append a new bullet narrating what
      this session did (that's the Work Log entry's job). (2) **Re-read the WHOLE section** and
@@ -18,6 +32,13 @@ actually invoked.
      no present-tense change needs no edit here at all (Work Log entry still always gets added).
      (Rationale: `README.md` "Why this exists".)
    - Move resolved Decisions rows from Open → Locked.
+   - **A new or edited Decisions row's Notes column is a pointer, never prose.** Point to the
+     `design\X.md` that's the real source if one exists; otherwise, if the decision is operative
+     (should govern a future action), put the actual rule in whichever procedure/companion file
+     enforces that action and point there instead; anything left over (pure historical rationale
+     with no other home) goes in `decisions_detail.md`, one short section per row, pointed to from
+     here. The Item + Status columns stay resident and readable at a glance; full detail is always
+     one click away, never inline — same shape as a skill stub vs. its template.
    - Prepend one dated Work Log entry (what changed, what's next). Newest on top.
    - Do NOT prune or move older entries automatically — only "archive" does that.
 2. Git — two independent repos live in this folder (`design\local_first_reframe.md`); handle both:

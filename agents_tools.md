@@ -10,6 +10,15 @@ tool"`). Public reaches every consumer via the shared `toolkit\` repo; private
 (`design\private_tools.md`) reaches every consumer the same automatic way but stays in this
 machine's own outer repo, never touching `toolkit\`'s public GitHub origin.
 
+**Language:** consumer-runtime scripts (hooks, subagents) are cross-platform Python by default;
+this repo's maintainer scripts are Python throughout too.
+
+**Skill triggers, if this tool is a Track-1 skill:** a short, closed-form command the user would
+say verbatim ("checkpoint," "archive") gets an **exact-phrase** trigger — fuzzy matching on that
+shape risks colliding with `capability_relationships`' own broad description-matching.
+Open-ended/no-single-phrase asks (e.g. filing a bug report) can stay fuzzy. `capability_relationships`
+itself is the catch-all for anything broader than one named command; don't add a second one.
+
 **Public branch:**
 1. Build and test it like normal project work.
 2. Strip anything project-specific — no hardcoded paths, project names, or repo-structure
