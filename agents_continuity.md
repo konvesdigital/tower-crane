@@ -100,11 +100,14 @@ actually invoked.
    holds many settled entries — a prompt only, never automatic.
 
 **"archive"** (user-initiated only — never automatic, never during "checkpoint")
-1. List current Work Log entries — date + one-line title only, newest first.
-2. Ask the user where to draw the cutoff. Do not guess. Wait for an explicit answer.
-3. Move every entry at or before that cutoff into `project_progress_archive.md`, appended in
+1. Determine which Work Log entries are both fully completed and not themselves a dependency for
+   current or other work items.
+2. List current Work Log entries — date + one-line title only, newest first — marking with a
+   checkmark those found fully complete and non-dependent in step 1.
+3. Ask the user where to draw the cutoff. Do not guess. Wait for an explicit answer.
+4. Move every entry at or before that cutoff into `project_progress_archive.md`, appended in
    chronological order (oldest first). Create the archive file if it doesn't exist yet.
-4. Remove those entries from `project_progress.md`. Confirm what was archived.
+5. Remove those entries from `project_progress.md`. Confirm what was archived.
 
 **"update"** — pulls `toolkit\`'s `origin` remote under a diff-review trust gate
 (`design\update_trust_review.md`, `design\local_first_reframe.md`). User-initiated only; mechanical

@@ -40,19 +40,21 @@ Every hand-off appends one dated line to a `## Round-trip log` section at the bo
 **Multi-user attribution:** with more than one committer, name the acting person alongside the project in each line (e.g. `fix applied by <name> (commit <sha>)…`). A single-owner hub keeps the terser project-only form above.
 
 ### Scanning at session start (including on `resume` — see `AGENTS.md`) or when asked to process requests
-Scan `change_requests\` for `Status: OPEN`. A `register` ticket (`Type: registration`) is handled by
-"Registration tickets" below; for a normal fix ticket, read the **last** `## Round-trip log` line to
-know whose turn it is:
+Run `python scripts\ticket_scan.py` (no flags) from inside `toolkit\` first — it categorizes every
+`Status: OPEN` ticket in `change_requests\` using exactly the rule below and prints it as a dry-run
+report; don't re-derive the categorization by hand. A `register` ticket (`Type: registration`) is
+handled by "Registration tickets" below instead. For a normal fix ticket, this is the rule the
+script applies, reading the **last** `## Round-trip log` line:
 - No round-trip activity yet → this agent's turn: fix it (Applying a fix, below).
 - "awaiting <consumer> verify" → ball is in the consumer's court; **skip**.
 - consumer "verified PASS" → flip `Status` to **DONE**, commit, push. Closed.
 - consumer "still fails: …" → this agent's turn again: re-fix.
 - "automation: fix proposed ..., PR #<n> opened, awaiting <owner> review" → the unattended
   sync-automation agent (Piece 3, `design\sync_automation.md`) already opened a PR for this ticket;
-  **skip** — don't also fix it by hand. If `scripts\ticket_scan.py`'s own mechanical pass hasn't
-  already caught it, `gh pr view <n> --json state` tells you: `MERGED` → the fix landed, ticket is
-  awaiting consumer verify (treat like any other applied fix); `CLOSED` (not merged) → this agent's
-  turn again, same as "still fails."
+  **skip** — don't also fix it by hand. If `ticket_scan.py`'s own mechanical pass hasn't already
+  caught it, `gh pr view <n> --json state` tells you: `MERGED` → the fix landed, ticket is awaiting
+  consumer verify (treat like any other applied fix); `CLOSED` (not merged) → this agent's turn
+  again, same as "still fails."
 
 Round-trip lines an unattended `scripts\run_automation.py` run writes are prefixed `automation:` to
 distinguish them from live-session lines. It never flips `Status` to DONE itself except via

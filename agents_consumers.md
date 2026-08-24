@@ -14,9 +14,13 @@ repo's HEAD.
    "<Full Title>" --scope local|multi_machine` (per the question above; default `local`). Writes ALL
    consumer files (`.claude\settings.json`, `CLAUDE.md` with `@import` lines, skeleton
    `project_progress.md`, `FIRST_RUN.md`) plus the registry entry. Defaults: opts into
-   `consistency_check`, imports `filing` + `compliance` + `continuity`. Flags: `-Tools @()` for no
-   hooks, `-NoContinuity` to skip, `-Force` to overwrite. Does NOT run git — the new project's first
-   session does that via its `FIRST_RUN.md`.
+   `consistency_check`, imports `filing` + `compliance` + `continuity`. Flags (real `argparse`
+   form): `--tools` (space-separated list; pass with no values for a consumer with no hooks) for
+   which shared tools to opt into, `--private-tools` (space-separated list, `design\private_tools.md`)
+   for which `toolkit_private\` hooks/skills to opt into, `--no-continuity` to skip the continuity
+   protocol piece, `--force` to overwrite an existing `CLAUDE.md`/`project_progress.md`/
+   `FIRST_RUN.md`. Does NOT run git — the new project's first session does that via its
+   `FIRST_RUN.md`.
 2. **Existing (hand-copied) project, never Tower-Crane-shaped** — same `scripts\new_consumer.py`
    invocation as #1, pointed at the project's existing local folder, run directly from this hub
    session (register.md's old courier-and-ticket detour is retired — this used to require copying

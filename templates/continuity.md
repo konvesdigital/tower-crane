@@ -55,6 +55,11 @@ this mechanism works and how it relates to other mechanisms.
 2. Git: `git add -A && git commit -m "Checkpoint: <summary>" && git push`
    - If no repo/remote is found: stop and ask the user whether to set one up now, rather than
      skipping silently.
+   - **Verify-clean loop (2026-08-11, ported from the hub's own checkpoint procedure):** afterward,
+     `git status --porcelain` must be empty. If it isn't (an edit landed after the commit above —
+     e.g. correcting this same Work Log entry once more), stage and commit the remainder now and
+     push again; repeat until clean. `checkpoint` is not finished while this repo carries
+     uncommitted changes.
 3. Confirm to the user: saved and pushed.
 4. **Suggest archiving when the file has grown** (resource conservation): the whole of
    `project_progress.md` is read into context each session, so a long Work Log is a recurring
