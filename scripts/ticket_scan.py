@@ -12,6 +12,14 @@ Two responsibilities, both importable (no `claude` subprocess calls live here):
     processing" - local ticket fixes commit directly, no PR is ever opened for a ticket) - just
     VERIFIED_PASS, on top of the ordinary human-session categories.
 
+  filter_by_project() - narrows a scan() result to tickets that plausibly mention a given consumer
+    project (case-insensitive substring over each ticket's raw text), reached via `--project` on
+    the CLI. Added for design\\command_procedure_audit.md's A4 finding: a connected project's own
+    `resume`-time ticket scan (templates\\filing_resume_check.md) needs this to reuse the same
+    categorization the hub's own scan already gets, instead of re-deriving it by hand from every
+    OPEN ticket's round-trip log - see that function's own docstring for the residual manual check
+    it deliberately does not eliminate.
+
   apply_mechanical_actions() - perform the one category that needs no judgment at all: flip a
     consumer-verified ticket to DONE. Every write here touches only change_requests\\<file>.md -
     `git add change_requests`, never `-A` - so the "auto-merge never for
@@ -84,6 +92,7 @@ class Ticket:
     is_registration: bool
     last_entry: str           # full text of the last '## Round-trip log' / '## Processing log' bullet
     category: str
+    text: str                # full raw ticket text - used by --project's substring filter below
 
 
 def _log_entries(section_body):
@@ -139,7 +148,7 @@ def parse_ticket(path):
     last_entry = _last_log_entry(text)
     category = _categorize(status, is_registration, last_entry)
     return Ticket(path=path, slug=path.stem, status=status, is_registration=is_registration,
-                  last_entry=last_entry, category=category)
+                  last_entry=last_entry, category=category, text=text)
 
 
 def scan(change_requests_dir=CHANGE_REQUESTS_DIR):
@@ -249,6 +258,31 @@ def apply_mechanical_actions(tickets, dry_run=False):
     return summary
 
 
+def filter_by_project(tickets, names):
+    """Case-insensitive substring match against each ticket's full raw text, for ANY of `names` -
+    a consumer session's own `filing` scan (templates\\filing_resume_check.md) uses this to narrow
+    the categorized list down to tickets that plausibly involve THIS project, since scan()/
+    parse_ticket() have no per-consumer concept otherwise (this script is shared by the hub's own
+    scan, where every OPEN ticket is relevant regardless of filer). Takes multiple names, not one,
+    because real ticket text names a project inconsistently - a slug uses underscores
+    (`some_project`), a "Filed by:" line uses the full Title-Case name (`Some Project`), and
+    round-trip prose freely uses an ad-hoc abbreviation instead of either - none is a reliable
+    single string to match on alone (a slug in particular never matches a "Filed by:" line, since
+    that line never contains underscores). Pass every form this project is known by.
+
+    Deliberately still coarse even with multiple names, same reliability class as a human skimming
+    for any of them: a hit only means one of `names` appears somewhere in the ticket's text (Filed
+    by:, Symptom/repro prose, a cross-consumer verify-request's free-text naming - none of these
+    have one fixed structured field to grep instead), NOT that this project is necessarily who's
+    being awaited right now - a ticket can legitimately affect more than one consumer. For an
+    AWAITING_CONSUMER hit specifically, the caller must still confirm the ticket's own last
+    round-trip line actually names this project before treating it as this project's turn
+    (design\\command_procedure_audit.md's A4 finding names this residual manual step explicitly -
+    it's not eliminated, only narrowed to the tickets this filter actually surfaces)."""
+    needles = [n.lower() for n in names]
+    return [t for t in tickets if any(n in t.text.lower() for n in needles)]
+
+
 def _cli_report(tickets):
     for t in tickets:
         print(f"  [{t.category}] {t.path.name}")
@@ -258,9 +292,19 @@ def main():
     parser = argparse.ArgumentParser(description="Mechanical, zero-AI scan/bookkeeping of change_requests\\*.md.")
     parser.add_argument('--apply', action='store_true', help="Perform mechanical bookkeeping (DONE flips). Without this flag, dry-run report only.")
     parser.add_argument('--json', action='store_true', help="Emit the categorized report as JSON instead of text.")
+    parser.add_argument('--project', nargs='+', default=None,
+                         help="Filter to tickets whose text mentions ANY of these project "
+                              "names/slug/abbreviations (case-insensitive substring) - for a "
+                              "consumer session's own scan, not used by the hub's own resume-time "
+                              "scan (every ticket is relevant there). Pass every form this project "
+                              "is known by (slug, full name, common abbreviation) - see "
+                              "filter_by_project()'s docstring for why one alone isn't reliable, "
+                              "and for the residual manual check this doesn't eliminate.")
     args = parser.parse_args()
 
     tickets = scan()
+    if args.project:
+        tickets = filter_by_project(tickets, args.project)
     if args.apply:
         summary = apply_mechanical_actions(tickets)
         if args.json:

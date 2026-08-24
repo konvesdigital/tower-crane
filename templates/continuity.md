@@ -52,14 +52,31 @@ this mechanism works and how it relates to other mechanisms.
    - Prepend **one** dated Work Log entry (what changed, what's next). Newest entry on top.
    - Do **not** prune or move older entries automatically — the Work Log stays complete until
      the user runs "archive".
-2. Git: `git add -A && git commit -m "Checkpoint: <summary>" && git push`
-   - If no repo/remote is found: stop and ask the user whether to set one up now, rather than
-     skipping silently.
-   - **Verify-clean loop (2026-08-11, ported from the hub's own checkpoint procedure):** afterward,
-     `git status --porcelain` must be empty. If it isn't (an edit landed after the commit above —
-     e.g. correcting this same Work Log entry once more), stage and commit the remainder now and
-     push again; repeat until clean. `checkpoint` is not finished while this repo carries
-     uncommitted changes.
+2. Git mechanics — mechanized (`design\command_procedure_audit.md`'s B2 consumer port):
+   ```
+   <python_launcher> "<hub root>\toolkit\scripts\checkpoint_consumer.py" --project-root "<this
+   project's absolute root>" --message "<summary>"
+   ```
+   (`<hub root>`/`<python_launcher>` resolved the same way `templates\update.md`'s Step 1
+   describes — the `toolkit\` folder your skill stub's own path resolved through, one level below
+   the hub root.) Handles staging and commit/push in one call:
+   - **Untracked-file safety**: never a blind `git add -A`. Tracked-file modifications are staged
+     automatically (`git add -u`, always safe). A genuinely untracked file — a real new file this
+     session wrote, or a stray temp/report file — looks identical to git either way, so nothing
+     here guesses: an `[UNTRACKED]` report blocks (exit 2, nothing touched) until each one is
+     resolved. Decide per file from this session's own context (ask the user if genuinely
+     unclear), then re-run with `--include <path...>` (stage specific ones, exactly as printed),
+     `--include-all` (stage everything listed), and/or `--skip-untracked` (leave everything else
+     alone this round).
+   - **No repo at all** (`[ABORT]`, no `.git\`): stop and ask the user whether to set one up now,
+     rather than skipping silently.
+   - **No `origin` remote configured**: soft, not an error — `[COMMITTED-NO-REMOTE]`: commits
+     locally, skips the push. A local-only project is a normal, everyday state.
+   - **A push failure**: the script names the specific condition (non-fast-forward — pull, then
+     re-run; no remote/auth — check credentials/`git remote -v`) instead of a bare refusal.
+   - Exit 0 = committed/pushed cleanly (or nothing to do, or committed with no remote). Re-running
+     is always safe if a further edit lands dirty afterward — e.g. correcting this same Work Log
+     entry once more — no separate verify-clean loop to operationalize by hand; just run it again.
 3. Confirm to the user: saved and pushed.
 4. **Suggest archiving when the file has grown** (resource conservation): the whole of
    `project_progress.md` is read into context each session, so a long Work Log is a recurring

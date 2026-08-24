@@ -53,14 +53,17 @@ reached) read whatever is present.
    predates pointer-indirection and never had this file also hits this branch — same skip, same
    reasoning.)
 2. `git pull` (this project's own repo).
-3. Check the shared tower_crane hub — both steps read-only, no gate needed:
-   - From the hub's `toolkit\` folder: `python scripts\update_toolkit.py --notify` (fetch +
-     compare against the hub's last-reviewed baseline — never merges). If it reports an update,
-     mention it, but do **not** `git pull` `toolkit\` from this project's session — that's the
-     gated `update` action, run only in a session opened directly in the hub.
-   - Then, same `toolkit\` folder: `scripts\check_tower_crane.py --write-guidance` (no
-     `--consumer` flag — the hub's per-machine `host:` scoping already limits it). Pure Python, no
-     pull required.
+3. Check the shared tower_crane hub — both steps read-only, no gate needed, chained into one call
+   (`design\command_procedure_audit.md`'s B1 audit re-run on consumer `resume`):
+   `python "<hub root>\toolkit\scripts\consumer_resume_check.py"` (same `toolkit\` folder this
+   file itself resolved through). Runs, in order, what used to be two separately prose-sequenced
+   calls:
+   - `update_toolkit.py --notify` (fetch + compare against the hub's last-reviewed baseline —
+     never merges). If it reports an update, mention it, but do **not** `git pull` `toolkit\` from
+     this project's session — that's the gated `update` action, run only in a session opened
+     directly in the hub.
+   - `check_tower_crane.py --write-guidance` (no `--consumer` flag — the hub's per-machine `host:`
+     scoping already limits it). Pure Python, no pull required.
    - This checks only whether the **hub's own toolkit source** has fallen behind its public
      upstream — separate from whether **this project** has adopted everything the hub already
      offers. That's this project's own on-demand `update` skill (if adopted): say "update" anytime
