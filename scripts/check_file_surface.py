@@ -115,7 +115,17 @@ Seven checks, five hard-fail, two soft-flag:
                                                   repo and won't have a filled-in per-machine config.
 
 Usage: python scripts\\check_file_surface.py --base-sha <sha> --head-sha <sha>
+       python scripts\\check_file_surface.py --base-sha origin/main --head-sha worktree
 Run from anywhere; always resolves paths against this toolkit\\ repo, not the caller's cwd.
+
+--head-sha worktree (added for checkpoint_git.py's leak-scan-first gate, design\\
+command_procedure_audit.md's "Leak-scan ordering"): compares base_sha directly against the
+on-disk working tree - both staged and unstaged changes - instead of two committed refs, so this
+gate can run BEFORE anything has been committed this round, not after. Same convention as
+check_standing_constraints.py's own `--head worktree`. Note `git diff <base>` (the single-ref form
+this mode uses) only ever shows a path that has an index entry - a brand-new file git doesn't know
+about yet is invisible to it until `git add`ed, staged or not; the caller must stage any untracked
+file it wants covered before invoking this mode.
 """
 
 import argparse
@@ -204,11 +214,20 @@ def git(shared_root, args):
     return subprocess.run(['git', '-C', str(shared_root)] + args, capture_output=True, text=True)
 
 
+def _diff_target(base_sha, head_sha):
+    """The ref-range argument `git diff` takes: 'base..head' normally, or a single-ref form
+    comparing base_sha directly against the on-disk working tree (see the module docstring's
+    "--head-sha worktree" section) when head_sha is the literal string 'worktree'."""
+    if head_sha == 'worktree':
+        return [base_sha]
+    return [f'{base_sha}..{head_sha}']
+
+
 def changed_files(shared_root, base_sha, head_sha):
     """Returns a list of (status, path) for every added/modified/renamed/copied file, path is the
     file's path AT HEAD (the new path, for renames/copies). Deletions are excluded - nothing to
     classify about a file that's gone."""
-    proc = git(shared_root, ['diff', '--name-status', '-M', '-C', f'{base_sha}..{head_sha}'])
+    proc = git(shared_root, ['diff', '--name-status', '-M', '-C'] + _diff_target(base_sha, head_sha))
     out = []
     for line in proc.stdout.splitlines():
         if not line.strip():
@@ -225,7 +244,7 @@ def changed_files(shared_root, base_sha, head_sha):
 
 
 def binary_paths(shared_root, base_sha, head_sha):
-    proc = git(shared_root, ['diff', '--numstat', f'{base_sha}..{head_sha}'])
+    proc = git(shared_root, ['diff', '--numstat'] + _diff_target(base_sha, head_sha))
     out = set()
     for line in proc.stdout.splitlines():
         parts = line.split('\t')
@@ -235,6 +254,11 @@ def binary_paths(shared_root, base_sha, head_sha):
 
 
 def read_file_at(shared_root, ref, path):
+    if ref == 'worktree':
+        p = Path(shared_root) / path
+        if not p.exists():
+            return None
+        return p.read_text(encoding='utf-8', errors='replace')
     proc = git(shared_root, ['show', f'{ref}:{path}'])
     return proc.stdout if proc.returncode == 0 else None
 
@@ -321,7 +345,7 @@ def check_disguised_code(shared_root, files, base_sha, head_sha):
             continue  # already-recognized code, not "disguised"
         if norm.startswith(WORKFLOW_DIR_PREFIX):
             continue  # legitimately embeds shell in `run:` blocks
-        proc = git(shared_root, ['diff', f'{base_sha}..{head_sha}', '--', path])
+        proc = git(shared_root, ['diff'] + _diff_target(base_sha, head_sha) + ['--', path])
         added_lines = [l[1:] for l in proc.stdout.splitlines()
                        if l.startswith('+') and not l.startswith('+++')]
         for line in added_lines:
@@ -351,7 +375,7 @@ def check_invisible_unicode(shared_root, files, base_sha, head_sha):
     hits = []
     for status, path in files:
         norm = path.replace('\\', '/')
-        proc = git(shared_root, ['diff', f'{base_sha}..{head_sha}', '--', path])
+        proc = git(shared_root, ['diff'] + _diff_target(base_sha, head_sha) + ['--', path])
         for line in proc.stdout.splitlines():
             if not line.startswith('+') or line.startswith('+++'):
                 continue
@@ -384,7 +408,7 @@ def check_python_capability_creep(shared_root, files, base_sha, head_sha):
         ext = PurePosixPath(norm).suffix.lower()
         if ext != PY_EXT or not norm.startswith(ALLOWED_PY_DIR_PREFIXES):
             continue
-        proc = git(shared_root, ['diff', f'{base_sha}..{head_sha}', '--', path])
+        proc = git(shared_root, ['diff'] + _diff_target(base_sha, head_sha) + ['--', path])
         for line in proc.stdout.splitlines():
             if not line.startswith('+') or line.startswith('+++'):
                 continue
@@ -499,7 +523,7 @@ def check_outgoing_host_id(shared_root, files, base_sha, head_sha):
     hits = []
     for status, path in files:
         norm = path.replace('\\', '/')
-        proc = git(shared_root, ['diff', f'{base_sha}..{head_sha}', '--', path])
+        proc = git(shared_root, ['diff'] + _diff_target(base_sha, head_sha) + ['--', path])
         for line in proc.stdout.splitlines():
             if not line.startswith('+') or line.startswith('+++'):
                 continue
@@ -531,7 +555,7 @@ def check_outgoing_private_content(shared_root, files, base_sha, head_sha):
     hits = []
     for status, path in files:
         norm = path.replace('\\', '/')
-        proc = git(shared_root, ['diff', f'{base_sha}..{head_sha}', '--', path])
+        proc = git(shared_root, ['diff'] + _diff_target(base_sha, head_sha) + ['--', path])
         for line in proc.stdout.splitlines():
             if not line.startswith('+') or line.startswith('+++'):
                 continue
@@ -557,7 +581,7 @@ def check_generic_absolute_paths(shared_root, files, base_sha, head_sha):
     hits = []
     for status, path in files:
         norm = path.replace('\\', '/')
-        proc = git(shared_root, ['diff', f'{base_sha}..{head_sha}', '--', path])
+        proc = git(shared_root, ['diff'] + _diff_target(base_sha, head_sha) + ['--', path])
         for line in proc.stdout.splitlines():
             if not line.startswith('+') or line.startswith('+++'):
                 continue
@@ -583,7 +607,10 @@ def main():
                      "whole-repo diff. Assumes an adversary, not just carelessness."
     )
     parser.add_argument('--base-sha', required=True)
-    parser.add_argument('--head-sha', default='HEAD')
+    parser.add_argument('--head-sha', default='HEAD',
+                         help="A commit-ish (default: HEAD), or the literal string 'worktree' to "
+                              "compare base-sha against the on-disk working tree instead (staged + "
+                              "unstaged; see module docstring).")
     args = parser.parse_args()
 
     shared_root = _resolve_shared_root()

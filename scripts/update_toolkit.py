@@ -160,7 +160,13 @@ def _git(args, check=True):
 
 
 def _is_dirty():
-    return bool(_git(['status', '--porcelain']).stdout.strip())
+    """TRACKED changes only (--untracked-files=no) - an untracked file may be one checkpoint_git.py's
+    own --skip-untracked deliberately left alone, not a real "run checkpoint" situation (found live
+    2026-08-23 testing checkpoint_git.py's B2 build - design\\command_procedure_audit.md). Also more
+    correct for cmd_check/cmd_approve's pre-merge abort: an untracked file doesn't block a
+    fast-forward merge unless it collides with an incoming path, which git already reports clearly
+    on its own."""
+    return bool(_git(['status', '--porcelain', '--untracked-files=no']).stdout.strip())
 
 
 def _sha_exists(sha):

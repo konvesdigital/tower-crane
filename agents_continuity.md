@@ -41,59 +41,37 @@ actually invoked.
      one click away, never inline — same shape as a skill stub vs. its template.
    - Prepend one dated Work Log entry (what changed, what's next). Newest on top.
    - Do NOT prune or move older entries automatically — only "archive" does that.
-2. Git — two independent repos live in this folder (`design\local_first_reframe.md`); handle both:
-   a. Outer project repo (this repo root — `project_progress.md`, `consumers\`, `change_requests\`,
-      `config.local.json`): `git add -A && git commit -m "Checkpoint: <summary>" && git push`
-      - If no repo/remote is found: stop and ask the user whether to set one up now — flag it
-        rather than skip silently.
-      - **Verify-clean loop (2026-08-11):** afterward, `git status --porcelain` must be empty. If
-        it isn't (an edit landed after the commit above — e.g. correcting this same Work Log entry
-        once more), stage and commit the remainder now and push again; repeat until clean.
-        `checkpoint` is not finished while this repo carries uncommitted changes — see step 3.
-   b. Inner `toolkit\` repo — only if `toolkit\` exists and `git -C toolkit status --porcelain`
-      shows changes:
-      - **Soft disclosure guardrail** (`design\update_trust_review.md`): if the pending changes
-        touch `AGENTS.md`, run `python scripts\check_standing_constraints.py --base HEAD --head
-        worktree` from inside `toolkit\`. `[UNCHANGED]`: proceed silently. `[CHANGED]`: surface the
-        printed before/after text as an explicit notice before committing — never skip silently.
-        **Paper trail (2026-08-11):** on `[CHANGED]`, the commit message below MUST carry a
-        `Standing-Constraints-changed: <one-line reason>` trailer summarizing what changed and why
-        (e.g. "pointer text only, no obligation added/removed" or a real substantive description if
-        one was) — this lands the declaration permanently in the public `toolkit\` repo's own
-        history, not only in this private repo's Work Log, since anyone auditing `toolkit\` directly
-        would otherwise see nothing marking this class of change.
-      - `git -C toolkit add -A && git -C toolkit commit -m "Checkpoint: <summary>"` — include the
-        `Standing-Constraints-changed:` trailer in this same commit message when the guardrail above
-        fired `[CHANGED]`.
-      - **Hard outgoing leak-scan gate, before pushing** (`design\resource_sharing_model.md` B1):
-        `git fetch origin`, then
-        `python scripts\check_file_surface.py --base-sha origin/main --head-sha HEAD` (from inside
-        `toolkit\`). `[FAIL]` (check 8a — added content matching a live `consumers\*.md` name or
-        path segment) is a **hard block**: don't push. Report it verbatim, fix the offending
-        content (likely belongs in `shared_resources\` instead), re-run this gate next checkpoint;
-        the bad commit stays local-only until it passes. `[WARN]` (check 8b — generic
-        absolute-path shape) doesn't block; mention it as a nudge.
-      - `git -C toolkit push` — safe once the gate above passes.
-      - **If the push fails** (`design\cross_machine_toolkit_sync.md`): don't block/roll back the
-        outer-repo checkpoint (2a already landed) — but name the specific condition from git's
-        output plus the exact resolving action, never a bare refusal. Non-fast-forward: state the
-        pending-commit count and say "run `update`, then re-run `checkpoint`." No remote/auth: name
-        that (check `git -C toolkit remote -v` / credentials). **Then correct step 1's
-        already-written `project_progress.md` text** — it assumed this push would succeed. Work
-        Log/Current Status must say "committed locally only, blocked on: `<reason>`" (with the
-        SHA), never a stray "built" claim. Amend and re-push the outer repo — a second small commit
-        beats a stale persisted claim.
-      - **Verify-clean loop (2026-08-11):** afterward (whether or not a push happened),
-        `git -C toolkit status --porcelain` must be empty. If it isn't — most often a further edit
-        landed on a companion/procedure file after the commit above — restart from the guardrail
-        check: re-run `check_standing_constraints.py` if `AGENTS.md` changed again, commit the
-        remainder (with its own trailer if the guardrail fires again), re-run the leak-scan gate,
-        and push. Repeat until clean. Found live this same day: a follow-up edit to this very
-        procedure (the paper-trail sentence a few lines up) was made after its own checkpoint
-        commit and never re-committed, leaving `toolkit\` dirty into the next session undetected —
-        `update`'s own dirty-tree abort is what finally caught it. `--notify` (`resume` step 3) now
-        also flags a dirty `toolkit\` immediately, as a second line of defense, but this loop is
-        the actual fix: don't let it happen in the first place.
+2. Git mechanics for both repos — mechanized (`design\command_procedure_audit.md`'s B2; mechanical
+   steps live in the script, same split as `update_toolkit.py` keeps below):
+   `python scripts\checkpoint_git.py --message "<summary>"` from inside `toolkit\`. Handles, for
+   both the outer project repo and the inner `toolkit\` repo in one call: staging, the
+   leak-scan-first gate, the Standing Constraints disclosure guardrail, commit, push, and (after a
+   successful `toolkit\` push) the `last_reviewed_sha` self-heal (the "B2 addendum" —
+   `design\command_procedure_audit.md`).
+   - **Untracked-file safety**: never a blind `git add -A`. Tracked-file modifications are staged
+     automatically (`git add -u`, always safe). A genuinely untracked file in either repo — a real
+     new design doc/script this session wrote, or a stray temp/report file dropped in a repo root —
+     looks identical to git either way, so nothing here guesses: an `[UNTRACKED]` report blocks
+     (exit 2, nothing touched) until each one is resolved. Decide per file from this session's own
+     context (ask the user if genuinely unclear), then re-run with `--include <path...>` (stage
+     specific ones, exactly as printed in the report), `--include-all` (stage everything listed),
+     and/or `--skip-untracked` (leave everything else alone this round).
+   - **Leak-scan FAIL** (check_file_surface.py, hard checks only): exit 1, `toolkit\` left
+     unstaged/uncommitted — the outer repo is unaffected and still commits/pushes normally. Fix the
+     flagged content (likely belongs in `shared_resources\` instead), re-run.
+   - **Standing Constraints `[CHANGED]`** with no note given: exit 1, `toolkit\` left
+     unstaged/uncommitted. Surface the printed before/after text to the user as an explicit notice
+     — never skip silently — then re-run with `--standing-constraints-note "<one-line reason>"`
+     (lands as a `Standing-Constraints-changed:` commit trailer).
+   - **A push failure** (either repo): the script names the specific condition (non-fast-forward —
+     run `update`, then re-run `checkpoint`; no remote/auth — check credentials/`git remote -v`)
+     instead of a bare refusal. On a `toolkit\` push failure specifically: correct step 1's
+     already-written `project_progress.md` text to say "committed locally only, blocked on:
+     `<reason>`" (with the SHA), never leave a stray "built"/"pushed" claim standing — amend with a
+     second small outer-repo commit once fixed.
+   - Exit 0 = both repos committed/pushed cleanly (or nothing to do). Re-running is always safe
+     (idempotent) if a further edit lands dirty afterward — e.g. correcting this same Work Log
+     entry once more — no separate verify-clean loop to operationalize by hand; just run it again.
 3. Confirm to the user: saved and pushed, **both repos' working trees clean** (note whether
    `toolkit\` push happened, was skipped clean, or failed).
 4. **Suggest archiving** if the file has grown past roughly **400 lines (~40 KB)**, or the Work Log
