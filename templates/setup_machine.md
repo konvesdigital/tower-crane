@@ -159,7 +159,7 @@ launcher-agnostic `python`/`python3` fallback as Step 0) and offer whatever it l
 prior machine's setup chose, e.g. something short and memorable rather than a raw system name)
 alongside the raw hostname, then ask directly whether this machine has connected to this hub before,
 under one of those names or a different one — don't try to infer it. Example framing: *"Host ID:
-this computer's system name is `DESKTOP-V62J0UC` — want to use something else? Already-known hosts
+this computer's system name is `DESKTOP-XYZ123` — want to use something else? Already-known hosts
 on this hub: `<name from --known-hosts>`. Has this machine connected before, under a different
 name?"* Empty `--known-hosts` output (a genuinely
 first-ever machine) just means propose the raw hostname with no further context, same as before.
