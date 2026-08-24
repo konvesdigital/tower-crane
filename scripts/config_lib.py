@@ -581,8 +581,9 @@ def apply_hook_command_fixes(settings, new_cmd, all_tools, dry_run=False, log=No
     build_new_cmd_map / build_dispatch_cmd_map). Also collapses any hook group that becomes (or
     already was) a byte-exact duplicate of an earlier group under the same event: a stale entry
     repaired to match an already-correct entry (e.g. two hosts with different python_launcher
-    values on an already-dispatch-form consumer) would otherwise leave both firing - the real
-    failure hit live on 2026-08-23 connecting a second host to Geo Rank Tracker (decisions_detail.md).
+    values on an already-dispatch-form consumer) would otherwise leave both firing - a real
+    failure mode hit live 2026-08-23 connecting a second host to an already-migrated consumer (see
+    the private hub's own decisions_detail.md for the incident - not this repo).
     Never adds, reorders, or touches an unrelated hook. Returns True if anything changed (or
     would, under dry_run).
     """
