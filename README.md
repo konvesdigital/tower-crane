@@ -160,10 +160,10 @@ yourself:
 
 1. **Clone or download `konvesdigital/tower-crane`.** What you get is `toolkit\` itself, with no
    private wrapper around it yet.
-2. **Open it in Claude Code and say:** *"read `templates\setup_machine.md` and follow it."* It
-   detects a fresh public clone and wraps it in a new, private outer folder — the "hub" described
-   above — checking live for Python/git/`gh` rather than assuming any of them are installed.
-   **Claude Code itself is the only assumed prerequisite.**
+2. **Open it in Claude Code and say:** *"setup machine."* It detects a fresh public clone and wraps
+   it in a new, private outer folder — the "hub" described above — checking live for Python/git/`gh`
+   rather than assuming any of them are installed. **Claude Code itself is the only assumed
+   prerequisite.**
 
 **What `setup_machine.md` and `AGENTS.md` actually do — verify this yourself before running
 anything, rather than taking this description on faith:**
@@ -200,10 +200,9 @@ your own outer hub folder and this public repo are separate git repos:
    `git clone https://github.com/konvesdigital/tower-crane.git toolkit`, run from inside that outer
    folder. Your outer repo doesn't track `toolkit\` at all (it's gitignored on purpose), so this
    step doesn't happen automatically just from cloning your outer repo.
-3. **Open it in Claude Code and say:** *"read `toolkit\templates\setup_machine.md` and follow it."*
-   It detects your outer folder is already set up and skips straight to configuring this machine —
-   same file as above; see "What `setup_machine.md` and `AGENTS.md` actually do" for what to check
-   before running it.
+3. **Open it in Claude Code and say:** *"setup machine."* It detects your outer folder is already
+   set up and skips straight to configuring this machine — same file as above; see "What
+   `setup_machine.md` and `AGENTS.md` actually do" for what to check before running it.
 
 The only real constraint either way: the folder needs to live somewhere under your home directory
 (`~`) — everything else is computed live from wherever it ends up, never typed in by hand.

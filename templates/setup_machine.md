@@ -4,8 +4,8 @@ This is the CANONICAL per-machine setup courier: fills config.local.json for THI
 checking and asking, never assuming. Referenced (never copied/duplicated) from:
   - README.md's "Setup (fresh clone / new machine)" section — Federate: joining or re-setting up a
     clone of an existing hub.
-  - This file's own Step 0 scenario B ("Bootstrapping the outer hub") — Replicate: standing up a
-    brand-new independent hub from a fresh public clone of `toolkit\`. Retired 2026-07-27:
+  - This file's own Step 0 flat-clone branch (0c) — Replicate: standing up a brand-new independent
+    hub from a fresh public clone of `toolkit\`. Retired 2026-07-27:
     `scripts\seed_hub.py`, `scripts\publish_release.py`, and the strip-in-place courier
     `templates\bootstrap_hub.md` (all three of which predated the outer/inner split) are gone —
     getting a hub of your own is now just an ordinary `git clone` of the public repo plus this
@@ -40,8 +40,13 @@ final `config.local.json` for explicit confirmation before writing it (Step 7).
 The hub is two nested git repos in one folder: an outer, private repo (holds `project_progress.md`,
 `consumers\`, `change_requests\` — the user's own continuity data) and an inner `toolkit\` repo
 (holds `hooks\`, `scripts\`, `templates\`, `AGENTS.md`, `config.example.json` — this file included).
-Two different starting points reach this file, and you need to tell them apart before doing
-anything else — ask the user directly if it isn't obvious; don't guess from folder names alone.
+
+Mechanized as `scripts\setup_machine_preflight.py` (`design\command_procedure_audit.md`'s C1-C6) —
+run it, don't reconstruct this sequence by hand or improvise around whatever error comes up first.
+Step 2 below is what formally settles this machine's `python_launcher` — that hasn't happened yet
+here, so just try `python3` first and fall back to `python` (same order Step 2 uses) for every
+invocation of this script in Step 0; if neither responds at all, Step 2 will catch and resolve that
+properly once you reach it.
 
 **Bringing an existing hub to a new machine? Clone, don't copy.** If the user mentions they
 physically copied (or are about to copy) the folder from another machine rather than `git clone`ing
@@ -52,51 +57,58 @@ paths) riding along from the old machine — see README.md's "Second machine" se
 two-clone steps. A copy isn't fatal (this file still works from one), but it invites exactly the
 kind of stale-state bugs `design\second_machine_onboarding.md` documents a live session hitting.
 
-**A. An existing hub, already set up.** You're running from inside `toolkit\`, and the outer folder
-one level up already has (or is meant to have) `project_progress.md`/`consumers\`/
-`change_requests\`. Verify `config.example.json` exists in **this** (`toolkit\`) folder's root. If
-`config.local.json` also exists here and looks filled in (no `<...>` placeholders left), tell the
-user and ask whether they want to redo it or stop here — don't overwrite a working config by
-default. Otherwise, skip straight to Step 1.
+**0a. Ask reconnect-vs-new first, before touching any file (C1).** Does the user already have an
+existing outer hub remote (a private GitHub repo from a previous machine, or one they just want to
+attach a fresh clone to), or is this the first time this hub exists anywhere? Ask directly — don't
+infer it from whatever's currently sitting in the folder. This also covers the recovery case: if
+`setup machine` was already run once this session under the wrong assumption (a fresh outer scaffold
+got written, then the user remembered they have an existing remote), the fix is to reconcile —
+discard or move the just-scaffolded files — not a separate procedure.
 
-**B. A fresh public clone — nothing wrapping it yet.** The user just cloned or downloaded
-`konvesdigital/tower-crane` directly, so what they're sitting in right now **is** the toolkit
-content itself (`hooks\`, `scripts\`, `templates\`, `AGENTS.md`, `config.example.json` all present),
-but there's no outer folder around it — none of `project_progress.md`/`consumers\`/
-`change_requests\`/`design\` exist anywhere yet. Tower Crane needs that outer layer to actually work
-day to day (it's where the user's own project tracking and tickets live) — go to "Bootstrapping the
-outer hub" below before continuing to Step 1.
+**0b. Detect the current shape:** the script's own path depends on the shape you're trying to
+detect, so try both from cwd: `scripts\setup_machine_preflight.py --detect` (resolves if cwd is
+flat, or if cwd is `toolkit\` itself) first, then `toolkit\scripts\setup_machine_preflight.py
+--detect` (resolves if cwd is an outer root with a `toolkit\` subfolder already) if the first path
+doesn't exist. If **neither** path exists at all, that's the ambiguous case below — nothing to run,
+go straight to asking. Whichever one resolves reports one of:
+- `[NESTED]` — already correctly structured (either cwd is the outer root with a `toolkit\`
+  subfolder, or cwd is `toolkit\` itself with a populated outer folder one level up). Nothing further
+  needed — skip straight to Step 1.
+- `[FLAT]` — cwd **is** the toolkit content itself (`hooks\`, `scripts\`, `templates\`, `AGENTS.md`,
+  `config.example.json` all present directly here), no outer wrapper around it yet. Continue to 0c.
+- `[AMBIGUOUS]` — neither shape found (C5). Don't assume cwd is the right place — ask the user
+  directly where they actually cloned things, relative to where this session is running, and re-run
+  `--detect` from the real location once you know it.
 
-### Bootstrapping the outer hub (only if B)
-1. Explain plainly what's about to happen: this folder needs to become a `toolkit\` subfolder one
-   level inside a new outer folder — the outer folder is the user's own **private** space (their
-   own GitHub repo, never the public one) holding `project_progress.md`, `consumers\`,
-   `change_requests\`, and a thin `CLAUDE.md` pointer importing `toolkit\AGENTS.md`.
-2. Ask the user to confirm (or pick) the new outer folder's name and location — don't assume
-   `tower_crane`; ask.
-3. This session's own working directory sits inside the folder that needs to move, so **this step
-   can't be finished by Claude Code alone, mid-session** — give the user the exact commands to run
-   themselves (adapt for their OS/shell: e.g. on Windows, from the parent of the current folder,
-   `mkdir <outer-name>` then `move <current-folder-name> <outer-name>\toolkit`; the `mv` equivalent
-   on macOS/Linux), then ask them to close this session. `git remote -v` inside the moved folder
-   should still show `origin` pointing at `konvesdigital/tower-crane` afterward — nothing about the
-   toolkit clone itself changes, only its location.
-4. Tell the user: once moved, open Claude Code fresh inside the new outer folder and say "read
-   `toolkit\templates\setup_machine.md` and follow it" again — this time Step 0 detects scenario A,
-   and the rest of this file builds `config.local.json` as normal.
-5. If they want a private GitHub repo backing the new outer folder (recommended, for backup/
-   continuity — see `design\local_first_reframe.md` if curious why this matters), offer to help once
-   the new session starts: `gh repo create <name> --private`, `git init`, add the remote, a
-   `.gitignore` with `/toolkit/` plus `/.claude/settings.local.json` and `/.claude/self_hooks_status.md`
-   (both personal/per-machine state — `AGENTS.md`'s "Self-use (dogfooding)" section assumes these are
-   already gitignored; without this, a fresh operator's own local settings would end up tracked in
-   their new private outer repo, colliding across their own machines the moment they have more than
-   one). Deliberately leave `.claude\hooks\` OUT of this list — `design\resource_sharing_model.md`'s
-   three-rung settings ladder relies on that folder staying tracked, so a hook script written on one
-   machine reaches every other machine the operator owns via the outer repo's ordinary `git pull`.
-   Then a thin `CLAUDE.md` pointer (`@~/<path-to-outer>/toolkit/AGENTS.md`), empty
-   `consumers\`/`change_requests\`/`design\` folders, and a skeleton `project_progress.md` (same shape
-   `templates\register.md`'s Step 3 writes). One-time setup, only for a brand-new outer hub.
+**0c. If flat: nest, then build or attach the outer layer.** Note the script's own path changes
+mid-sequence: before step 1 it's flat in cwd (`scripts\setup_machine_preflight.py`); from step 2
+onward `--nest` has already moved it down (`toolkit\scripts\setup_machine_preflight.py`).
+1. `python scripts\setup_machine_preflight.py --nest` — creates a `toolkit\` subfolder in cwd and
+   moves the flat content down into it (`.git\` included). cwd itself never moves, so this needs no
+   session restart — the whole sequence below continues in the same session.
+2. Per step 0a's answer:
+   - **New hub, no existing remote yet:** `python toolkit\scripts\setup_machine_preflight.py
+     --new-outer` (add `--git-remote-url <url>` if the user already has one — see the "if they want a
+     private GitHub repo" note below for creating one first). Scaffolds `CLAUDE.md`, `.gitignore`,
+     `consumers\`/`change_requests\`/`design\`, and a skeleton `project_progress.md`. Writes files
+     and runs `git init` only — nothing is committed or pushed yet.
+   - **Reconnect to an existing remote:** `python toolkit\scripts\setup_machine_preflight.py
+     --attach-existing --git-remote-url <url>` — runs `git init` / `remote add origin` / `fetch` /
+     `checkout -b main --track origin/main` (C2's workaround for `git clone` refusing a non-empty
+     target directory, which cwd now is thanks to the just-created `toolkit\` subfolder).
+3. If you scaffolded a new outer (not attached an existing one), commit and push it now through the
+   ordinary checkpoint flow: `toolkit\scripts\checkpoint_git.py --message "Initial hub scaffold"
+   --include-all`.
+4. **If the user wants a private GitHub repo backing a brand-new outer hub** (recommended, for
+   backup/continuity — see `design\local_first_reframe.md` if curious why this matters) and doesn't
+   have one yet: this is the one moment `gh` might be needed (C4 — check lazily, right here, never
+   earlier) — `gh --version`; if missing, tell the user plainly and point at `gh`'s install docs, or
+   let them create the repo manually on GitHub's website instead. Then `gh repo create <name>
+   --private`, and pass the resulting URL as `--git-remote-url` to `--new-outer` above (or `git
+   remote add origin <url>` by hand afterward if `--new-outer` already ran without it).
+
+Once Step 0 finishes (nested from the start, or freshly nested-and-built/attached above), continue
+to Step 1 from inside the now-correctly-structured hub.
 
 ## Step 1 — This machine's OS
 You already know this from your own environment context (the platform your session is running on) —
@@ -140,8 +152,17 @@ just leave `config.local.json`'s `shared_root` field as `""` in Step 7 and let S
 
 ## Step 5 — host_id
 Get this machine's hostname (`$env:COMPUTERNAME` on Windows / `hostname` on macOS/Linux — or ask the
-user if you can't run shell commands directly) and propose it as `host_id`. Confirm with the user
-rather than silently accepting it — they may want a different label.
+user if you can't run shell commands directly). Don't just propose it and wait for a yes — the raw
+hostname alone gives no frame of reference for what a `host_id` actually looks like (C6): from
+inside `toolkit\`, run `scripts\setup_machine_preflight.py --known-hosts` first (same
+launcher-agnostic `python`/`python3` fallback as Step 0) and offer whatever it lists (nicknames a
+prior machine's setup chose, e.g. something short and memorable rather than a raw system name)
+alongside the raw hostname, then ask directly whether this machine has connected to this hub before,
+under one of those names or a different one — don't try to infer it. Example framing: *"Host ID:
+this computer's system name is `DESKTOP-V62J0UC` — want to use something else? Already-known hosts
+on this hub: `<name from --known-hosts>`. Has this machine connected before, under a different
+name?"* Empty `--known-hosts` output (a genuinely
+first-ever machine) just means propose the raw hostname with no further context, same as before.
 
 ## Step 6 — Identity
 `identity.git_remote` means the **outer** hub's own private remote (the one behind

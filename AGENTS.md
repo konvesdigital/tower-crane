@@ -81,6 +81,9 @@ field, a MENU cell) still use full Title Case (e.g. `consumers\<slug>.md` carrie
 ## Procedures (companion files — read on trigger, not preloaded)
 Each item below is a full procedure in its own file. Read that file only when its trigger fires;
 none of these are resident in this file.
+- **"setup machine"** — configures this machine's `config.local.json` (a fresh clone, or a second
+  machine joining an existing hub). Runs once per machine, then is just loaded context forever
+  after. Full: `templates\setup_machine.md`.
 - **"new tool"** / **"new private tool"** / **"self hooks"** / **"modify tool"** — building,
   self-enabling, or changing a shared tool. Full: `agents_tools.md`.
 - **"connect project"** — registering a consumer (new scaffold, existing hand-copied project, or
