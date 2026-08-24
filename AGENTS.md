@@ -104,37 +104,39 @@ none of these are resident in this file.
 Source of truth: `project_progress.md`. At session start read only Current Status, Next Up,
 Decisions, and the most recent Work Log entry. Do not re-derive facts already logged there.
 
+**Repo map** (fixed locations — consult instead of searching/inferring):
+| | Outer repo (this hub) | Inner `toolkit\` repo |
+|---|---|---|
+| Root | `tower_crane\` | `tower_crane\toolkit\` |
+| Remote's field in `config.local.json` | `identity.git_remote` | `publish.public_repo_remote` |
+| Lives here | `CLAUDE.md`, `project_progress*.md`, `consumers\`, `change_requests\`, `design\`, `decisions_detail.md`, `shared_resources\`, `toolkit_private\` | `AGENTS.md`, `README.md`, `MENU.md`, `scripts\`, `hooks\`, `templates\`, `agents_*.md`, `config.local.json` (gitignored, per-machine, physically here) |
+
 **"resume"**
 1. Read `host_id` from `toolkit\config.local.json`. Never infer machine identity any other way
    (path, `hostname`, prior context).
 2. Outer project repo: `git pull`.
-3. Inner `toolkit\` repo — check only, never pull/merge/push (`update`/`checkpoint` are separate).
-   If `toolkit\` exists: `python scripts\update_toolkit.py --notify` from inside `toolkit\` (fetch,
-   checks three independent conditions — uncommitted changes, incoming vs `last_reviewed_sha`,
-   outgoing local HEAD vs `origin/main`, `design\cross_machine_toolkit_sync.md` — no golden suite,
-   no mutation). Report each independently: dirty → "toolkit\ has uncommitted changes — run
-   `checkpoint`"; incoming → "toolkit\ has N commit(s) available — run `update`"; outgoing →
-   "toolkit\ has N local commit(s) not yet pushed — run `checkpoint`"; none of the three → say
-   nothing; `toolkit\` missing: skip silently.
-4. Rung-2 hook activation: `python toolkit\scripts\check_hook_activation.py --project-root .` —
-   notify-only check for whether every synced `.claude\hooks\` script is referenced in this
-   machine's own gitignored `settings.local.json`. Note any `[UNWIRED]` line; say nothing if only
-   `[WIRED]`/`[N/A]`. Never blocks.
-5. Multi-machine nudge (`design\multi_machine_hub.md` "Problem 2"):
-   `python toolkit\scripts\check_multi_machine.py` — notify-only, never mutates. Any `[NUDGE]` line
-   names a `scope: multi_machine` consumer with no `hosts.<this host>` entry yet; mention it and
-   offer to run "connect project". Silent output means nothing to nudge about.
-6. Stale hand-written-path nudge (`design\grt_connectivity_audit.md` item (iv)):
-   `python toolkit\scripts\check_stale_paths.py` — notify-only, never mutates. Any `[STALE-PATH]`
-   line names a backtick-quoted absolute path in a connected consumer's own CLAUDE.md/
-   project_progress.md that doesn't exist on this host; mention it, but don't assume it needs
-   fixing — may be intentionally single-host-only. Silent output means nothing to nudge about.
-7. Read `project_progress.md`: Current Status, Next Up, Decisions table, most recent Work Log
+3. If `toolkit\` exists: `python toolkit\scripts\resume_check.py` (`design\command_procedure_audit.md`
+   finding B1) — one call chaining the four notify-only checks below; never pulls/merges/pushes
+   (`update`/`checkpoint` are separate) and never mutates. `toolkit\` missing: skip silently.
+   Interpret its consolidated output per sub-check, exactly as each already reports on its own:
+   - `update_toolkit.py --notify` (dirty / incoming-vs-`last_reviewed_sha` / outgoing-vs-`origin/main`,
+     `design\cross_machine_toolkit_sync.md`) — dirty → "toolkit\ has uncommitted changes — run
+     `checkpoint`"; incoming → "toolkit\ has N commit(s) available — run `update`"; outgoing →
+     "toolkit\ has N local commit(s) not yet pushed — run `checkpoint`"; none → say nothing.
+   - `check_hook_activation.py` (rung-2 activation) — note any `[UNWIRED]`/`[BROKEN]` line; say
+     nothing if only `[WIRED]`/`[N/A]`.
+   - `check_multi_machine.py` (`design\multi_machine_hub.md` "Problem 2") — any `[NUDGE]` line names
+     a `scope: multi_machine` consumer with no `hosts.<this host>` entry yet; mention it and offer
+     "connect project". Silent → say nothing.
+   - `check_stale_paths.py` (`design\grt_connectivity_audit.md` item (iv)) — any `[STALE-PATH]` line
+     names a hand-written absolute path that doesn't resolve on this host; mention it, but don't
+     assume it needs fixing — may be intentionally single-host-only. Silent → say nothing.
+4. Read `project_progress.md`: Current Status, Next Up, Decisions table, most recent Work Log
    entry only.
-8. Scan `change_requests\` per `agents_change_requests.md`'s "Scanning at session start" section —
+5. Scan `change_requests\` per `agents_change_requests.md`'s "Scanning at session start" section —
    this is what surfaces a Piece 3 automation PR (`design\sync_automation.md`).
-9. State status and next step in 1-3 lines, leading with the machine identity from step 1, folding
-   in anything steps 3/4/5/6/8 surfaced. Do not replay full history.
+6. State status and next step in 1-3 lines, leading with the machine identity from step 1, folding
+   in anything steps 3/5 surfaced. Do not replay full history.
 
 **"quick resume"** — a thinner `resume`, for reopening seconds after a `checkpoint` mid-session
 (the only way to flush a long context window mid-session). Skips every sync check above entirely —
