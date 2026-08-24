@@ -575,11 +575,19 @@ def build_new_cmd_map(tools, private_tools, config, optins_dir, private_optins_d
 
 def apply_hook_command_fixes(settings, new_cmd, all_tools, dry_run=False, log=None):
     """Rewrite, in place, any hook command in `settings` (an already-loaded settings.json dict)
-    that references an opted-in tool's hook file (hooks/<tool>.ps1 or .py) to that tool's current
-    command from `new_cmd` (see build_new_cmd_map). Never adds, removes, or reorders unrelated
-    hooks. Returns True if anything changed (or would, under dry_run).
+    that references an opted-in tool's hook file - either the direct form (hooks/<tool>.ps1 or
+    .py) or the dispatch-wrapper form (hooks/_hub_dispatch.py <tool>, design\\
+    consumer_reference_indirection.md) - to that tool's current command from `new_cmd` (see
+    build_new_cmd_map / build_dispatch_cmd_map). Also collapses any hook group that becomes (or
+    already was) a byte-exact duplicate of an earlier group under the same event: a stale entry
+    repaired to match an already-correct entry (e.g. two hosts with different python_launcher
+    values on an already-dispatch-form consumer) would otherwise leave both firing - the real
+    failure hit live on 2026-08-23 connecting a second host to Geo Rank Tracker (decisions_detail.md).
+    Never adds, reorders, or touches an unrelated hook. Returns True if anything changed (or
+    would, under dry_run).
     """
     changed = False
+    dispatch_file = re.escape(Path(HUB_DISPATCH_RELPATH).name)
     for evt, groups in settings.get('hooks', {}).items():
         for grp in groups:
             for h in grp.get('hooks', []):
@@ -588,8 +596,10 @@ def apply_hook_command_fixes(settings, new_cmd, all_tools, dry_run=False, log=No
                 for t in all_tools:
                     if t not in new_cmd:
                         continue
-                    pattern = r'hooks[\\/]' + re.escape(t) + r'\.(ps1|py)'
-                    if re.search(pattern, h['command']) and h['command'] != new_cmd[t]:
+                    direct_pattern = r'hooks[\\/]' + re.escape(t) + r'\.(ps1|py)'
+                    dispatch_pattern = r'hooks[\\/]' + dispatch_file + r'["\']?\s+' + re.escape(t) + r'\s*$'
+                    matches = re.search(direct_pattern, h['command']) or re.search(dispatch_pattern, h['command'])
+                    if matches and h['command'] != new_cmd[t]:
                         if log:
                             verb = 'would change' if dry_run else 'change'
                             log(f"  [{verb}] {t}")
@@ -597,6 +607,21 @@ def apply_hook_command_fixes(settings, new_cmd, all_tools, dry_run=False, log=No
                             log(f"      to:   {new_cmd[t]}")
                         h['command'] = new_cmd[t]
                         changed = True
+
+        # Collapse byte-exact duplicate groups under this event - see docstring above.
+        seen = []
+        deduped = []
+        for grp in groups:
+            key = json.dumps(grp, sort_keys=True)
+            if key in seen:
+                if log:
+                    verb = 'would remove' if dry_run else 'remove'
+                    log(f"  [{verb}] duplicate hook group under '{evt}': {grp}")
+                changed = True
+                continue
+            seen.append(key)
+            deduped.append(grp)
+        groups[:] = deduped
     return changed
 
 

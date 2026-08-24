@@ -32,10 +32,10 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from config_lib import (get_shared_config, build_new_cmd_map, apply_hook_command_fixes,
-                         fix_skill_stubs, fix_adopted_stub_paths, commit_consumer_changes,
-                         fix_hub_pointer, fix_hub_dispatch_wrapper, fix_imports,
-                         sync_consumer_repo, HUB_POINTER_IMPORT_LINE)
+from config_lib import (get_shared_config, build_new_cmd_map, build_dispatch_cmd_map,
+                         apply_hook_command_fixes, fix_skill_stubs, fix_adopted_stub_paths,
+                         commit_consumer_changes, fix_hub_pointer, fix_hub_dispatch_wrapper,
+                         fix_imports, sync_consumer_repo, HUB_POINTER_IMPORT_LINE)
 from registry_lib import parse_registry, host_path, reconcile_scope_floor
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
@@ -213,11 +213,17 @@ def main():
         # design\private_tools.md; a private command's path already contains 'hooks/<tool>.py'
         # same as a public one, so the rewrite below needs no separate pattern per source). Shared
         # with new_consumer.py's host-merge reuse (design\consumer_reconnect.md) - config_lib.py's
-        # build_new_cmd_map/apply_hook_command_fixes.
+        # build_new_cmd_map/build_dispatch_cmd_map/apply_hook_command_fixes. Target form mirrors
+        # use_pointer_here (same signal fix_skill_stubs already keys off, above) - a consumer
+        # already migrated to the dispatch-wrapper form must regenerate TO that form, never forced
+        # back to direct-path just because apply_hook_command_fixes can now also recognize it.
         def _warn(msg):
             print(f"  [warn] {msg}")
             COUNTS['warn'] += 1
-        new_cmd = build_new_cmd_map(c['tools'], c['private_tools'], config, OPTINS_DIR, PRIVATE_OPTINS_DIR, warn=_warn)
+        if use_pointer_here:
+            new_cmd = build_dispatch_cmd_map(c['tools'], c['private_tools'], config, OPTINS_DIR, PRIVATE_OPTINS_DIR)
+        else:
+            new_cmd = build_new_cmd_map(c['tools'], c['private_tools'], config, OPTINS_DIR, PRIVATE_OPTINS_DIR, warn=_warn)
 
         # Rewrite any command that references an opted-in tool's hook file (hooks/<tool>.ps1 or
         # .py) to that tool's new command. This handles both path relocation and the .ps1 -> .py
