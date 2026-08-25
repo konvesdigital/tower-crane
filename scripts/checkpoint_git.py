@@ -75,7 +75,8 @@ OUTER_ROOT = TOOLKIT_ROOT.parent
 
 
 def _git(root, args, check=False):
-    return subprocess.run(['git', '-C', str(root)] + args, capture_output=True, text=True, check=check)
+    return subprocess.run(['git', '-C', str(root)] + args, capture_output=True,
+                           encoding='utf-8', check=check)
 
 
 def is_repo(root):
@@ -104,15 +105,24 @@ def tracked_dirty(root):
 
 def porcelain_status(root):
     """(tracked_changed, untracked): both are lists of repo-relative paths from `git status
-    --porcelain`. A rename's reported path is the NEW path (the part after '-> ')."""
-    proc = _git(root, ['status', '--porcelain'])
+    --porcelain -z`. -z gives NUL-delimited, unquoted paths - the plain LF form wraps a path in
+    literal "..." (with backslash-escapes) whenever it contains characters like a space+parens
+    combo, a quote, a backslash, or non-ASCII bytes, and a naive line[3:] slice then captures those
+    quote characters as part of the path, breaking any later `git add --` on it. A rename emits two
+    consecutive NUL-terminated fields (new path, then old path); only the new path is kept,
+    matching the LF form's old ' -> '-split behavior."""
+    proc = _git(root, ['status', '--porcelain', '-z'])
+    fields = proc.stdout.split('\0')
     tracked, untracked = [], []
-    for line in proc.stdout.splitlines():
-        if not line:
+    i = 0
+    while i < len(fields):
+        entry = fields[i]
+        i += 1
+        if not entry:
             continue
-        code, path = line[:2], line[3:]
-        if ' -> ' in path:
-            path = path.split(' -> ', 1)[1]
+        code, path = entry[:2], entry[3:]
+        if 'R' in code or 'C' in code:
+            i += 1  # skip the old-path field a rename/copy carries alongside the new path
         (untracked if code == '??' else tracked).append(path)
     return tracked, untracked
 
