@@ -239,15 +239,25 @@ HUB_DISPATCH_TEMPLATE = 'hooks/_hub_dispatch.py'
 def get_dispatch_optin(optin_path, tool_name, config):
     """Same hooks event/matcher SHAPE as get_expanded_optin() (read from the same canonical
     templates\\optins\\<tool>.json - one file, no duplicated second canonical source), but every
-    hook's command replaced with the fixed dispatch-wrapper invocation:
-    '<launcher> "$CLAUDE_PROJECT_DIR/.claude/hooks/_hub_dispatch.py" <tool_name>'. This command
-    string never contains the hub's real path, so it never needs per-host regeneration - only
-    python_launcher varies, same narrow axis get_expanded_optin() already substitutes today.
+    hook's command replaced with a fixed, fully host-invariant invocation that looks up
+    python_launcher from THIS host's own .claude\\hub_pointer.md at firing time, instead of baking
+    a launcher value into the command text (design\\multi_machine_hub.md "Problem 3", Fix B - the
+    prior baked-launcher form was a treadmill the instant a consumer gained a second host, same
+    shape as Problem 1's fixed hub CLAUDE.md self-import). Requires a POSIX shell to run the
+    lookup - every hook entry this produces also carries "shell": "bash"
+    (design\\multi_machine_hub.md "Prerequisite locked: Git Bash on Windows").
+
+    `config` is accepted but no longer read for the launcher (kept for signature stability across
+    every existing caller - build_dispatch_cmd_map, new_consumer.py, check_tower_crane.py, etc. -
+    none of which need updating for this).
     """
     with open(optin_path, 'r', encoding='utf-8') as f:
         optin = json.load(f)
-    launcher = str(config.get('python_launcher', ''))
-    command = f'{launcher} "$CLAUDE_PROJECT_DIR/{HUB_DISPATCH_RELPATH}" {tool_name}'
+    command = (
+        'L=$(grep \'^python_launcher:\' "$CLAUDE_PROJECT_DIR/' + HUB_POINTER_RELPATH + '" | '
+        'sed \'s/^python_launcher: *//\'); "$L" "$CLAUDE_PROJECT_DIR/' + HUB_DISPATCH_RELPATH
+        + '" ' + tool_name
+    )
     if 'hooks' in optin:
         for evt, groups in optin['hooks'].items():
             for grp in groups:
@@ -255,6 +265,7 @@ def get_dispatch_optin(optin_path, tool_name, config):
                     for h in grp['hooks']:
                         if 'command' in h:
                             h['command'] = command
+                            h['shell'] = 'bash'
     return optin
 
 
@@ -290,11 +301,16 @@ def build_dispatch_cmd_map(tools, private_tools, config, optins_dir, private_opt
 def build_hub_pointer_content(config, import_pieces):
     """Renders .claude\\hub_pointer.md's full content for THIS host, right now
     (design\\consumer_reference_indirection.md): a fenced yaml block carrying the raw
-    shared_root:/import_base: values config_lib.get_shared_config() just computed, followed by the
-    literal @import lines for every mandatory/imported protocol piece this consumer has - the exact
-    lines that used to live directly in CLAUDE.md. Gitignored, one per consumer, one value per
-    host - regenerated fresh by new_consumer.py (scaffold/host-merge) and relocate.py, never
-    hand-edited.
+    shared_root:/import_base:/python_launcher: values config_lib.get_shared_config() just computed,
+    followed by the literal @import lines for every mandatory/imported protocol piece this consumer
+    has - the exact lines that used to live directly in CLAUDE.md. Gitignored, one per consumer,
+    one value per host - regenerated fresh by new_consumer.py (scaffold/host-merge) and
+    relocate.py, never hand-edited.
+
+    python_launcher (design\\multi_machine_hub.md "Problem 3", Fix B) lives here rather than baked
+    into a tracked hook command for the same reason shared_root/import_base already do: it's a
+    per-host value read live by get_dispatch_optin()'s command at hook-firing time, never written
+    into anything a second host's `origin` pull could inherit and re-break.
     """
     import_base = config['import_base']
     lines = [
@@ -304,6 +320,7 @@ def build_hub_pointer_content(config, import_pieces):
         '```yaml',
         f"shared_root: {config['shared_root']}",
         f"import_base: {import_base}",
+        f"python_launcher: {config['python_launcher']}",
         '```',
         '',
     ]
@@ -573,7 +590,8 @@ def build_new_cmd_map(tools, private_tools, config, optins_dir, private_optins_d
     return new_cmd
 
 
-def apply_hook_command_fixes(settings, new_cmd, all_tools, dry_run=False, log=None):
+def apply_hook_command_fixes(settings, new_cmd, all_tools, dry_run=False, log=None,
+                              needs_shell=False):
     """Rewrite, in place, any hook command in `settings` (an already-loaded settings.json dict)
     that references an opted-in tool's hook file - either the direct form (hooks/<tool>.ps1 or
     .py) or the dispatch-wrapper form (hooks/_hub_dispatch.py <tool>, design\\
@@ -584,6 +602,13 @@ def apply_hook_command_fixes(settings, new_cmd, all_tools, dry_run=False, log=No
     values on an already-dispatch-form consumer) would otherwise leave both firing - a real
     failure mode hit live 2026-08-23 connecting a second host to an already-migrated consumer (see
     the private hub's own decisions_detail.md for the incident - not this repo).
+
+    `needs_shell` (design\\multi_machine_hub.md "Problem 3", Fix B): set True when `new_cmd` came
+    from build_dispatch_cmd_map - its command text now depends on a POSIX shell (the launcher
+    lookup against .claude\\hub_pointer.md), so any entry this function rewrites onto that form
+    also needs "shell": "bash" set, same as get_dispatch_optin() sets it on a fresh one.
+    build_new_cmd_map's direct-path form needs no such key - leave False for that caller.
+
     Never adds, reorders, or touches an unrelated hook. Returns True if anything changed (or
     would, under dry_run).
     """
@@ -607,6 +632,8 @@ def apply_hook_command_fixes(settings, new_cmd, all_tools, dry_run=False, log=No
                             log(f"      from: {h['command']}")
                             log(f"      to:   {new_cmd[t]}")
                         h['command'] = new_cmd[t]
+                        if needs_shell:
+                            h['shell'] = 'bash'
                         changed = True
 
         # Collapse byte-exact duplicate groups under this event - see docstring above.

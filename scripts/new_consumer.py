@@ -489,7 +489,7 @@ def main():
         else:
             stale_cmd = build_new_cmd_map(existing_tool_names, existing_private_names, config, OPTINS_DIR, PRIVATE_OPTINS_DIR)
         if apply_hook_command_fixes(settings, stale_cmd, existing_tool_names + existing_private_names,
-                                     dry_run=False, log=print):
+                                     dry_run=False, log=print, needs_shell=is_new_connection):
             print(f"  patched stale hook command(s) in {settings_path}")
 
     # Every consumer reads canonical Track-1 skill/resume-check content straight out of

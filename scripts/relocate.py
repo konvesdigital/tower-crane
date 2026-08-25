@@ -228,7 +228,8 @@ def main():
         # Rewrite any command that references an opted-in tool's hook file (hooks/<tool>.ps1 or
         # .py) to that tool's new command. This handles both path relocation and the .ps1 -> .py
         # migration in one motion.
-        changed_here = apply_hook_command_fixes(settings, new_cmd, all_tools, args.dry_run, log=print)
+        changed_here = apply_hook_command_fixes(settings, new_cmd, all_tools, args.dry_run, log=print,
+                                                 needs_shell=use_pointer_here)
 
         if changed_here:
             if args.dry_run:

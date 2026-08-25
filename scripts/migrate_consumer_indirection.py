@@ -106,7 +106,8 @@ def main():
     if settings_path.exists() and (tools or private_tools):
         settings = json.loads(settings_path.read_text(encoding='utf-8'))
         new_cmd = build_dispatch_cmd_map(tools, private_tools, config, OPTINS_DIR, PRIVATE_OPTINS_DIR)
-        if apply_hook_command_fixes(settings, new_cmd, tools + private_tools, dry_run=False, log=print):
+        if apply_hook_command_fixes(settings, new_cmd, tools + private_tools, dry_run=False, log=print,
+                                     needs_shell=True):
             settings_path.write_text(json.dumps(settings, indent=2), encoding='utf-8', newline='\n')
             print(f"  wrote  {settings_path} (hook command(s) -> dispatch-wrapper form)")
 

@@ -34,7 +34,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from config_lib import get_shared_config, get_expanded_optin, materialize_skill_stub
+from config_lib import get_shared_config, get_dispatch_optin, materialize_skill_stub
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent  # toolkit\
 TEMPLATES_DIR = SHARED_ROOT / 'templates'
@@ -92,7 +92,7 @@ def scan_hooks(cfg, state):
     have_hooks = state['settings'].get('hooks') if isinstance(state['settings'], dict) else None
     for optin_path in sorted(OPTINS_DIR.glob('*.json')):
         tool = optin_path.stem
-        expanded = get_expanded_optin(optin_path, cfg)
+        expanded = get_dispatch_optin(optin_path, tool, cfg)
         missing = False
         for evt, groups in expanded.get('hooks', {}).items():
             canon = [json.dumps(g, separators=(',', ':')).replace('\\\\', '/') for g in groups]
@@ -124,7 +124,7 @@ def scan_private(cfg, state):
     if PRIVATE_OPTINS_DIR.is_dir():
         for optin_path in sorted(PRIVATE_OPTINS_DIR.glob('*.json')):
             tool = optin_path.stem
-            expanded = get_expanded_optin(optin_path, cfg)
+            expanded = get_dispatch_optin(optin_path, tool, cfg)
             missing = False
             for evt, groups in expanded.get('hooks', {}).items():
                 canon = [json.dumps(g, separators=(',', ':')).replace('\\\\', '/') for g in groups]
@@ -199,7 +199,7 @@ def _insert_import_line(md_text, line):
 
 def apply_hook(project_root, cfg, item):
     tool = item['name']
-    expanded = get_expanded_optin(OPTINS_DIR / f'{tool}.json', cfg)
+    expanded = get_dispatch_optin(OPTINS_DIR / f'{tool}.json', tool, cfg)
     settings_path = project_root / '.claude' / 'settings.json'
     settings_path.parent.mkdir(parents=True, exist_ok=True)
     settings = {}
@@ -238,7 +238,7 @@ def apply_private(project_root, cfg, item):
     {{IMPORT_BASE}} substitution - see apply_skill's public case for the contrast)."""
     name = item['name']
     if item['kind'] == 'hook':
-        expanded = get_expanded_optin(PRIVATE_OPTINS_DIR / f'{name}.json', cfg)
+        expanded = get_dispatch_optin(PRIVATE_OPTINS_DIR / f'{name}.json', name, cfg)
         settings_path = project_root / '.claude' / 'settings.json'
         settings_path.parent.mkdir(parents=True, exist_ok=True)
         settings = {}
