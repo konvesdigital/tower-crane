@@ -239,7 +239,11 @@ distinct match.
         (`design\directive_economy.md`'s "Adopted-stub path portability" — the stub body's own
         `Read ~/.../shared_resources/<file>` line stays a concrete, resolved path for this host
         right now; `hub-rel:` is only the portable anchor used to regenerate it later, never
-        written into the body itself):
+        written into the body itself). **Place the marker as the first line of the stub's body,
+        immediately after the closing `---` of the frontmatter — never before the opening `---`.**
+        A leading comment before the frontmatter delimiter breaks Claude Code's YAML frontmatter
+        parsing entirely, so the skill's `description` field never reaches the always-resident
+        skill listing (the harness falls back to showing raw file content instead):
         ```
         <!-- shared_resources: <entry name> adopted YYYY-MM-DD index-sha256:<hash of the entry
         file's content at adoption time> hub-rel:shared_resources/<entry file's own name> -->
