@@ -52,7 +52,8 @@ def parse_registry(path):
 
     obj = {
         'name': None, 'scope': None, 'remote': None, 'hosts': {}, 'owner': None, 'registered': None,
-        'opted_in': [], 'imported': [], 'private_opted_in': [], 'file': str(path),
+        'opted_in': [], 'imported': [], 'private_opted_in': [], 'private_categories': [],
+        'file': str(path),
     }
     section = None
     current_host = None
@@ -107,6 +108,13 @@ def parse_registry(path):
         if re.match(r'^private_opted_in:\s*$', line):
             section = 'private_opted_in'
             continue
+        if re.match(r'^private_categories:\s*\[\s*\]\s*$', line):
+            obj['private_categories'] = []
+            section = None
+            continue
+        if re.match(r'^private_categories:\s*$', line):
+            section = 'private_categories'
+            continue
 
         if section == 'hosts':
             m1 = re.match(r'^  (\S+):\s*$', line)
@@ -139,6 +147,11 @@ def parse_registry(path):
             if m1:
                 obj['private_opted_in'].append({'name': m1.group(1), 'since': None})
                 continue
+        if section == 'private_categories':
+            m1 = re.match(r'^\s*-\s*category:\s*(.+?)\s*$', line)
+            if m1:
+                obj['private_categories'].append({'name': m1.group(1), 'since': None})
+                continue
 
         m1 = re.match(r'^\s*since:\s*(.+?)\s*$', line)
         if m1:
@@ -148,6 +161,8 @@ def parse_registry(path):
                 obj['imported'][-1]['since'] = m1.group(1)
             elif section == 'private_opted_in' and obj['private_opted_in']:
                 obj['private_opted_in'][-1]['since'] = m1.group(1)
+            elif section == 'private_categories' and obj['private_categories']:
+                obj['private_categories'][-1]['since'] = m1.group(1)
             continue
     return obj
 

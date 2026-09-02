@@ -23,7 +23,12 @@ This hub keeps a **`shared_resources\`** folder at the hub root (one level up fr
 see `templates\filing.md` if the hub-root/`toolkit\` split is unfamiliar). Unlike everything else
 at the hub root, this one folder is not off-limits to write from inside a project session — see
 "Saving" below. It holds three kinds of entry, indexed in one catalog,
-`shared_resources\CATALOG.md` (`Name | Kind | File | Description | Added | Status`):
+`shared_resources\CATALOG.md` (`Name | Kind | File | Category | Tier | Description | Added |
+Status`). `Category`/`Tier` are optional metadata (`design\shared_resources_relationship_graph.md`)
+— a broad domain tag plus a Category-scoped retrieval-circumstance pointer — and a companion file,
+`shared_resources\resource_relationships.yaml`, holds typed edges between entries plus each
+Category's situational-tier circumstance definitions. See "Saving" and "Retrieval" below for how
+these get written and read; an entry with no Category is unaffected by any of this.
 
 - **`reference`** — passive, read-on-demand domain knowledge (methodology, facts). Using one means
   reading it, or `@import`ing it if it's plain prose with no spaced paths.
@@ -90,16 +95,86 @@ formality:
   path instead of re-filing from scratch.
 - **Neither is obvious** → ask before saving.
 
-Then, before writing anything, state what's about to happen and get an explicit go-ahead: the
-entry's name, its `kind`, a one-line description, and that it's about to be written into
-`shared_resources\` plus a new `CATALOG.md` row. Only write after confirmation — this is the one
-disk-writing action in the whole mechanism and the one carrying the classification call above, so
-it gets its own explicit checkpoint even though entering the mode already got one.
+Then work through the rest of this flow — never another design interview, fast in the moment
+because a real save happens inside a task already in progress. **Governing principle: this is
+never classification for its own sake.** Every save is fundamentally "I want Claude to know this
+fact" — the only question this flow actually needs answered is *"under what circumstances should
+Claude surface it?"* Category/Tier are a compressed way of storing that answer, never an
+organizational scheme applied on top of it.
 
-When saving a `reference` or `tool` entry: create one new file in `shared_resources\`, then append
-one row to `shared_resources\CATALOG.md` (`Status` column left blank — active by default), then
-**propagate the write** (see below). For `insight`, see "Insights are different" below — its save
-flow is a negotiation, not a fixed write, but ends the same way.
+1. **Classify** — `kind`, `Category`, one-line description. `Category` is free text, discovered by
+   checking whether any other `CATALOG.md` row already carries it — no separate registry lists
+   valid values. No Category is a legitimate answer (leaves both columns blank, unaffected by
+   everything below).
+2. **Circumstance** — if this entry has a Category, ask: *"Should Claude know this always, in
+   `[Category]` contexts, or only under specific circumstances?"*
+   - **Always** → Tier is `Primary`, no entry in `resource_relationships.yaml`'s `tiers:` block
+     (nothing to compare a future save against). Skip to step 3.
+   - **Specific circumstances** → resolve which one, grounded in the cheapest real evidence
+     available, never an abstract taxonomy question:
+     - **No situational tiers exist yet in this Category** — ask directly what circumstance
+       triggers it, and that answer becomes the first tier's `circumstance:` text verbatim, named
+       from the user's own words.
+     - **Situational tiers already exist** — surface, as context informing the user's own answer,
+       never a presumed default: (a) this session's own active circumstance, if one is in play, as
+       one candidate among others (a save can just as easily be an unrelated aside); (b) this
+       Category's other existing tiers and their `circumstance:` text (never another Category's
+       tiers). The user states the circumstance; an exact or close match folds in; a near match
+       broadens the existing tier's `circumstance:` text (a small, cheap edit) and folds in; no
+       match names a new tier from the circumstance just given. Tier names/definitions stay
+       revisable going forward — expect renaming, broadening, or splitting as more entries test a
+       tier's boundary, never a one-time-locked taxonomy.
+3. **Show the active node's existing edge-neighborhood, don't ask an open question.** If a
+   process/entry already in play this session has existing edges in `resource_relationships.yaml`,
+   show them compactly (the same `Entry | Edges` shape `design\shared_resources_relationship_graph.md`'s
+   worked SEO table uses) and ask whether to tie the new entry to it the same way — answerable
+   yes/no/adjust, not a blank "what should this tie to?" Edge types: `process-material`
+   (directional, "reach for this while doing that" — the dominant shape), `prerequisite`
+   (directional, a real specific dependency, not a generic "A is foundational" claim),
+   `lifecycle-sibling` (undirected, same object/question at a different stage), `related`
+   (undirected, no specific claim — the zero-effort default, always available, needs no
+   justification).
+4. **No obvious active node** (a genuinely cold save) — fall back to asking, scoped by Category:
+   *"Which of `[Category]`'s existing entries/processes does this belong near, if any — or is this
+   a first-of-its-kind save?"* — never the full graph dumped at once.
+5. **Confirm before writing anything** — the entry's name, `kind`, `Category`/`Tier`, one-line
+   description, any edge(s) from steps 3–4, and that it's about to be written into
+   `shared_resources\` plus a new `CATALOG.md` row (plus any `resource_relationships.yaml` change).
+   Only write after confirmation — this is the one disk-writing action in the whole mechanism and
+   the one carrying the classification call above, so it gets its own explicit checkpoint even
+   though entering the mode already got one.
+6. **Write.** For a `reference`/`tool` entry: create one new file in `shared_resources\`, append
+   one row to `CATALOG.md` (`Status` blank — active by default) with its `Category`/`Tier`, and
+   write any new/updated `tiers:` circumstance text or edge(s) into
+   `shared_resources\resource_relationships.yaml`. For `insight`, see "Insights are different"
+   below — its save flow is a negotiation, not a fixed write, but ends the same way. Either way,
+   finish with **propagate the write** (see below).
+7. **Coverage guarantee, then a precision offer — only when this entry has a Category.** Two
+   distinct things, not one:
+   - **This save is the Category's very first entry, of any kind** (`Primary`, or the first entry
+     of a brand-new situational Tier) — offer immediately, always deferrable like every offer in
+     this flow: build a generic **Category-level fallback skill** (`AGENTS.md`'s "new private
+     tool" procedure) whose trigger is deliberately broad ("use when doing any `[Category]` work")
+     and whose body reads the *whole Category's* live graph via the retrieval procedure below, not
+     just one Tier's. This is what guarantees autonomous coverage exists from this Category's very
+     first entry, before any Tier has had the chance to prove itself.
+   - **A situational Tier just reached its 2nd entry** (via a new save or a merge) — *now* offer,
+     always deferrable, to split a narrower Tier-scoped skill out of the fallback: a better-tuned
+     trigger, a smaller live-read scope. This is a precision upgrade layered on the fallback that
+     already covers this Tier, never the entry's first route to being surfaced — declining it
+     changes nothing observable.
+   - Below the 2-entry mark, with the fallback already in place, say nothing further — no
+     automation debt implied.
+   - Either skill is built to read its scope's anchor entry and graph neighbors *live* from
+     `CATALOG.md`/`resource_relationships.yaml` (see "Retrieval" below), never hardcoded — so
+     building the fallback at entry #1, or a Tier-scoped skill at its 2-entry mark, automatically
+     covers every entry that already existed, no separate backfill.
+8. **Propagate the new skill to subscribed consumers, right then** — once a skill from step 7 is
+   actually built, check `consumers\*.md` for every project whose `private_categories:` list
+   already names this Category and offer to push it to each of them immediately, in this same
+   session, rather than leaving it to chance that a project happens to run its own `update` soon.
+   Still confirmed per push. Declining for a given consumer doesn't remove its subscription — that
+   consumer's own next `update` scan surfaces the gap again on its own.
 
 **If the entry is a `tool`, or a `reference` whose real content is a pointer to something kept
 outside `shared_resources\` (not copied into the entry file itself)** — never write a flat target
@@ -181,6 +256,32 @@ unresolved `## Broadcast` section:
    same three options — resurfaces at the next `resume` on this host, and every one after that,
    until it's resolved via option 1 or 2. This is the default when the user doesn't pick a lane, not
    a failure state — matches how an unresolved `## Broadcast` section already behaves.
+
+### Retrieval — one canonical procedure, every domain skill routes through it
+
+A Category-level fallback skill or Tier-scoped skill (built via Saving's step 7 above) never
+hardcodes which entries exist — it routes through this procedure, live, every time it fires. This
+is what a flat "read this whole file in full" instruction (the retired `seo_*_index.md` shape)
+couldn't guarantee: that instruction was easy for a session to satisfy from memory instead of
+actually doing (`2026-08-31_toolkit_private_seo-skill-index-not-read-in-full.md`). Naming the
+concrete next action — read *this specific file* — closes that gap structurally instead of
+restating the same prose instruction more emphatically:
+
+1. **Identify the specific active anchor entry** for the current task — a nameable file, not an
+   abstract "the whole tier" — from the task's own shape (e.g. a monthly report in progress names
+   `monthly_movement_report_workflow.md` directly; a head-to-head competitor comparison names
+   `seo_evaluator_gem.md` directly). A Category-level fallback skill does this across the whole
+   Category's live graph; a Tier-scoped skill does it within just its own Tier.
+2. **Read that entry.** Not a paraphrase from memory of a previous read — `CATALOG.md` and
+   `resource_relationships.yaml` float on HEAD and may have changed since.
+3. **Look up its graph neighbors in `resource_relationships.yaml`** and state them by title —
+   never preload their content just because an edge exists. E.g. completing a monthly report's
+   "why" analysis surfaces `trend_shape_vs_period_totals.md` and `gsc_position_diagnostic.md` by
+   name via their `process-material` edges into `monthly_movement_report_workflow.md`, without a
+   separate full-file read to discover they exist.
+4. **Anything not directly linked but still in the same Category/Tier stays reachable via an
+   ordinary browse** (see "Discovery" below) — the graph narrows what's surfaced by default, it
+   doesn't hide the rest.
 
 ### Discovery: search or browse, then select, then apply
 

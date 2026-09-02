@@ -34,7 +34,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from config_lib import get_shared_config, get_dispatch_optin, materialize_skill_stub
+from config_lib import get_shared_config, get_dispatch_optin, materialize_skill_stub, _LEADING_COMMENT_RE
+from registry_lib import parse_registry, host_path
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent  # toolkit\
 TEMPLATES_DIR = SHARED_ROOT / 'templates'
@@ -47,6 +48,47 @@ PROJECT_ROOT = SHARED_ROOT.parent  # hub root
 PRIVATE_ROOT = PROJECT_ROOT / 'toolkit_private'
 PRIVATE_OPTINS_DIR = PRIVATE_ROOT / 'templates' / 'optins'
 PRIVATE_SKILLS_DIR = PRIVATE_ROOT / 'templates' / 'skills'
+CONSUMERS_DIR = PROJECT_ROOT / 'consumers'
+
+_FRONTMATTER_RE = re.compile(r'^---\s*\r?\n(.*?)\r?\n---\s*\r?\n', re.DOTALL)
+
+
+def read_skill_category(skill_md_path):
+    """The `category:` frontmatter field of a toolkit_private skill stub, or None if absent -
+    design\\shared_resources_relationship_graph.md's "Category subscription" section. Same field
+    scan_private()'s subscription match below needs and the SEO skill bundle's own stubs carry.
+    Strips the canonical source's leading maintainer HTML comment first (same regex
+    materialize_skill_stub() uses) since scan_private() reads straight from PRIVATE_SKILLS_DIR's
+    un-materialized source, not an installed, already-stripped copy."""
+    if not skill_md_path.exists():
+        return None
+    text = _LEADING_COMMENT_RE.sub('', skill_md_path.read_text(encoding='utf-8'), count=1)
+    m = _FRONTMATTER_RE.search(text)
+    if not m:
+        return None
+    cm = re.search(r'^category:\s*(.+?)\s*$', m.group(1), re.MULTILINE)
+    return cm.group(1) if cm else None
+
+
+def find_private_categories(cfg, project_root):
+    """This project's own `private_categories:` subscriptions, found by matching its
+    hosts.<this host>.path against consumers\\*.md (registry_lib.host_path) - ground truth for
+    "already have" stays local-state per this script's own docstring, but a subscription is a
+    hub-registry concept with nothing local to mirror it, so this is the one lookup that reads
+    consumers\\<slug>.md directly. Empty set if this project isn't registered yet, or no registry
+    entry's host path resolves to project_root."""
+    if not CONSUMERS_DIR.is_dir():
+        return set()
+    host_id = cfg.get('host_id')
+    resolved = project_root.resolve()
+    for f in sorted(CONSUMERS_DIR.glob('*.md')):
+        c = parse_registry(f)
+        if c is None:
+            continue
+        p = host_path(c, host_id)
+        if p and Path(p).resolve() == resolved:
+            return {pc['name'] for pc in c['private_categories']}
+    return set()
 
 # Mirrors scripts\new_consumer.py's SKILL_PIECES / check_tower_crane.py's SKILL_PIECES - keep in
 # sync.
@@ -115,11 +157,18 @@ def scan_skills(state):
     return items
 
 
-def scan_private(cfg, state):
+def scan_private(cfg, state, project_root):
     """design\\private_tools.md - same shape as scan_hooks/scan_skills combined, pointed at
     toolkit_private\\ instead of toolkit\\. Silently yields nothing if toolkit_private\\ doesn't
-    exist yet on this machine (no private tools built yet, or a fresh clone)."""
+    exist yet on this machine (no private tools built yet, or a fresh clone).
+
+    design\\shared_resources_relationship_graph.md's "Category subscription": each scanned skill
+    item also carries its own `category:` frontmatter (None if absent) and a `subscribed` flag -
+    True when that category is in this project's own `private_categories:` registry list - so a
+    subscribed item is structurally called out rather than just another anonymous number in the
+    listing (see print_items() below)."""
     items = []
+    subscribed_categories = find_private_categories(cfg, project_root)
     have_hooks = state['settings'].get('hooks') if isinstance(state['settings'], dict) else None
     if PRIVATE_OPTINS_DIR.is_dir():
         for optin_path in sorted(PRIVATE_OPTINS_DIR.glob('*.json')):
@@ -141,8 +190,11 @@ def scan_private(cfg, state):
             name = skill_dir.name
             if name in state['have_skills'] or not (skill_dir / 'SKILL.md').exists():
                 continue
+            skill_category = read_skill_category(skill_dir / 'SKILL.md')
             items.append({'category': 'private', 'kind': 'skill', 'name': name,
-                           'detail': f'toolkit_private/templates/skills/{name}/SKILL.md'})
+                           'detail': f'toolkit_private/templates/skills/{name}/SKILL.md',
+                           'skill_category': skill_category,
+                           'subscribed': skill_category is not None and skill_category in subscribed_categories})
     return items
 
 
@@ -174,7 +226,11 @@ def print_items(items):
         if it['category'] != current_cat:
             current_cat = it['category']
             print(f"-- {labels[current_cat]} --")
-        print(f"  [{i}] {it['name']}  ({it['detail']})")
+        # design\shared_resources_relationship_graph.md "Category subscription": call out a
+        # private skill matching one of this project's own private_categories: subscriptions,
+        # rather than leaving it just another anonymous number the operator must recognize by name.
+        tag = f" [{it['skill_category']} — subscribed]" if it.get('subscribed') else ''
+        print(f"  [{i}] {it['name']}{tag}  ({it['detail']})")
     print("=== END AVAILABLE ===")
 
 
@@ -356,7 +412,8 @@ def main():
 
     cfg = get_shared_config(SHARED_ROOT)
     state = read_consumer_state(project_root)
-    items = scan_hooks(cfg, state) + scan_skills(state) + scan_pieces(state) + scan_private(cfg, state)
+    items = (scan_hooks(cfg, state) + scan_skills(state) + scan_pieces(state)
+              + scan_private(cfg, state, project_root))
 
     if args.apply is None:
         print_items(items)
