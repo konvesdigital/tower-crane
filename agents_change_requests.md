@@ -14,6 +14,34 @@ Tickets are markdown files in `change_requests\`. The filename convention
 `Status: OPEN` or `Status: DONE` — only two statuses; a ticket stays **OPEN through the entire
 round-trip** (below).
 
+### What a ticket actually is
+A ticket here is not a conventional bug report between separate parties — the same human operates
+every connected project and the hub, so filing and fixing are separated by *session context*, not
+by person. The filing agent's limitation is real (it only sees its own project — no hub design
+docs, no other consumers, no cross-project architectural history), but the human filing it, and the
+human present when this agent addresses it, has full context on both sides of that gap. That's the
+actual point of a ticket: it's a **symptom captured from a context-limited vantage point**, valuable
+precisely because that vantage point is narrower than what will end up addressing it — not a spec
+to implement literally.
+
+Treat a ticket's Symptom/repro as evidence and its Proposed fix/content as one candidate response,
+not the response. Reason about the underlying issue with the full cross-project context only
+available here, and address *that* — which may mean: fixing exactly what was proposed; fixing
+something broader that the proposal was only a symptom of (several tickets converging into one
+piece of architectural work is normal, not a deviation to justify — see
+`design\shared_resources_relationship_graph.md`'s retrofit, which folded in three); fixing something
+adjacent the ticket never mentioned; or concluding, after full-context review, that no separate fix
+is warranted because another change already covers it. All are legitimate outcomes of "Applying a
+fix" (below) — none require the literal Proposed fix to have been built for the ticket to close
+correctly.
+
+When the actual fix diverges from the proposal, say so plainly in the round-trip log rather than
+leaving a future reader to infer it from a diff: what was proposed, what was actually done instead
+(or in addition), why, and — if the ticket's own Suggested test no longer matches what shipped —
+what the consumer should actually re-verify in its place. If two or more open tickets converge onto
+the same fix, say that explicitly and name the single live verification event that closes all of
+them, rather than leaving redundant, now-stale verify requests standing on each one separately.
+
 **Registration tickets** (`YYYY-MM-DD_register_<consumer>_<slug>.md`, `Type: registration`): an
 already-connected consumer reporting a standalone-skill/tool adoption (e.g. after its own `update`
 skill applies a `STANDALONE_SKILLS` item). Same inbox, **no round-trip** — see "Registration
@@ -25,10 +53,13 @@ new shared content rather than reporting a bug. Same round-trip as an ordinary t
 "Applying a fix" below, reading "Proposed content" as the equivalent of "Proposed fix."
 
 ### `DONE` means consumer-verified — not "fix applied"
-`DONE` = the **filing consumer** has re-run its own test and confirmed the fix works. It does NOT
-mean this agent applied a fix. Applying a fix and pushing it leaves the ticket **OPEN**, awaiting
-the consumer's verification. Closing authority stays here: the consumer appends a "verified PASS"
-line, and this agent flips `Status` to `DONE` on its next session.
+`DONE` = the **filing consumer** has re-run the current verification for this ticket — its original
+Suggested test, or a replacement the round-trip log names when the shipped fix diverged from the
+proposal (see "What a ticket actually is" above) — and confirmed the underlying need is met. It
+does NOT mean this agent applied a fix, and it does NOT require that the literal Proposed fix was
+what got built. Applying a fix and pushing it leaves the ticket **OPEN**, awaiting the consumer's
+verification. Closing authority stays here: the consumer appends a "verified PASS" line, and this
+agent flips `Status` to `DONE` on its next session.
 
 ### Round-trip log
 Every hand-off appends one dated line to a `## Round-trip log` section at the bottom of the ticket
@@ -36,6 +67,9 @@ Every hand-off appends one dated line to a `## Round-trip log` section at the bo
 - this agent: `2026-07-18 — fix applied (commit <sha>), affects: <slug>; awaiting <slug> verify`
 - consumer:   `2026-07-19 — <slug> re-verified, still fails: <what>`   (ticket stays OPEN)
 - consumer:   `2026-07-20 — <slug> verified PASS`                       (this agent flips DONE next session)
+- this agent (diverged/converged fix — see "What a ticket actually is"): `2026-07-21 — fix applied
+  via a broader mechanism than proposed (commit <sha>); this ticket's goal is now covered by
+  <other-ticket>'s verify — closing tied to that event, not tracked separately here`
 
 **Multi-user attribution:** with more than one committer, name the acting person alongside the project in each line (e.g. `fix applied by <name> (commit <sha>)…`). A single-owner hub keeps the terser project-only form above.
 
@@ -55,6 +89,11 @@ script applies, reading the **last** `## Round-trip log` line:
   caught it, `gh pr view <n> --json state` tells you: `MERGED` → the fix landed, ticket is awaiting
   consumer verify (treat like any other applied fix); `CLOSED` (not merged) → this agent's turn
   again, same as "still fails."
+- `unknown_state` (non-empty log, wording matches none of the above) → **read it by hand.** The
+  script deliberately declines to guess here rather than mis-file it as either "untouched" or
+  "done" — this is exactly the shape a diverged/converged-fix closing note takes (see "What a
+  ticket actually is"), so don't treat the category itself as a problem to fix; read the actual
+  log and act on what it says.
 
 Round-trip lines an unattended `scripts\run_automation.py` run writes are prefixed `automation:` to
 distinguish them from live-session lines. It never flips `Status` to DONE itself except via
@@ -85,9 +124,12 @@ in the same hub session via `scripts\new_consumer.py`'s adoption branch. See
    (`tests\<tool>\`) catches a behavior regression, its reference scan confirms no consumer's
    wiring/imports broke. Also run the ticket's Suggested test plus your own. Add/extend a golden
    fixture when the fix is behavior-changing.
-4. Append a `## Round-trip log` line recording the **commit SHA** and affected consumers. Leave
-   `Status: OPEN`. Log it in `project_progress.md`, naming affected consumers there too. Commit and
-   push — the ticket closes only when the consumer verifies.
+4. Append a `## Round-trip log` line recording the **commit SHA** and affected consumers. If what
+   shipped diverges from the Proposed fix/content, or converges with another open ticket, say so
+   explicitly per "What a ticket actually is" above — name the replacement Suggested test if the
+   original no longer applies, and name the other ticket if verification is now shared with it.
+   Leave `Status: OPEN`. Log it in `project_progress.md`, naming affected consumers there too.
+   Commit and push — the ticket closes only when the consumer verifies.
 
 ### Cross-consumer verify tickets (only when 2+ consumers exist)
 When a behavior-changing fix ships and the registry (`consumers\`) lists consumers *other* than the

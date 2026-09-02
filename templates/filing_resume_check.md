@@ -32,7 +32,7 @@ mentions any of those strings, each already categorized (`awaiting_consumer`, `n
 `still_fails`, `verified_pass`, …) using the exact rule below, instead of hand-deriving that from
 the raw `## Round-trip log` text.
 
-Two categories need this project's attention now:
+Three categories need this project's attention now:
 
 - `awaiting_consumer` — the ball may be in this project's court. **Still open the ticket and
   confirm its own last `## Round-trip log` line actually names this project** before acting — the
@@ -41,6 +41,12 @@ Two categories need this project's attention now:
   "plausibly relevant," not "confirmed, act now." This is the one residual manual step the script
   doesn't eliminate.
 - a **verify-request ticket that names this project** (`Relates to: <original>`) — same
+  confirm-before-acting step as above.
+- `unknown_state` — the log has real activity the script couldn't classify; it deliberately
+  declines to guess rather than mis-file it as "nothing to do." Open the ticket and read the actual
+  entry — it's often the shape a diverged-from-proposal or converged-with-another-ticket closing
+  note takes (the hub's `agents_change_requests.md`, "What a ticket actually is"), and may name a
+  *different* Suggested test than the one the ticket originally shipped with. Same
   confirm-before-acting step as above.
 
 Every other category (`no_activity`, `still_fails`, `verified_pass`) on a filtered hit means the

@@ -79,9 +79,9 @@ TYPE_REGISTRATION_RE = re.compile(r'^Type:\s*registration\s*$', re.MULTILINE | r
 SECTION_HEADING_RE = re.compile(r'^##\s*(Round-trip log|Processing log)\s*$', re.MULTILINE)
 NEXT_HEADING_RE = re.compile(r'^##\s', re.MULTILINE)
 
-RE_VERIFIED_PASS = re.compile(r'verified PASS', re.IGNORECASE)
-RE_STILL_FAILS = re.compile(r'still fails', re.IGNORECASE)
-RE_AWAITING = re.compile(r'\bawaiting\b.+?\bverify\b', re.IGNORECASE)
+RE_VERIFIED_PASS = re.compile(r'verified\s+PASS', re.IGNORECASE)
+RE_STILL_FAILS = re.compile(r'still\s+fails', re.IGNORECASE)
+RE_AWAITING = re.compile(r'\bawaiting\b.+?\bverify\b', re.IGNORECASE | re.DOTALL)
 
 
 @dataclass
@@ -95,15 +95,21 @@ class Ticket:
     text: str                # full raw ticket text - used by --project's substring filter below
 
 
+ENTRY_START_RE = re.compile(r'^(?:- |\*\*\d{4}-\d{2}-\d{2}\b)')
+
+
 def _log_entries(section_body):
     """Split a log section's body into bullet entries. An entry starts at a line beginning with
-    '- ' (no leading whitespace); any following non-'- '-prefixed lines are that entry's
-    continuation (matches every real ticket's wrapped-paragraph style, e.g.
-    change_requests\\2026-07-20_consistency_check_ps1-to-python.md's multi-line bullets)."""
+    '- ' (no leading whitespace; matches every real ticket's wrapped-paragraph style, e.g.
+    change_requests\\2026-07-20_consistency_check_ps1-to-python.md's multi-line bullets) OR at a
+    line beginning with a bold dated header, e.g. '**2026-09-01 — ...**' (the shape several
+    round-trip entries drifted into without the leading '- ' - recognized here rather than
+    rewriting every such entry back to the dash form, so a future entry in either shape still
+    parses). Any following line matching neither start pattern is that entry's continuation."""
     entries = []
     current = []
     for line in section_body.splitlines():
-        if line.startswith('- '):
+        if ENTRY_START_RE.match(line):
             if current:
                 entries.append('\n'.join(current))
             current = [line]
