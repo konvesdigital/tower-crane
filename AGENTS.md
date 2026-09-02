@@ -134,6 +134,12 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
    - `check_stale_paths.py` (`design\grt_connectivity_audit.md` item (iv)) — any `[STALE-PATH]` line
      names a hand-written absolute path that doesn't resolve on this host; mention it, but don't
      assume it needs fixing — may be intentionally single-host-only. Silent → say nothing.
+   - `check_shared_resource_catalog.py` (`shared_resources\CATALOG.md`/`resource_relationships.yaml`
+     internal consistency — added 2026-09-02, resume-only, never runs at `quick resume`) — any `[!]`
+     line names a broken `File` reference, a `Tier` value with no matching tier definition, or a
+     graph edge pointing at a name no `CATALOG.md` row resolves to; mention it and offer to fix the
+     named file (a hand edit, not a script-driven repair — the check only detects, per its own
+     docstring). Silent (the "no catalog/graph inconsistencies found" line) → say nothing.
 4. Read `project_progress.md`: Current Status, Next Up, Decisions table, most recent Work Log
    entry only.
 5. Scan `change_requests\` per `agents_change_requests.md`'s "Scanning at session start" section —

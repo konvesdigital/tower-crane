@@ -42,17 +42,28 @@ CATALOG_PATH = PROJECT_ROOT / 'shared_resources' / 'CATALOG.md'
 
 
 def parse_catalog(catalog_text):
-    """Parse shared_resources\\CATALOG.md's table (Name | Kind | File | Description | Added |
-    Status). Returns a list of dicts; skips the header and separator rows. Malformed rows (fewer
-    than 6 cells) are silently skipped - out of scope for this scan, not a failure."""
+    """Parse shared_resources\\CATALOG.md's table (Name | Kind | File | Category | Tier |
+    Description | Added | Status - design\\shared_resources_relationship_graph.md's Category/Tier
+    columns, inserted after File). Returns a list of dicts; skips the header and separator rows.
+    Malformed rows (fewer than 8 cells) are silently skipped - out of scope for this scan, not a
+    failure.
+
+    Column-index fix (2026-09-02): this used to unpack `cells[:6]` assuming the pre-Category/Tier
+    six-column shape (Name/Kind/File/Description/Added/Status), which silently mis-assigned every
+    cell from Category onward once those two columns were inserted - `status` ended up holding the
+    Description text instead of the real Status column, so the archived-row filter below
+    (`row['status'].lower().startswith('archived')`) stopped matching real 'Archived ...' values
+    and started including archived rows (the three retired seo_*_index.md rows) as if active.
+    Caught by hand-tracing this exact bug live, not by a test."""
     rows = []
     lines = [l for l in catalog_text.splitlines() if l.strip().startswith('|')]
     for line in lines[2:]:  # [0] header, [1] '---' separator
         cells = [c.strip() for c in line.strip().strip('|').split('|')]
-        if len(cells) < 6:
+        if len(cells) < 8:
             continue
-        name, kind, file_cell, _description, _added, status = cells[:6]
-        rows.append({'name': name, 'kind': kind, 'file': file_cell.strip('`'), 'status': status})
+        name, kind, file_cell, category, tier, _description, _added, status = cells[:8]
+        rows.append({'name': name, 'kind': kind, 'file': file_cell.strip('`'),
+                     'category': category, 'tier': tier, 'status': status})
     return rows
 
 
