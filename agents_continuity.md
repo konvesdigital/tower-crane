@@ -72,6 +72,19 @@ actually invoked.
    - Exit 0 = both repos committed/pushed cleanly (or nothing to do). Re-running is always safe
      (idempotent) if a further edit lands dirty afterward — e.g. correcting this same Work Log
      entry once more — no separate verify-clean loop to operationalize by hand; just run it again.
+   - **Success also closes the loop, symmetrically with the failure branch above**: if step 1's
+     Work Log entry or Current Status text carries any git-commit-state language describing *this*
+     checkpoint's own work ("not yet committed," "pending `checkpoint`," "committed locally only,
+     blocked on...," etc. — written truthfully while a prior blocked/partial run left it that way),
+     and this run's git mechanics now succeed, that language is stale the instant it lands — commit
+     status is exactly the kind of fact step 1's own Inclusion test already excludes (re-derivable
+     via `git status` in seconds). Strike it, or fold in the commit SHA in its place, as part of
+     this same checkpoint — never leave a "pending checkpoint" claim standing inside a commit that
+     the checkpoint which just ran already made. Do not write this kind of language pre-emptively
+     in the first place (step 2 is about to resolve it in the same invocation, or fails and the
+     branch above documents the correction); it belongs only for a state that's actually still
+     open when the entry is written, e.g. a run genuinely blocked on untracked files/leak-scan/
+     standing constraints and left to resume later.
 3. Confirm to the user: saved and pushed, **both repos' working trees clean** (note whether
    `toolkit\` push happened, was skipped clean, or failed).
 4. **Suggest archiving** if the file has grown past roughly **400 lines (~40 KB)**, or the Work Log

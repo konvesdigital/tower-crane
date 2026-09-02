@@ -81,6 +81,16 @@ runs itself; nothing schedules --check automatically.
               --notify/resume, only surfacing later when --check's own dirty-tree abort happened to
               run - now checked here too, on the same immediate-every-resume footing as the other
               two directions.
+  --consumer  Modifier, only meaningful with --notify (change_requests\\2026-08-25_update_toolkit_
+              notify-audience-mismatch.md): every --notify message above names a hub-only fix verb
+              (`checkpoint`, `update`) describing the hub's own toolkit\\ clone state relative to
+              its public upstream - correct and actionable when read in a hub session
+              (resume_check.py), but misleading when the identical text surfaces verbatim in a
+              connected consumer session (consumer_resume_check.py), where none of those verbs are
+              reachable and the state described isn't this project's own update status (that's
+              scan_consumer_update.py's separate, already-correct territory). --consumer rephrases
+              every such message as informational-only, pointing at a session opened directly in
+              the hub instead. Never changes the underlying check, only the audience of the text.
 
 Remote-identity check (added 2026-07-27, security stress-test pass, design\\security_stress_test.md):
 every subcommand that talks to `origin` first confirms `git remote get-url origin` still matches
@@ -536,23 +546,43 @@ def cmd_approve(cfg, through=None):
         print(f"Approved. Trusted baseline advanced to {merge_target[:8]}. toolkit\\ is up to date.")
 
 
-def cmd_notify(cfg):
+def cmd_notify(cfg, consumer=False):
     """The 'check for update' proactive notice (design\\local_first_reframe.md): a plain fetch +
     comparison against last_reviewed_sha, no LLM, no golden suite, no pending-file write - never
     mutates anything, safe to run on any cadence (resume, cron). Surfaces a single line; never
     triggers the full review gate (that stays --check, user-initiated only). The remote-identity
     check here is a WARN, not an abort - --notify's whole point is a safe, side-effect-free
-    heads-up, so it still reports a mismatched origin without blocking `resume`."""
+    heads-up, so it still reports a mismatched origin without blocking `resume`.
+
+    consumer=True (change_requests\\2026-08-25_update_toolkit_notify-audience-mismatch.md): every
+    message below describes the hub's own toolkit\\ clone relative to its public upstream, and
+    every hub-audience phrasing names a hub-only fix verb (`checkpoint`, `update`). Read verbatim
+    from a connected consumer session, none of those verbs are reachable and the state described
+    isn't this project's own update status - so each message gets an informational-only rephrasing
+    that points at a session opened directly in the hub instead, rather than the literal hub text."""
     if _is_dirty():
-        print("[update check] toolkit\\ has uncommitted changes - run `checkpoint` to commit them "
-              "(a prior checkpoint likely ended before the working tree was actually clean).")
+        if consumer:
+            print("[update check] the hub's toolkit\\ has uncommitted changes - informational "
+                  "only, not this project's concern. The hub owner resolves it with `checkpoint` "
+                  "from a session opened directly in the hub.")
+        else:
+            print("[update check] toolkit\\ has uncommitted changes - run `checkpoint` to commit "
+                  "them (a prior checkpoint likely ended before the working tree was actually "
+                  "clean).")
 
     mismatch = _origin_remote_mismatch(cfg)
     if mismatch is not None:
         expected, actual = mismatch
-        print(f"[update check] [WARN] 'origin' does not match the expected upstream (configured: "
-              f"{expected!r}, actual: {actual!r}) - run `update` for the full check, which will "
-              "abort until this is resolved.")
+        if consumer:
+            print(f"[update check] [WARN] the hub's toolkit\\ 'origin' remote does not match its "
+                  f"expected upstream (configured: {expected!r}, actual: {actual!r}) - "
+                  "informational only; this is the hub's own remote configuration, not something "
+                  "this project's `update` skill checks. The hub owner resolves it from a session "
+                  "opened directly in the hub.")
+        else:
+            print(f"[update check] [WARN] 'origin' does not match the expected upstream "
+                  f"(configured: {expected!r}, actual: {actual!r}) - run `update` for the full "
+                  "check, which will abort until this is resolved.")
 
     fetch = _git(['fetch', 'origin'], check=False)
     if fetch.returncode != 0:
@@ -568,13 +598,24 @@ def cmd_notify(cfg):
     if head != target:
         ahead = _git(['rev-list', f'{target}..{head}', '--count']).stdout.strip()
         if ahead != '0':
-            print(f"[update check] toolkit\\ has {ahead} local commit(s) not yet pushed to origin "
-                  "- run `checkpoint` to retry the push, or `update` first if origin has moved "
-                  "ahead too.")
+            if consumer:
+                print(f"[update check] the hub's toolkit\\ has {ahead} local commit(s) not yet "
+                      "pushed to its origin - informational only; not this project's own update "
+                      "state (that's this project's own `update` skill, which reports separately). "
+                      "The hub owner resolves it from a session opened directly in the hub.")
+            else:
+                print(f"[update check] toolkit\\ has {ahead} local commit(s) not yet pushed to "
+                      "origin - run `checkpoint` to retry the push, or `update` first if origin "
+                      "has moved ahead too.")
 
     base = read_last_reviewed()
     if base is None or not _sha_exists(base):
-        print("[update check] no reviewed baseline yet - run `update` to establish one.")
+        if consumer:
+            print("[update check] the hub's toolkit\\ has no reviewed baseline yet against its own "
+                  "upstream - informational only. The hub owner establishes one by running "
+                  "`update` from a session opened directly in the hub.")
+        else:
+            print("[update check] no reviewed baseline yet - run `update` to establish one.")
         return
 
     if not _git(['diff', '--quiet', base, target], check=False).returncode:
@@ -582,8 +623,16 @@ def cmd_notify(cfg):
         return
 
     count = _git(['rev-list', f'{base}..{target}', '--count']).stdout.strip()
-    print(f"[update check] a tower_crane update is available ({count} commit(s) since last "
-          "review) - run `update` to review and pull it in.")
+    if consumer:
+        print(f"[update check] toolkit\\'s public upstream has moved ahead of the hub's "
+              f"last-reviewed baseline ({count} commit(s)) - informational only; this is the hub "
+              "falling behind its own source, not this project falling behind the hub (that's "
+              "this project's own `update` skill, which checks separately and reports its own "
+              "result). The hub owner reviews and pulls this from a session opened directly in "
+              "the hub.")
+    else:
+        print(f"[update check] a tower_crane update is available ({count} commit(s) since last "
+              "review) - run `update` to review and pull it in.")
 
 
 def cmd_reject():
@@ -613,12 +662,16 @@ def main():
                          help="With --approve: partial approval, only through this pending commit "
                               "(1-based index from the last --check's list, or one of those "
                               "commits' own SHAs). Ignored by every other flag.")
+    parser.add_argument('--consumer', action='store_true',
+                         help="With --notify only: rephrase every message as informational-only, "
+                              "for a consumer session where none of --notify's hub-only fix verbs "
+                              "are reachable. Ignored by every other flag.")
     args = parser.parse_args()
 
     cfg = get_shared_config(SHARED_ROOT)
 
     if args.notify:
-        cmd_notify(cfg)
+        cmd_notify(cfg, consumer=args.consumer)
         return
 
     if args.approve:

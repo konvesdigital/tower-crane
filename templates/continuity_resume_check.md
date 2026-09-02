@@ -58,10 +58,12 @@ reached) read whatever is present.
    `python "<hub root>\toolkit\scripts\consumer_resume_check.py"` (same `toolkit\` folder this
    file itself resolved through). Runs, in order, what used to be two separately prose-sequenced
    calls:
-   - `update_toolkit.py --notify` (fetch + compare against the hub's last-reviewed baseline —
-     never merges). If it reports an update, mention it, but do **not** `git pull` `toolkit\` from
-     this project's session — that's the gated `update` action, run only in a session opened
-     directly in the hub.
+   - `update_toolkit.py --notify --consumer` (fetch + compare against the hub's last-reviewed
+     baseline — never merges; `--consumer` rephrases every message as informational-only, since
+     none of `--notify`'s hub-only fix verbs are reachable from this session — change_requests\
+     2026-08-25_update_toolkit_notify-audience-mismatch.md). If it reports the hub falling behind
+     its own upstream, mention it, but do **not** `git pull` `toolkit\` from this project's session
+     — that's the gated `update` action, run only in a session opened directly in the hub.
    - `check_tower_crane.py --write-guidance` (no `--consumer` flag — the hub's per-machine `host:`
      scoping already limits it). Pure Python, no pull required.
    - This checks only whether the **hub's own toolkit source** has fallen behind its public

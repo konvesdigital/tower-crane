@@ -11,7 +11,11 @@ machine's own hook activation, the consumers\\ registry, other consumers' stale 
 which a consumer session can meaningfully run against another project's registry entry).
 
 Runs, in order, each exactly as `resume` step 3 already documents invoking it standalone:
-  1. update_toolkit.py --notify        (toolkit\\ dirty / incoming / outgoing state - never merges)
+  1. update_toolkit.py --notify --consumer   (toolkit\\ dirty / incoming / outgoing state - never
+                                               merges; --consumer rephrases every message as
+                                               informational-only, since none of --notify's hub-only
+                                               fix verbs are reachable from here - change_requests\\
+                                               2026-08-25_update_toolkit_notify-audience-mismatch.md)
   2. check_tower_crane.py --write-guidance   (no --consumer flag - the hub's per-machine `host:`
                                                scoping already limits it to what's reachable here)
 
@@ -52,7 +56,7 @@ def main():
     launcher = cfg['python_launcher']
 
     checks = [
-        ('update_toolkit.py --notify', 'update_toolkit.py', ['--notify']),
+        ('update_toolkit.py --notify --consumer', 'update_toolkit.py', ['--notify', '--consumer']),
         ('check_tower_crane.py --write-guidance', 'check_tower_crane.py', ['--write-guidance']),
     ]
 
