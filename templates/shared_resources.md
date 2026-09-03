@@ -28,7 +28,12 @@ Status`). `Category`/`Tier` are optional metadata (`design\shared_resources_rela
 — a broad domain tag plus a Category-scoped retrieval-circumstance pointer — and a companion file,
 `shared_resources\resource_relationships.yaml`, holds typed edges between entries plus each
 Category's situational-tier circumstance definitions. See "Saving" and "Retrieval" below for how
-these get written and read; an entry with no Category is unaffected by any of this.
+these get written and read; an entry with no Category is unaffected by any of this. A second,
+optional sidecar, `shared_resources\trigger_index.yaml`, holds hand-authored string-match trigger
+phrases per entry — a deterministic recognition layer under the Category/Tier skill mechanism,
+consulted by a `UserPromptSubmit` hook rather than by an agent's own judgment
+(`design\shared_resources_mechanical_trigger.md`); see Saving step 2a below for how entries get
+triggers, and `MENU.md`'s `shared_resources_trigger_match` row for the opt-in.
 
 - **`reference`** — passive, read-on-demand domain knowledge (methodology, facts). Using one means
   reading it, or `@import`ing it if it's plain prose with no spaced paths.
@@ -124,6 +129,13 @@ organizational scheme applied on top of it.
        match names a new tier from the circumstance just given. Tier names/definitions stay
        revisable going forward — expect renaming, broadening, or splitting as more entries test a
        tier's boundary, never a one-time-locked taxonomy.
+2a. **Draft trigger phrases** (`design\shared_resources_mechanical_trigger.md`) — from the content
+    just classified, draft 3-8 short string-match phrases someone might actually type that should
+    surface this entry (e.g. `"GSC average position"`, `"position vs traffic"` — specific multi-word
+    phrases, not single common words). Show the draft, let the user edit/approve. This is a one-time
+    cost paid once per entry, at the moment a session is already engaged with its content; skipping
+    this step is fine (an entry can always get triggers later, or never) — it only means this entry
+    stays reachable through the existing skill-gate/search/browse paths, not this mechanical one.
 3. **Show the active node's existing edge-neighborhood, don't ask an open question.** If a
    process/entry already in play this session has existing edges in `resource_relationships.yaml`,
    show them compactly (the same `Entry | Edges` shape `design\shared_resources_relationship_graph.md`'s
@@ -138,17 +150,19 @@ organizational scheme applied on top of it.
    *"Which of `[Category]`'s existing entries/processes does this belong near, if any — or is this
    a first-of-its-kind save?"* — never the full graph dumped at once.
 5. **Confirm before writing anything** — the entry's name, `kind`, `Category`/`Tier`, one-line
-   description, any edge(s) from steps 3–4, and that it's about to be written into
-   `shared_resources\` plus a new `CATALOG.md` row (plus any `resource_relationships.yaml` change).
-   Only write after confirmation — this is the one disk-writing action in the whole mechanism and
-   the one carrying the classification call above, so it gets its own explicit checkpoint even
-   though entering the mode already got one.
+   description, any edge(s) from steps 3–4, any trigger phrases from step 2a, and that it's about to
+   be written into `shared_resources\` plus a new `CATALOG.md` row (plus any
+   `resource_relationships.yaml`/`trigger_index.yaml` change). Only write after confirmation — this
+   is the one disk-writing action in the whole mechanism and the one carrying the classification
+   call above, so it gets its own explicit checkpoint even though entering the mode already got one.
 6. **Write.** For a `reference`/`tool` entry: create one new file in `shared_resources\`, append
-   one row to `CATALOG.md` (`Status` blank — active by default) with its `Category`/`Tier`, and
-   write any new/updated `tiers:` circumstance text or edge(s) into
-   `shared_resources\resource_relationships.yaml`. For `insight`, see "Insights are different"
-   below — its save flow is a negotiation, not a fixed write, but ends the same way. Either way,
-   finish with **propagate the write** (see below).
+   one row to `CATALOG.md` (`Status` blank — active by default) with its `Category`/`Tier`, write
+   any new/updated `tiers:` circumstance text or edge(s) into
+   `shared_resources\resource_relationships.yaml`, and — if step 2a produced any trigger phrases —
+   append a `resource`/`triggers` entry to `shared_resources\trigger_index.yaml` (create the file
+   with an `entries: []` skeleton first if it doesn't exist yet). For `insight`, see "Insights are
+   different" below — its save flow is a negotiation, not a fixed write, but ends the same way.
+   Either way, finish with **propagate the write** (see below).
 7. **Coverage guarantee, then a precision offer — only when this entry has a Category.** Two
    distinct things, not one:
    - **This save is the Category's very first entry, of any kind** (`Primary`, or the first entry
@@ -196,9 +210,10 @@ that adopted this entry runs on a machine not yet in this list.
 
 ### Every write here ends with the same propagation step
 
-Any write into `shared_resources\` — a new `reference`/`tool`/`insight` entry, an `insight` archive
-edit, or a new-host addition to an existing entry's `Hosts:` block (see "Per-host availability for
-pointer entries" below) — finishes with a scoped commit+push against the **hub's own outer repo**
+Any write into `shared_resources\` — a new `reference`/`tool`/`insight` entry, a
+`trigger_index.yaml` addition (step 2a above), an `insight` archive edit, or a new-host addition to
+an existing entry's `Hosts:` block (see "Per-host availability for pointer entries" below) —
+finishes with a scoped commit+push against the **hub's own outer repo**
 (the private repo one level above `toolkit\`, not this project's own repo), run immediately, from
 this session, right after the write:
 

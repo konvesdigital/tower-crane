@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{PYTHON_LAUNCHER}} \"{{SHARED_ROOT}}/hooks/shared_resources_trigger_match.py\""
+          }
+        ]
+      }
+    ]
+  }
+}
