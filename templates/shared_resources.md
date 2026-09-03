@@ -110,7 +110,13 @@ organizational scheme applied on top of it.
 1. **Classify** — `kind`, `Category`, one-line description. `Category` is free text, discovered by
    checking whether any other `CATALOG.md` row already carries it — no separate registry lists
    valid values. No Category is a legitimate answer (leaves both columns blank, unaffected by
-   everything below).
+   everything below). If the message that triggered this save itself carried a `shared_resources
+   mechanical trigger` hit (the `additionalContext` block `shared_resources_trigger_match.py`
+   injects, when opted in — `design\shared_resources_mechanical_trigger.md`), treat the entry it
+   named as a live candidate for "this might not be new" — folding into that entry or tying an edge
+   to it in step 3 — before treating this as a fresh save. A matcher hit firing on the very message
+   that starts a save is exactly the situation it's most useful for: the content is topically close
+   enough to trip an existing trigger, which is real evidence worth weighing, not noise to ignore.
 2. **Circumstance** — if this entry has a Category, ask: *"Should Claude know this always, in
    `[Category]` contexts, or only under specific circumstances?"*
    - **Always** → Tier is `Primary`, no entry in `resource_relationships.yaml`'s `tiers:` block
@@ -129,13 +135,31 @@ organizational scheme applied on top of it.
        match names a new tier from the circumstance just given. Tier names/definitions stay
        revisable going forward — expect renaming, broadening, or splitting as more entries test a
        tier's boundary, never a one-time-locked taxonomy.
-2a. **Draft trigger phrases** (`design\shared_resources_mechanical_trigger.md`) — from the content
-    just classified, draft 3-8 short string-match phrases someone might actually type that should
-    surface this entry (e.g. `"GSC average position"`, `"position vs traffic"` — specific multi-word
-    phrases, not single common words). Show the draft, let the user edit/approve. This is a one-time
-    cost paid once per entry, at the moment a session is already engaged with its content; skipping
-    this step is fine (an entry can always get triggers later, or never) — it only means this entry
-    stays reachable through the existing skill-gate/search/browse paths, not this mechanical one.
+2a. **Draft trigger phrases** (`design\shared_resources_mechanical_trigger.md`) — draft 3-8 short
+    string-match phrases from the entry's **own full content**, never just its one-line `CATALOG.md`
+    description or title (same anti-pattern the Apply procedure's skill-trigger drafting already
+    calls out, below — a description written for a human scanning many rows isn't shaped for
+    recognizing an organically-arising question). Specific multi-word phrases, not single common
+    words, and deliberately covering more than one angle rather than minor rewordings of the same
+    phrase:
+    - the entry's own jargon/terminology, as written;
+    - a plain-English restatement of the same terms (both the spelled-out and the abbreviated form
+      where one exists, e.g. `"Google Search Console"` alongside `"GSC"`);
+    - at least one **symptom-first** phrasing of the underlying pain point — the same framing
+      `insight`'s retrieval hook already uses (below): describing the situation that needs this
+      entry, not the entry's own solution/vocabulary. This is the angle most likely to be missed by
+      just restating the content, and it's exactly the shape of phrasing that motivated this
+      mechanism in the first place (`design\shared_resources_mechanical_trigger.md`'s Part 1 — the
+      real incident's own phrasing named neither the entry nor its vocabulary).
+
+    Before showing the draft, check it against `trigger_index.yaml`'s existing phrases and flag —
+    never silently allow — an exact or near-duplicate of another entry's phrase, or a phrase generic
+    enough to fire on unrelated messages (a single common word, or anything overlapping the literal
+    `"shared resources"` gate phrase itself); the user decides whether to keep, narrow, or drop each
+    flagged phrase. Show the draft, let the user edit/approve. This is a one-time cost paid once per
+    entry, at the moment a session is already engaged with its content; skipping this step is fine
+    (an entry can always get triggers later, or never) — it only means this entry stays reachable
+    through the existing skill-gate/search/browse paths, not this mechanical one.
 3. **Show the active node's existing edge-neighborhood, don't ask an open question.** If a
    process/entry already in play this session has existing edges in `resource_relationships.yaml`,
    show them compactly (the same `Entry | Edges` shape `design\shared_resources_relationship_graph.md`'s
