@@ -66,7 +66,8 @@ probably has something on this — anyway, back to the bug"*)? The former fires;
 When genuinely ambiguous, ask rather than guess either way. It can be followed immediately by the
 actual request in the same breath (*"shared resources — save this as an insight"*), precede it
 (*"everything we've figured out about X, make a note of this in shared resources"*), or stand
-alone, in which case ask what's wanted (save, search, browse, apply, forget, archive).
+alone, in which case ask what's wanted (save, search, browse, apply, forget, archive, adjust
+triggers, backfill triggers).
 
 On firing, say so out loud before doing anything else — e.g. *"Switching to shared resources —
 thinking across projects now, not just this one."* — so the context-switch is visible, not just
@@ -410,6 +411,49 @@ Use it when a resource was adopted for a one-off task and is now just `CLAUDE.md
 reset this project's behavior back to before adoption. If Claude's advice in some domain seems
 off, checking whether a relevant resource was ever adopted (via browse's in-use indicator) — and
 forgetting it if it's stale — is a reasonable first move.
+
+### Adjusting triggers — recalibrating after living with them
+
+Triggered by something like *"shared resources — the position diagnostic trigger keeps firing on
+unrelated stuff"* or *"shared resources — add a trigger for X, it should have caught this."* A
+trigger phrase in `trigger_index.yaml` is a calibration, not a locked decision
+(`design\shared_resources_mechanical_trigger.md`'s own framing: a real reliability trade, not a
+perfect guarantee) — this is the narrow write that lets it drift toward better precision/recall in
+either direction, same self-approving spirit as Saving:
+
+1. **Identify the entry** — same search/browse flow as any other action, if not already named.
+2. **Show its current `trigger_index.yaml` phrases**, or state plainly it has none yet and route to
+   "Backfilling triggers" below instead.
+3. **Diagnose which direction:**
+   - **Too greedy** (fired on something unrelated) — the actual message that mis-fired is the best
+     evidence for which phrase was too broad; use it, don't guess abstractly. Narrow the phrase's
+     wording or remove it outright.
+   - **Too stingy** (a real need didn't surface it) — draft additional phrase(s) covering the missed
+     angle, same guidance as Saving step 2a (full entry content, jargon/plain-English/symptom-first
+     mix, cross-checked against every entry's existing phrases for collision/genericity).
+4. **Confirm before writing**, same checkpoint every other write here requires.
+5. **Write** the updated phrase list to `trigger_index.yaml`, then **propagate** (see "Every write
+   here ends with the same propagation step" above).
+
+### Backfilling triggers for pre-existing entries
+
+Triggered by something like *"shared resources — backfill triggers"* (a whole-catalog pass) or
+*"shared resources — add triggers for `<entry>`"* (one entry). Every entry that predates this
+mechanism, or was saved without trigger phrases, has no `trigger_index.yaml` entry yet — this closes
+that gap without a separate registration step
+(`design\shared_resources_mechanical_trigger.md`'s "Backfill"):
+
+1. List every **active** `CATALOG.md` entry with no `trigger_index.yaml` entry yet. An archived
+   entry is still reachable via ordinary browse either way — skip it unless asked for by name.
+2. For each, draft phrases exactly as Saving step 2a does (full content, jargon/plain-English/
+   symptom-first mix, collision/genericity check against phrases already drafted this pass *and*
+   against every entry already in `trigger_index.yaml`).
+3. Show the whole batch for review in one pass rather than confirming entry-by-entry — cheaper for a
+   genuine backfill — but let the user pull any single entry out for adjustment before approving the
+   rest.
+4. Write every approved entry to `trigger_index.yaml` in one pass, then **propagate once for the
+   whole batch** (a single commit covering the sweep, not one per entry — this is maintenance, not
+   an ongoing stream of individual saves).
 
 ### Insights are different
 

@@ -134,6 +134,12 @@ def format_context(hits):
                 lines.append(f"  {row['description']}")
         else:
             lines.append(f'- {path} - matched "{phrase}" (no CATALOG.md row found for detail)')
+    lines.append(
+        "If you act on one of these (or deliberately dismiss it as irrelevant), say so briefly to "
+        "the user - a mis-fire is otherwise invisible to them. That visibility is what lets a "
+        "trigger phrase get recalibrated later: \"shared resources - adjust triggers for <entry>\" "
+        "if a phrase is too greedy (fired on unrelated content) or too stingy (missed a real need)."
+    )
     return "\n".join(lines)
 
 
