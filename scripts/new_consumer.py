@@ -265,9 +265,12 @@ def main():
     parser = argparse.ArgumentParser(description="Scaffold a new tower_crane consumer project.")
     parser.add_argument('--target-path', required=True, help="Absolute path to the new consumer's project root.")
     parser.add_argument('--project-name', required=True, help='Full title in Title Case (e.g. "My Cool Project").')
-    parser.add_argument('--tools', nargs='*', default=['consistency_check'],
+    parser.add_argument('--tools', nargs='*', default=['consistency_check', 'shared_resources_trigger_match'],
                          help="Tools to opt into (each needs templates/optins/<tool>.json). Pass --tools with no "
-                              "values for a consumer with no hooks. Default: consistency_check.")
+                              "values for a consumer with no hooks. Default: consistency_check, "
+                              "shared_resources_trigger_match (rides along with the shared_resources protocol "
+                              "piece, which every consumer gets unconditionally - design\\"
+                              "shared_resources_mechanical_trigger.md's \"Rollout\").")
     parser.add_argument('--private-tools', nargs='*', default=[],
                          help="Private tools to opt into (design\\private_tools.md) - each needs either "
                               "toolkit_private/templates/optins/<name>.json (hook) or "

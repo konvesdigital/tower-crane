@@ -78,7 +78,7 @@ def scan_all(cfg, consumers, this_host):
             print(f"  [skip] {c['name']}: no CLAUDE.md at {this_path} - path stale or moved?")
             continue
         state = read_consumer_state(project_root)
-        items = scan_hooks(cfg, state) + scan_skills(state) + scan_pieces(state) + scan_private(cfg, state)
+        items = scan_hooks(cfg, state) + scan_skills(state) + scan_pieces(state) + scan_private(cfg, state, project_root)
         if items:
             slug = Path(c['file']).stem
             result.append((slug, {'consumer': c, 'project_root': project_root, 'items': items}))

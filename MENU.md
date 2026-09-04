@@ -46,8 +46,12 @@ Fails open on any error (missing/malformed `trigger_index.yaml`, unreadable `CAT
 stdin) — never blocks or alters the submitted prompt, exits 0 either way. A hub with no
 `shared_resources\trigger_index.yaml` yet, or one with no entries, produces no output at all — safe
 to opt into before any resource has been given trigger phrases (see the design doc's "Backfill").
-Not folded into `shared_resources.md`'s own MANDATORY status; opt in per project like any other
-`toolkit\` tool.
+
+Default-on for every consumer, rides along with `shared_resources.md`'s own MANDATORY status
+(`scripts\new_consumer.py`'s default `--tools` list) since 2026-09-04 — a project that has
+`shared_resources` also gets the mechanical layer that helps recognize when to use it, no separate
+decision needed. Still an ordinary hook opt-in mechanically (a `--tools` override can still exclude
+it), not folded into the `pieces` bundle itself.
 
 ## Subagents
 *(none yet)*
