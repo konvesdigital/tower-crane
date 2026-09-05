@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Read|Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{PYTHON_LAUNCHER}} \"{{SHARED_ROOT}}/hooks/shared_resources_read_tracker.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -29,11 +29,12 @@ Status`). `Category`/`Tier` are optional metadata (`design\shared_resources_rela
 `shared_resources\resource_relationships.yaml`, holds typed edges between entries plus each
 Category's situational-tier circumstance definitions. See "Saving" and "Retrieval" below for how
 these get written and read; an entry with no Category is unaffected by any of this. A second,
-optional sidecar, `shared_resources\trigger_index.yaml`, holds hand-authored string-match trigger
-phrases per entry — a deterministic recognition layer under the Category/Tier skill mechanism,
-consulted by a `UserPromptSubmit` hook rather than by an agent's own judgment
-(`design\shared_resources_mechanical_trigger.md`); see Saving step 2a below for how entries get
-triggers, and `MENU.md`'s `shared_resources_trigger_match` row for the opt-in.
+optional sidecar, `shared_resources\trigger_index.yaml`, holds hand-authored concept-slot groups per
+entry (plus a slot-set per Category, applied to every entry in it) — a deterministic recognition
+layer under the Category/Tier skill mechanism, consulted by a `UserPromptSubmit` hook rather than by
+an agent's own judgment (`design\shared_resources_mechanical_trigger.md`); see Saving step 2a below
+for how entries get triggers, and `MENU.md`'s `shared_resources_trigger_match`/
+`shared_resources_read_tracker` rows for the opt-ins.
 
 - **`reference`** — passive, read-on-demand domain knowledge (methodology, facts). Using one means
   reading it, or `@import`ing it if it's plain prose with no spaced paths.
@@ -136,28 +137,49 @@ organizational scheme applied on top of it.
        match names a new tier from the circumstance just given. Tier names/definitions stay
        revisable going forward — expect renaming, broadening, or splitting as more entries test a
        tier's boundary, never a one-time-locked taxonomy.
-2a. **Draft trigger phrases** (`design\shared_resources_mechanical_trigger.md`) — draft 3-8 short
-    string-match phrases from the entry's **own full content**, never just its one-line `CATALOG.md`
-    description or title (same anti-pattern the Apply procedure's skill-trigger drafting already
-    calls out, below — a description written for a human scanning many rows isn't shaped for
-    recognizing an organically-arising question). Specific multi-word phrases, not single common
-    words, and deliberately covering more than one angle rather than minor rewordings of the same
-    phrase:
+2a. **Draft one group of concept slots** (`design\shared_resources_mechanical_trigger.md` Part 3) —
+    from the entry's **own full content**, never just its one-line `CATALOG.md` description or title
+    (same anti-pattern the Apply procedure's skill-trigger drafting already calls out, below — a
+    description written for a human scanning many rows isn't shaped for recognizing an
+    organically-arising question). A **group** is 2-3 **slots**; each slot is a short list of 1-2
+    word alternate phrasings for one concept (fires only when *every* slot in the group has at least
+    one term present in the prompt — AND across slots, OR within a slot). Draft vocabulary per
+    concept, not a full sentence — the matching logic handles arrangement, so word order and exact
+    phrasing don't matter. Cover more than one angle across the slots' terms rather than minor
+    rewordings of the same concept:
     - the entry's own jargon/terminology, as written;
-    - a plain-English restatement of the same terms (both the spelled-out and the abbreviated form
-      where one exists, e.g. `"Google Search Console"` alongside `"GSC"`);
-    - at least one **symptom-first** phrasing of the underlying pain point — the same framing
-      `insight`'s retrieval hook already uses (below): describing the situation that needs this
-      entry, not the entry's own solution/vocabulary. This is the angle most likely to be missed by
-      just restating the content, and it's exactly the shape of phrasing that motivated this
-      mechanism in the first place (`design\shared_resources_mechanical_trigger.md`'s Part 1 — the
-      real incident's own phrasing named neither the entry nor its vocabulary).
+    - a plain-English restatement of the same terms in the same slot (both the spelled-out and the
+      abbreviated form where one exists, e.g. `"Google Search Console"` alongside `"GSC"`);
+    - at least one slot capturing a **symptom-first** angle of the underlying pain point — the same
+      framing `insight`'s retrieval hook already uses (below): describing the situation that needs
+      this entry, not the entry's own solution/vocabulary. This is the angle most likely to be
+      missed by just restating the content, and it's exactly the shape of phrasing that motivated
+      this mechanism in the first place (`design\shared_resources_mechanical_trigger.md`'s Part 1 —
+      the real incident's own phrasing named neither the entry nor its vocabulary).
 
-    Before showing the draft, check it against `trigger_index.yaml`'s existing phrases and flag —
-    never silently allow — an exact or near-duplicate of another entry's phrase, or a phrase generic
-    enough to fire on unrelated messages (a single common word, or anything overlapping the literal
-    `"shared resources"` gate phrase itself); the user decides whether to keep, narrow, or drop each
-    flagged phrase. Show the draft, let the user edit/approve. This is a one-time cost paid once per
+    A **second group** only gets drafted when the circumstance being described genuinely doesn't
+    reduce to alternate wording of the first group's concepts — a resource reachable via two
+    unrelated circumstances that share no vocabulary. This is the exception, not the default; most
+    entries need exactly one group. If this entry's `Category` already has a `categories:` slot-set
+    in `trigger_index.yaml`, it applies automatically to every group as an implicit extra AND-slot —
+    don't re-draft a slot just to re-cover "this is `[Category]`-related."
+
+    **If this save is this Category's very first entry** (Saving step 7's Coverage guarantee), also
+    draft the Category's own slot-set now — one slot (a short list of alternate terms for "this is
+    `[Category]` work at all," e.g. `["SEO", "search performance", "rankings"]`), written once to
+    `trigger_index.yaml`'s top-level `categories:` block, applied to every resource tagged with this
+    Category from then on. This is the same rare, ad hoc moment "Category-level slots" (below)
+    describes, not a separate procedure.
+
+    Before showing the draft, check it against `trigger_index.yaml`'s existing entries and flag —
+    never silently allow — an exact or near-duplicate slot in another entry's group, or a slot with
+    only a single overly generic term (one that would fire on unrelated messages alone, or anything
+    overlapping the literal `"shared resources"` gate phrase itself); the user decides whether to
+    keep, narrow, or drop each flagged term. Also grep every existing `shared_resources\*.md` file
+    for a literal, backtick-quoted citation of this entry's own filename, and grep this entry's own
+    content for a citation of any existing file's name — a hit either direction is a checkable,
+    deterministic signal for a `required`-strength `process-material` edge (see step 3 below), not
+    left to memory. Show the draft, let the user edit/approve. This is a one-time cost paid once per
     entry, at the moment a session is already engaged with its content; skipping this step is fine
     (an entry can always get triggers later, or never) — it only means this entry stays reachable
     through the existing skill-gate/search/browse paths, not this mechanical one.
@@ -170,24 +192,33 @@ organizational scheme applied on top of it.
    (directional, a real specific dependency, not a generic "A is foundational" claim),
    `lifecycle-sibling` (undirected, same object/question at a different stage), `related`
    (undirected, no specific claim — the zero-effort default, always available, needs no
-   justification).
+   justification). If step 2a's citation grep found this entry's filename literally cited inside an
+   existing file (or vice versa), that pair gets a `process-material` edge with `strength: required`
+   (`design\shared_resources_mechanical_trigger.md` Part 3's edge-assist) — a deterministic outcome
+   from the grep hit, not a judgment call the way the rest of this step is; every other
+   `process-material` edge tied here is unset-strength (the default relax-to-one-slot behavior) —
+   only mark `required` from an actual literal-citation hit, never from a strong-but-inferred
+   relationship.
 4. **No obvious active node** (a genuinely cold save) — fall back to asking, scoped by Category:
    *"Which of `[Category]`'s existing entries/processes does this belong near, if any — or is this
    a first-of-its-kind save?"* — never the full graph dumped at once.
 5. **Confirm before writing anything** — the entry's name, `kind`, `Category`/`Tier`, one-line
-   description, any edge(s) from steps 3–4, any trigger phrases from step 2a, and that it's about to
-   be written into `shared_resources\` plus a new `CATALOG.md` row (plus any
-   `resource_relationships.yaml`/`trigger_index.yaml` change). Only write after confirmation — this
-   is the one disk-writing action in the whole mechanism and the one carrying the classification
-   call above, so it gets its own explicit checkpoint even though entering the mode already got one.
+   description, any edge(s) from steps 3–4, any group/slot draft (and any new Category slot-set)
+   from step 2a, and that it's about to be written into `shared_resources\` plus a new `CATALOG.md`
+   row (plus any `resource_relationships.yaml`/`trigger_index.yaml` change). Only write after
+   confirmation — this is the one disk-writing action in the whole mechanism and the one carrying
+   the classification call above, so it gets its own explicit checkpoint even though entering the
+   mode already got one.
 6. **Write.** For a `reference`/`tool` entry: create one new file in `shared_resources\`, append
    one row to `CATALOG.md` (`Status` blank — active by default) with its `Category`/`Tier`, write
-   any new/updated `tiers:` circumstance text or edge(s) into
-   `shared_resources\resource_relationships.yaml`, and — if step 2a produced any trigger phrases —
-   append a `resource`/`triggers` entry to `shared_resources\trigger_index.yaml` (create the file
-   with an `entries: []` skeleton first if it doesn't exist yet). For `insight`, see "Insights are
-   different" below — its save flow is a negotiation, not a fixed write, but ends the same way.
-   Either way, finish with **propagate the write** (see below).
+   any new/updated `tiers:` circumstance text or edge(s) (`strength: required` where step 2a's
+   citation grep found one) into `shared_resources\resource_relationships.yaml`, and — if step 2a
+   produced a group/slot draft — append a `resource`/`groups` entry to
+   `shared_resources\trigger_index.yaml` (create the file with an `entries: []` skeleton first if it
+   doesn't exist yet; add the new Category's slot-set to the top-level `categories:` block too, if
+   this save is that Category's first entry). For `insight`, see "Insights are different" below —
+   its save flow is a negotiation, not a fixed write, but ends the same way. Either way, finish with
+   **propagate the write** (see below).
 7. **Coverage guarantee, then a precision offer — only when this entry has a Category.** Two
    distinct things, not one:
    - **This save is the Category's very first entry, of any kind** (`Primary`, or the first entry
@@ -416,24 +447,58 @@ forgetting it if it's stale — is a reasonable first move.
 
 Triggered by something like *"shared resources — the position diagnostic trigger keeps firing on
 unrelated stuff"* or *"shared resources — add a trigger for X, it should have caught this."* A
-trigger phrase in `trigger_index.yaml` is a calibration, not a locked decision
+resource's groups/slots in `trigger_index.yaml` are a calibration, not a locked decision
 (`design\shared_resources_mechanical_trigger.md`'s own framing: a real reliability trade, not a
-perfect guarantee) — this is the narrow write that lets it drift toward better precision/recall in
-either direction, same self-approving spirit as Saving:
+perfect guarantee) — this is the narrow write that lets them drift toward better precision/recall in
+either direction, same self-approving spirit as Saving.
+
+**Three levers, not one — term, slot, group** (Part 3's "Calibration levers"), each answering a
+different plain-language question:
+
+| Lever | Question | Effect |
+|---|---|---|
+| **Term** (within a slot) | Is this just another way of saying a concept already required here? | None — widens/narrows recall on one existing AND-condition, changes nothing about how many conditions exist |
+| **Slot** (within a group) | Is this a genuinely separate concept, also required alongside the existing ones? | Adding tightens (one more required condition); removing loosens |
+| **Group** (across the resource) | Is this a genuinely separate scenario that should trigger this resource entirely on its own? | Adding broadens recall without touching any existing group's strictness — there's no "remove a group" fix for over-firing, narrow via term/slot instead |
 
 1. **Identify the entry** — same search/browse flow as any other action, if not already named.
-2. **Show its current `trigger_index.yaml` phrases**, or state plainly it has none yet and route to
-   "Backfilling triggers" below instead.
-3. **Diagnose which direction:**
-   - **Too greedy** (fired on something unrelated) — the actual message that mis-fired is the best
-     evidence for which phrase was too broad; use it, don't guess abstractly. Narrow the phrase's
-     wording or remove it outright.
-   - **Too stingy** (a real need didn't surface it) — draft additional phrase(s) covering the missed
-     angle, same guidance as Saving step 2a (full entry content, jargon/plain-English/symptom-first
-     mix, cross-checked against every entry's existing phrases for collision/genericity).
+2. **Show its current `trigger_index.yaml` groups/slots** (and its Category's slot-set, if it has
+   one — a Category-slot edit affects every entry in that Category, so flag that blast radius before
+   touching one), or state plainly it has none yet and route to "Backfilling triggers" below
+   instead.
+3. **Diagnose which lever, using the actual real message as evidence — never an abstract guess:**
+   - **Too greedy** (fired on something unrelated) → narrow a **term** out of the slot it came from
+     (same strictness, less recall on that slot), or add a whole new **slot** to the group (more
+     strictness, one more required condition).
+   - **Too stingy** (a real need didn't surface it) → add a **term** into an existing slot (same
+     strictness, more recall), or remove a slot (less strictness) — or, if the missed need is a
+     genuinely separate circumstance rather than a narrower version of the existing one, add a
+     second **group** instead of touching the first group at all. New term/slot content follows the
+     same drafting guidance as Saving step 2a (full entry content, jargon/plain-English/
+     symptom-first mix, cross-checked for collision/genericity).
+   - The diagnostic question: "is this message just phrasing the same concept differently?" → term.
+     "Is this message missing one of the required concepts entirely, or carrying an extra one that
+     shouldn't be required?" → slot. "Is this message describing a scenario that shares none of the
+     existing group's required concepts?" → group.
 4. **Confirm before writing**, same checkpoint every other write here requires.
-5. **Write** the updated phrase list to `trigger_index.yaml`, then **propagate** (see "Every write
-   here ends with the same propagation step" above).
+5. **Write** the updated groups/slots (or Category slot-set) to `trigger_index.yaml`, then
+   **propagate** (see "Every write here ends with the same propagation step" above).
+
+**Surfacing the need to calibrate — judgment, not a tracked/forced event.** No mechanism detects a
+miss (Part 3's "Speed vs. precision" — a silent miss degrades gracefully to today's status quo,
+worth more than a slower check that would catch it). Two moments already do this without new
+machinery, both ending in a concrete drafted fix rather than an open question:
+
+- **A miss discovered after the fact.** A user's critical correction ("why did you do it like
+  this," "actually the answer is XYZ") already sends the agent looking for documentation it should
+  have used. If that search turns up a `shared_resources` entry that would have caught the issue,
+  say so, and immediately draft the specific term/slot addition using *this turn's own
+  critical-feedback wording* as the drafting evidence — present it for one-step approval, never an
+  open "what should the trigger be" question.
+- **A fired-but-unneeded candidate, mentioned later.** Occasional, not forced on every hit: "by the
+  way, `X` was surfaced earlier but wasn't needed here, because of `[reason]` — want to narrow its
+  trigger?", leading with the specific proposed narrowing. Skip the mention when it wouldn't change
+  anything or would just interrupt flow.
 
 ### Backfilling triggers for pre-existing entries
 
@@ -445,9 +510,10 @@ that gap without a separate registration step
 
 1. List every **active** `CATALOG.md` entry with no `trigger_index.yaml` entry yet. An archived
    entry is still reachable via ordinary browse either way — skip it unless asked for by name.
-2. For each, draft phrases exactly as Saving step 2a does (full content, jargon/plain-English/
-   symptom-first mix, collision/genericity check against phrases already drafted this pass *and*
-   against every entry already in `trigger_index.yaml`).
+2. For each, draft a group of concept slots exactly as Saving step 2a does (full content,
+   jargon/plain-English/symptom-first mix across the slots, the citation grep both directions for a
+   `required`-strength edge, collision/genericity check against slots already drafted this pass
+   *and* against every entry already in `trigger_index.yaml`).
 3. Show the whole batch for review in one pass rather than confirming entry-by-entry — cheaper for a
    genuine backfill — but let the user pull any single entry out for adjustment before approving the
    rest.

@@ -20,7 +20,8 @@ consumer's `settings.json`. Don't duplicate a snippet's JSON here; point at its 
 | Name | File | What it does | Trigger |
 |---|---|---|---|
 | consistency_check | `hooks\consistency_check.py` | AST-based static analysis on a `.py` file: undefined names, function call arg-count mismatches, inconsistent string-key/column spellings. No AI, no tokens - pure static analysis. | PostToolUse, after any `.py` write/edit |
-| shared_resources_trigger_match | `hooks\shared_resources_trigger_match.py` | Case-insensitive substring match of the submitted prompt against `shared_resources\trigger_index.yaml`'s authored trigger phrases; on a hit, surfaces the candidate entry as additional context. No AI, no tokens, no network call - a deterministic recognition layer under the existing skill-gate mechanism (`design\shared_resources_mechanical_trigger.md`). Requires `templates\shared_resources.md` (shared_resources itself). | UserPromptSubmit, every submitted message |
+| shared_resources_trigger_match | `hooks\shared_resources_trigger_match.py` | Matches the submitted prompt against `shared_resources\trigger_index.yaml`'s authored concept-slot groups (AND-across-slots within a group, OR-across-groups, plus each entry's Category slot-set applied as an implicit extra slot); on a hit, surfaces the candidate entry as additional context. Edge-assist (optional, needs `shared_resources_read_tracker` below) relaxes or waives a resource's own bar when a `process-material`-linked resource is already "in play" this session. No AI, no tokens, no network call - a deterministic recognition layer under the existing skill-gate mechanism (`design\shared_resources_mechanical_trigger.md` Part 3). Requires `templates\shared_resources.md` (shared_resources itself). | UserPromptSubmit, every submitted message |
+| shared_resources_read_tracker | `hooks\shared_resources_read_tracker.py` | Tracks which `shared_resources\` entries have been read this session (a `Read` or single-file `Grep` hit under `shared_resources\`), so `shared_resources_trigger_match`'s edge-assist knows what's already "in play." Silent plumbing - no output, never blocks. Optional companion to `shared_resources_trigger_match`; that hook's plain slot matching works without this one, just with no edge-assist. | PostToolUse, after any `Read`/`Grep` call |
 
 ### consistency_check - opt-in snippet
 Canonical snippet: **`templates\optins\consistency_check.json`**. Merge it into the project's
@@ -42,16 +43,29 @@ project's `.claude\settings.json` (into any existing `hooks` block — don't rep
 config-template convention as `consistency_check`'s command
 (`{{PYTHON_LAUNCHER}} "{{SHARED_ROOT}}/hooks/shared_resources_trigger_match.py"`).
 
-Fails open on any error (missing/malformed `trigger_index.yaml`, unreadable `CATALOG.md`, bad
-stdin) — never blocks or alters the submitted prompt, exits 0 either way. A hub with no
-`shared_resources\trigger_index.yaml` yet, or one with no entries, produces no output at all — safe
-to opt into before any resource has been given trigger phrases (see the design doc's "Backfill").
+Fails open on any error (missing/malformed `trigger_index.yaml`, unreadable `CATALOG.md`/
+`resource_relationships.yaml`, bad stdin) — never blocks or alters the submitted prompt, exits 0
+either way. A hub with no `shared_resources\trigger_index.yaml` yet, or one with no entries,
+produces no output at all — safe to opt into before any resource has been given trigger phrases (see
+the design doc's "Backfill").
 
 Default-on for every consumer, rides along with `shared_resources.md`'s own MANDATORY status
 (`scripts\new_consumer.py`'s default `--tools` list) since 2026-09-04 — a project that has
 `shared_resources` also gets the mechanical layer that helps recognize when to use it, no separate
 decision needed. Still an ordinary hook opt-in mechanically (a `--tools` override can still exclude
 it), not folded into the `pieces` bundle itself.
+
+### shared_resources_read_tracker - opt-in snippet
+Canonical snippet: **`templates\optins\shared_resources_read_tracker.json`**. Merge it into the
+project's `.claude\settings.json` (into any existing `hooks` block — don't replace it). Same
+config-template convention (`{{PYTHON_LAUNCHER}} "{{SHARED_ROOT}}/hooks/shared_resources_read_tracker.py"`).
+
+Fails open on any error — never blocks a `Read`/`Grep` call, exits 0 either way, and prints nothing
+on success or failure (silent plumbing, not a check). Writes a small per-session state file under
+this project's own `logs\shared_resources_session_state\` — nothing to clean up by hand, same
+convention as `consistency_check`'s own `logs\` output. Purely additive: not opted into by default
+(unlike `shared_resources_trigger_match`), since edge-assist is an enhancement to the base matcher,
+not something the base mechanism needs to function.
 
 ## Subagents
 *(none yet)*
