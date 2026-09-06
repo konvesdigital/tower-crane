@@ -137,17 +137,61 @@ organizational scheme applied on top of it.
        match names a new tier from the circumstance just given. Tier names/definitions stay
        revisable going forward — expect renaming, broadening, or splitting as more entries test a
        tier's boundary, never a one-time-locked taxonomy.
-2a. **Draft one group of concept slots** (`design\shared_resources_mechanical_trigger.md` Part 3) —
-    from the entry's **own full content**, never just its one-line `CATALOG.md` description or title
-    (same anti-pattern the Apply procedure's skill-trigger drafting already calls out, below — a
-    description written for a human scanning many rows isn't shaped for recognizing an
-    organically-arising question). A **group** is 2-3 **slots**; each slot is a short list of 1-2
-    word alternate phrasings for one concept (fires only when *every* slot in the group has at least
-    one term present in the prompt — AND across slots, OR within a slot). Draft vocabulary per
-    concept, not a full sentence — the matching logic handles arrangement, so word order and exact
-    phrasing don't matter. Cover more than one angle across the slots' terms rather than minor
-    rewordings of the same concept:
-    - the entry's own jargon/terminology, as written;
+2a. **Draft one group of concept slots** (`design\shared_resources_mechanical_trigger.md` Parts 3–4).
+
+    **Evidence source, checked in this order** (Part 4) — real evidence of how the operator actually
+    talks beats a guess at the entry's own vocabulary:
+    1. **This session's own live conversation**, if this save is happening because of something
+       that just occurred here — draft directly from that real exchange's own wording rather than
+       reconstructing it from the entry's content.
+    2. **This entry's own `evidence:` bank** in `trigger_index.yaml`, if it already holds prior real
+       quotes (only relevant when this entry predates this pass, e.g. during "Adjusting triggers" or
+       a Backfill).
+    3. **Already-drafted entries elsewhere in `trigger_index.yaml`**, checked for the operator's
+       demonstrated phrasing style (jargon-first vs. plain-English-first, a preferred acronym form,
+       how a symptom tends to get phrased) even on an unrelated topic.
+    4. **Only when none of the above yields real evidence**, fall back to deriving vocabulary from
+       the entry's **own full content** — never just its one-line `CATALOG.md` description or title
+       (same anti-pattern the Apply procedure's skill-trigger drafting already calls out, below — a
+       description written for a human scanning many rows isn't shaped for recognizing an
+       organically-arising question). This is expected, not a shortfall, for a resource's first-ever
+       trigger draft with nothing yet in sources 1–3 (e.g. the very first whole-catalog backfill).
+
+    **Whichever source supplies the words, draft the *question*, never the *answer*.** A term that
+    reads naturally inside the entry's own content is something Claude would say back after reading
+    it, not necessarily something the operator would say to go looking for it — a resource
+    explaining "index bloat" is an answer to a question phrased around "why isn't this indexed" or
+    "why isn't this showing up," not a question that already contains the phrase "index bloat."
+    Prefer symptom/circumstance/uncertainty phrasing over the entry's own solution vocabulary even
+    when source (4) is all that's available; only fall back to jargon terms where they're also
+    standard *request*-language a practitioner would use before knowing the entry exists (e.g.
+    "target keyword" — something anyone would ask about directly — vs. "keyword divergence," a
+    diagnosis only the entry itself produces).
+
+    A **group** is 2-3 **slots**; each slot is a short list of alternate phrasings for one concept
+    (fires only when *every* slot in the group has at least one term present in the prompt — AND
+    across slots, OR within a slot). A resource whose content spans genuinely separate circumstances
+    sharing no vocabulary gets multiple groups instead (OR-across-groups) rather than one forced
+    AND-pair — don't manufacture a second slot just to hit the "2-3 slots" shape when the resource
+    doesn't actually have a second necessary concept.
+
+    **Prefer the most inclusive real-word form of each term, since matching is plain substring
+    containment**, not just for singular-vs-plural: any term that is itself a prefix of one of its
+    own inflected forms is strictly better than the longer form, because the shorter string matches
+    everything the longer one would plus more (`"rank"` matches `rank`/`ranks`/`ranking`/`rankings`/
+    `ranked`; a plural like `"ranking factors"` only ever matches that exact plural). Trim to the
+    shortest form that still reads as a real, recognizable word or an unambiguous fragment of one
+    (`"crawl"`, `"index"`, `"recover"`, `"disorganiz"` all work — none collides with an unrelated
+    common word); don't trim past that point if it would either produce something misleading (e.g.
+    `"improv"`, which is itself a different real word) or delete a whole distinguishing word from a
+    multi-word phrase that needs it to stay specific. Where a contraction is a natural way to phrase
+    something (`"isn't"`, `"didn't"`), list the expanded form too (`"is not"`, `"did not"`) as a
+    separate alternate in the same slot — the two are never substrings of each other.
+
+    Cover more than one angle across the slots' terms rather than minor rewordings of the same
+    concept:
+    - the entry's own jargon/terminology, as written, only where it's also natural *request*
+      vocabulary per the question-vs-answer test above;
     - a plain-English restatement of the same terms in the same slot (both the spelled-out and the
       abbreviated form where one exists, e.g. `"Google Search Console"` alongside `"GSC"`);
     - at least one slot capturing a **symptom-first** angle of the underlying pain point — the same
@@ -216,7 +260,12 @@ organizational scheme applied on top of it.
    produced a group/slot draft — append a `resource`/`groups` entry to
    `shared_resources\trigger_index.yaml` (create the file with an `entries: []` skeleton first if it
    doesn't exist yet; add the new Category's slot-set to the top-level `categories:` block too, if
-   this save is that Category's first entry). For `insight`, see "Insights are different" below —
+   this save is that Category's first entry). **If step 2a's draft was source (1)** — this session's
+   own live conversation actually being why this entry exists — **append that real exchange's own
+   wording to the new entry's `evidence:` list, tagged `[save]`** (`design\
+   shared_resources_mechanical_trigger.md` Part 4's evidence bank; format documented in
+   `trigger_index.yaml`'s own header comment) — this is the single richest evidence-capture moment
+   there is, since the entry wouldn't exist without it. For `insight`, see "Insights are different" below —
    its save flow is a negotiation, not a fixed write, but ends the same way. Either way, finish with
    **propagate the write** (see below).
 7. **Coverage guarantee, then a precision offer — only when this entry has a Category.** Two
@@ -494,7 +543,11 @@ machinery, both ending in a concrete drafted fix rather than an open question:
   have used. If that search turns up a `shared_resources` entry that would have caught the issue,
   say so, and immediately draft the specific term/slot addition using *this turn's own
   critical-feedback wording* as the drafting evidence — present it for one-step approval, never an
-  open "what should the trigger be" question.
+  open "what should the trigger be" question. On approval, also append that same wording to the
+  entry's `evidence:` list tagged `[miss]` (`design\shared_resources_mechanical_trigger.md` Part
+  4) — this preserves the real quote for future recalibration, not just spending it on this one
+  edit. (The other case below — a fired-but-unneeded candidate — is evidence a term is too loose,
+  never evidence of real phrasing, so it never gets logged to `evidence:`.)
 - **A fired-but-unneeded candidate, mentioned later.** Occasional, not forced on every hit: "by the
   way, `X` was surfaced earlier but wasn't needed here, because of `[reason]` — want to narrow its
   trigger?", leading with the specific proposed narrowing. Skip the mention when it wouldn't change
@@ -510,10 +563,16 @@ that gap without a separate registration step
 
 1. List every **active** `CATALOG.md` entry with no `trigger_index.yaml` entry yet. An archived
    entry is still reachable via ordinary browse either way — skip it unless asked for by name.
-2. For each, draft a group of concept slots exactly as Saving step 2a does (full content,
-   jargon/plain-English/symptom-first mix across the slots, the citation grep both directions for a
-   `required`-strength edge, collision/genericity check against slots already drafted this pass
-   *and* against every entry already in `trigger_index.yaml`).
+2. For each, draft a group of concept slots exactly as Saving step 2a does — same evidence-source
+   priority order (this session's own conversation, then the entry's own `evidence:` bank, then
+   already-drafted sibling entries' phrasing style, then the entry's own content as the fallback),
+   same question-vs-answer framing, same most-inclusive-real-word-form trimming, the citation grep
+   both directions for a `required`-strength edge, collision/genericity check against slots already
+   drafted this pass *and* against every entry already in `trigger_index.yaml`. A whole-catalog
+   backfill's very first pass has no prior entries and usually no session conversation about most of
+   the entries either — falling to the entry's own content for most or all of the batch is expected
+   there, not a shortfall; the bank starts paying off from whichever entry's topic next comes up for
+   real.
 3. Show the whole batch for review in one pass rather than confirming entry-by-entry — cheaper for a
    genuine backfill — but let the user pull any single entry out for adjustment before approving the
    rest.

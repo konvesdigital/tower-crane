@@ -109,7 +109,12 @@ def parse_trigger_index(text):
     Tolerant of anything it doesn't recognize - an unfamiliar line is just skipped, never a crash.
 
     Returns (categories: {name: [slot, ...]}, entries: {resource_stem: [group, ...]}) where each
-    group is a list of slots and each slot is a list of alternate term strings."""
+    group is a list of slots and each slot is a list of alternate term strings.
+
+    An entry's optional `evidence:` block (design\\shared_resources_mechanical_trigger.md Part 4 -
+    dated real-quote drafting material) is intentionally never recognized here - it's drafting
+    material only, not consumed at match time. It falls through this loop's "anything unfamiliar is
+    skipped" contract same as any other unrecognized line, by design, not by omission."""
     categories = {}
     entries = {}
 
