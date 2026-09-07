@@ -28,6 +28,10 @@
 #     any-one-slot; `strength: required` waives the check entirely - the resource surfaces
 #     unconditionally, since a `required` edge means the target's own content literally cites this
 #     resource's filename (a checkable fact, not an inferred association).
+#   - PROCEDURE ENTRIES (design doc Part 5) - trigger_index.yaml's `procedures:` block matches this
+#     same group/slot model against a *procedure* (currently just `retrieval_audit`) instead of a
+#     CATALOG.md resource: no row lookup, no Category slot, no edge-assist, always full AND-strictness.
+#     A hit renders as a distinct "[Retrieval Audit]" candidate, never as a "read this file" line.
 #
 # Triggered by Claude Code's UserPromptSubmit hook, once per submitted message. Reads the prompt
 # from stdin JSON's "user_input" field, matches it, and on a hit, emits
@@ -81,6 +85,7 @@ RELATIONSHIPS_PATH = HUB_ROOT / 'shared_resources' / 'resource_relationships.yam
 CATEGORY_KEY_RE = re.compile(r'^  (\S+):\s*$')
 CATEGORY_SLOT_RE = re.compile(r'^    - (\[.*\])\s*$')
 ENTRY_RESOURCE_RE = re.compile(r'^  - resource:\s*(\S+)\s*$')
+PROCEDURE_ENTRY_RE = re.compile(r'^  - procedure:\s*(\S+)\s*$')
 GROUP_START_RE = re.compile(r'^      - slots:\s*$')
 SLOT_RE = re.compile(r'^          - (\[.*\])\s*$')
 
@@ -103,13 +108,16 @@ def _parse_slot_literal(text):
 
 
 def parse_trigger_index(text):
-    """Hand-rolled parser for trigger_index.yaml's two top-level keys (Part 3 schema: `categories:`
-    and `entries:`), same style as check_shared_resource_catalog.py's parse_relationships() - no
-    external YAML dependency, relies on the file's always-consistent machine-written indentation.
-    Tolerant of anything it doesn't recognize - an unfamiliar line is just skipped, never a crash.
+    """Hand-rolled parser for trigger_index.yaml's three top-level keys (`categories:` and `entries:`
+    from Part 3; `procedures:` added by Part 5), same style as check_shared_resource_catalog.py's
+    parse_relationships() - no external YAML dependency, relies on the file's always-consistent
+    machine-written indentation. Tolerant of anything it doesn't recognize - an unfamiliar line is
+    just skipped, never a crash.
 
-    Returns (categories: {name: [slot, ...]}, entries: {resource_stem: [group, ...]}) where each
-    group is a list of slots and each slot is a list of alternate term strings.
+    Returns (categories: {name: [slot, ...]}, entries: {resource_stem: [group, ...]}, procedures:
+    {procedure_name: [group, ...]}) where each group is a list of slots and each slot is a list of
+    alternate term strings. `procedures` (design doc Part 5) is structurally identical to `entries`,
+    just keyed under `- procedure:` instead of `- resource:` and never resolved against CATALOG.md.
 
     An entry's optional `evidence:` block (design\\shared_resources_mechanical_trigger.md Part 4 -
     dated real-quote drafting material) is intentionally never recognized here - it's drafting
@@ -117,10 +125,12 @@ def parse_trigger_index(text):
     skipped" contract same as any other unrecognized line, by design, not by omission."""
     categories = {}
     entries = {}
+    procedures = {}
 
     section = None
     current_category = None
     current_entry = None
+    current_procedure = None
 
     for line in text.splitlines():
         stripped = line.strip()
@@ -131,6 +141,10 @@ def parse_trigger_index(text):
         if stripped == 'entries:':
             section = 'entries'
             current_entry = None
+            continue
+        if stripped == 'procedures:':
+            section = 'procedures'
+            current_procedure = None
             continue
 
         if section == 'categories':
@@ -158,7 +172,21 @@ def parse_trigger_index(text):
                 entries[current_entry][-1].append(_parse_slot_literal(m.group(1)))
                 continue
 
-    return categories, entries
+        if section == 'procedures':
+            m = PROCEDURE_ENTRY_RE.match(line)
+            if m:
+                current_procedure = m.group(1)
+                procedures[current_procedure] = []
+                continue
+            if GROUP_START_RE.match(line) and current_procedure is not None:
+                procedures[current_procedure].append([])
+                continue
+            m = SLOT_RE.match(line)
+            if m and current_procedure is not None and procedures[current_procedure]:
+                procedures[current_procedure][-1].append(_parse_slot_literal(m.group(1)))
+                continue
+
+    return categories, entries, procedures
 
 
 def parse_process_material_edges(text):
@@ -245,11 +273,13 @@ def group_satisfied(slots, haystack, relax_to_one):
     return satisfied, matched_terms
 
 
-def find_matches(prompt_text, categories, entries, edges, catalog_text, in_play):
+def find_matches(prompt_text, categories, entries, edges, catalog_text, in_play, procedures=None):
     """Evaluate every resource's groups (plus its Category's implicit slot, plus edge-assist)
     against the prompt. Returns a list of (resource_stem, detail_dict) for every resource that
     fires, where detail_dict carries enough to render a useful message (matched terms, or the
-    required/default edge-assist reason when that's what fired it)."""
+    required/default edge-assist reason when that's what fired it). Also evaluates any `procedures`
+    (design doc Part 5) - plain groups/slots only, no CATALOG.md row, no Category slot, no
+    edge-assist - appending a `{'procedure': name, ...}`-shaped hit distinguishable in format_context."""
     haystack = prompt_text.lower()
     hits = []
 
@@ -285,6 +315,13 @@ def find_matches(prompt_text, categories, entries, edges, catalog_text, in_play)
                 hits.append((resource_stem, detail))
                 break
 
+    for procedure_name, groups in (procedures or {}).items():
+        for group in groups:
+            satisfied, matched_terms = group_satisfied(group, haystack, relax_to_one=False)
+            if satisfied:
+                hits.append((procedure_name, {'procedure': procedure_name, 'matched_terms': matched_terms}))
+                break
+
     return hits
 
 
@@ -298,6 +335,19 @@ def format_context(hits):
         "trusting this description or any memory of the file's past content:",
     ]
     for resource_stem, detail in hits:
+        if detail.get('procedure'):
+            lines.append(
+                '- [Retrieval Audit] This message\'s shape matches a shared_resources '
+                'retrieval-audit moment. If it genuinely is one, run the full audit now '
+                '(templates\\shared_resources.md\'s "Retrieval Audit"): what was actually read '
+                'this session and why, what should plausibly have fired but didn\'t, and - for '
+                'any real gap - a concrete term/slot/group fix drafted from this session\'s own '
+                'wording, presented for one-step approval. This is a self-serve write, same as '
+                'any other shared_resources\\ adjustment: no ticket, no hub session needed.'
+            )
+            if detail.get('matched_terms'):
+                lines.append(f"  matched: {', '.join(detail['matched_terms'])}")
+            continue
         row = detail.get('row')
         path = f"shared_resources/{resource_stem}.md"
         if row:
@@ -345,8 +395,9 @@ def main():
         if not prompt_text or not TRIGGER_INDEX_PATH.exists():
             sys.exit(0)
 
-        categories, entries = parse_trigger_index(TRIGGER_INDEX_PATH.read_text(encoding='utf-8'))
-        if not entries:
+        categories, entries, procedures = parse_trigger_index(
+            TRIGGER_INDEX_PATH.read_text(encoding='utf-8'))
+        if not entries and not procedures:
             sys.exit(0)
 
         catalog_text = CATALOG_PATH.read_text(encoding='utf-8') if CATALOG_PATH.exists() else ""
@@ -354,7 +405,7 @@ def main():
             RELATIONSHIPS_PATH.read_text(encoding='utf-8')) if RELATIONSHIPS_PATH.exists() else []
         in_play = read_in_play_resources()
 
-        hits = find_matches(prompt_text, categories, entries, edges, catalog_text, in_play)
+        hits = find_matches(prompt_text, categories, entries, edges, catalog_text, in_play, procedures)
         if not hits:
             sys.exit(0)
 

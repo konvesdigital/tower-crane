@@ -34,7 +34,9 @@ entry (plus a slot-set per Category, applied to every entry in it) — a determi
 layer under the Category/Tier skill mechanism, consulted by a `UserPromptSubmit` hook rather than by
 an agent's own judgment (`design\shared_resources_mechanical_trigger.md`); see Saving step 2a below
 for how entries get triggers, and `MENU.md`'s `shared_resources_trigger_match`/
-`shared_resources_read_tracker` rows for the opt-ins.
+`shared_resources_read_tracker` rows for the opt-ins. The same file's `procedures:` block can also
+mechanically surface the "Retrieval Audit" flow itself (below), without needing the exact
+`"shared resources"` phrase (Part 5).
 
 - **`reference`** — passive, read-on-demand domain knowledge (methodology, facts). Using one means
   reading it, or `@import`ing it if it's plain prose with no spaced paths.
@@ -579,6 +581,53 @@ that gap without a separate registration step
 4. Write every approved entry to `trigger_index.yaml` in one pass, then **propagate once for the
    whole batch** (a single commit covering the sweep, not one per entry — this is maintenance, not
    an ongoing stream of individual saves).
+
+### Retrieval Audit — noticing, comparing, and fixing a gap in one pass
+
+A third moment alongside "Adjusting triggers"'s two "Surfacing calibration opportunities" cases (a
+miss caught via user correction; a fired-but-unneeded candidate) — all three end in the same
+concrete, one-step-approvable fix, just with a different entry point. Enter this whenever: the
+literal `"shared resources"` phrase is used to ask it directly ("did we use the right resources,"
+"what would have caught this"); a `trigger_index.yaml` `procedures:` hit surfaces it as a candidate
+(`design\shared_resources_mechanical_trigger.md` Part 5 — a deterministic, narrower entry point that
+doesn't require the exact phrase, scoped only to this flow, never to the rest of this file); or the
+user otherwise asks what was retrieved and why.
+
+**Why this exists as its own named flow, not left to ad hoc reconstruction:** a 2026-09-06 Cast and
+Hue session needed three separate manual asks in sequence to get from "what did you use and why" to
+a drafted trigger fix — and even then, the session incorrectly treated the fix as blocked pending a
+ticket, when trigger adjustment has always been the same self-approving, no-ticket write as Saving.
+This flow exists to do all of that in one pass and to state the self-serve fact plainly, at the exact
+moment it's needed, rather than leaving it to only ever live in this document.
+
+1. **Narrate what happened, unprompted, in one pass** — every `shared_resources\`-adjacent read or
+   tool call actually made (this session, or the task in question), what surfaced it, and whether
+   that was the right call. Produce this table shape proactively, in one reply, rather than waiting
+   for it to be drawn out across several separate asks.
+2. **Compare against what plausibly should have fired** — the same Category/Tier peers,
+   `CATALOG.md` rows, and `resource_relationships.yaml` graph neighbors of whatever was actually
+   read — and name anything not read that arguably should have been.
+3. **For each real gap, diagnose which kind it is before proposing a fix** — these are not
+   interchangeable:
+   - An authored `trigger_index.yaml` entry exists but this session's actual wording didn't clear
+     it → an ordinary "Adjusting triggers" vocabulary gap.
+   - No `trigger_index.yaml` entry exists for that resource yet → a "Backfilling triggers" gap.
+   - The gap is a skill/gate never invoked at all (e.g. a Category's own fallback/Primary-tier skill
+     depending on a separate self-initiated call that never happened) → **not** a
+     `trigger_index.yaml` problem. Say so plainly rather than forcing it into a trigger fix that
+     wouldn't address it — this is a skill-design question, out of this flow's scope, for the
+     operator to take up separately (as a hub-session change, per `agents_tools.md`'s tool-lifecycle
+     procedures).
+4. **Draft the concrete fix immediately** for whichever of the first two kinds applies, using this
+   session's own real wording as evidence (the `evidence:` bank, tagged `[miss]`) — present for
+   one-step approval, never an open "what should the trigger be" question, exactly as "Adjusting
+   triggers" already requires for a miss caught via correction. **State plainly that approval writes
+   directly to the hub with no ticket and no separate session** — the same self-approving write every
+   other write in this file already is. This sentence is the actual fix for the belief that caused
+   the 2026-09-06 gap; say it, don't assume it's already known.
+5. **A genuinely spurious `procedures:` hit gets dismissed briefly, not acted on** — same as any
+   other surfaced candidate: if the message only superficially resembles an audit ask, say so in a
+   sentence and move on, rather than running the full narration every time the slots happen to clear.
 
 ### Insights are different
 
