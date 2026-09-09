@@ -9,31 +9,51 @@ Paired with consumer_README.md.tmpl (project narrative - this file is directives
 scaffolded alongside this one, same non-float status.
 
 Substitution tokens the scaffolder replaces:
-  {{PROJECT_NAME}}        - full title in Title Case (e.g. "My Cool Project")
-  {{DATE}}                - scaffold date, YYYY-MM-DD
-  {{SHARED_TOOLS_LIST}}   - bullet list of opted-in tools (or a "none yet" line)
-  {{PROTOCOL_IMPORTS}}    - the single @.claude/hub_pointer.md indirection line
-                            (design\consumer_reference_indirection.md) - that gitignored,
-                            per-host file carries the real @import lines for the selected
-                            protocol pieces, regenerated fresh by "connect project"/relocate.py
+  {{PROJECT_NAME}}              - full title in Title Case (e.g. "My Cool Project")
+  {{DATE}}                      - scaffold date, YYYY-MM-DD
+  {{SHARED_TOOLS_LIST}}         - bullet list of opted-in tools (or a "none yet" line)
+  {{ADOPTED_SHARED_RESOURCES}}  - "Adopted Shared Resources" body (or a "none yet" line) -
+                                  mechanically maintained by shared_resources.md's Apply/Forget
+                                  procedures from here on, never hand-edited once real content
+                                  exists
+  {{PROTOCOL_IMPORTS}}          - the single @.claude/hub_pointer.md indirection line
+                                  (design\consumer_reference_indirection.md) - that gitignored,
+                                  per-host file carries the real @import lines for the selected
+                                  protocol pieces, regenerated fresh by "connect project"/relocate.py
 The scaffolder strips this comment block from the materialized copy.
+
+Deliberately NOT in this template: any top-of-file assertion like "this file is directives only."
+Tower Crane may be adopted mid-lifecycle onto a CLAUDE.md that already carries any amount of
+unrelated hand-authored content (a real, live consumer's `CLAUDE.md` has ten unrelated `## `
+headings before `## Tower Crane In Use` even appears - confirmed against actual connected-project
+state, not a hypothetical) - Tower Crane keeps its own
+directive-only/narrative-in-README convention for what IT manages below this heading, but never
+claims it governs the rest of the file, since a user is never required to follow Tower Crane's own
+internal conventions just for adopting it. `## Tower Crane In Use` must stay the first
+Tower-Crane-related heading in the file, full stop - `disconnect_consumer.py`'s
+`replace_prose_sections()` finds it by literal string search and sweeps everything from there
+through the next `## ` heading after `## Shared Workflow Protocol` (or EOF); anything Tower-Crane-
+owned placed before it (Adopted Shared Resources included) would silently survive a disconnect
+instead of being removed with the rest. This is why Adopted Shared Resources is a `###` subsection
+INSIDE this section (between Opted-in tools and Shared Workflow Protocol), not its own `##`
+heading before or after it - either alternative risks breaking that sweep, see the Apply procedure's
+own note on this in shared_resources.md.
 -->
 
 # Project: {{PROJECT_NAME}}
 
-Agent directives only. Project narrative/background: `README.md`. Decisions/activity log:
-`project_progress.md`.
-
 <!-- FIRST_RUN: replace this block with this project's agent directives — standing constraints,
-     domain policies, and anything an agent must act on. Directives only: what this project is,
-     who it's for, and other narrative belongs in README.md instead. A directive naming an
-     adopted skill/shared resource must be imperative ("read X before answering Y", "treat X as
-     authoritative for Y") — never a descriptive claim that it "fires automatically" or "needs no
-     manual reference": a Skill fires on the model's own judgment, not a guarantee, and a false
-     automatic-coverage claim licenses silently skipping verification. (A `shared_resources`
-     adoption that reaches project-defining status gets its own mechanically-maintained "Adopted
-     Shared Resources" section below, via `shared_resources.md`'s Apply procedure — don't hand-author
-     one here.) Delete this comment when done. -->
+     domain policies, and anything an agent must act on — or delete it if this project doesn't
+     want a directives section here at all. This is Tower Crane's own suggested convention
+     (directives here, narrative in `README.md`, decisions/activity log in `project_progress.md`)
+     for whoever chooses to follow it — nothing enforces it. A directive naming an adopted
+     skill/shared resource works better imperative ("read X before answering Y", "treat X as
+     authoritative for Y") than descriptive ("fires automatically", "needs no manual reference") —
+     a Skill fires on the model's own judgment, not a guarantee, and a false automatic-coverage
+     claim licenses silently skipping verification. (A `shared_resources` adoption that reaches
+     project-defining status gets its own mechanically-maintained "Adopted Shared Resources"
+     subsection under `## Tower Crane In Use`, below, via `shared_resources.md`'s Apply procedure —
+     don't hand-author one here.) Delete this comment when done. -->
 _Agent directives go here (see `FIRST_RUN.md`)._
 
 ## Tower Crane In Use
@@ -44,7 +64,10 @@ next time it runs. This machine's copy of the hub lives wherever `.claude/hub_po
 project's own gitignored, per-host pointer file) currently records — see that file's
 `shared_root:` value for the real path, or the hub's own `MENU.md` there for the full catalog. Do
 not edit the shared files; to report a bug or request an improvement, follow the filing protocol
-imported below.
+imported below. Tower Crane keeps everything it manages in this file directive-only, with
+narrative in `README.md` and a decisions/activity log in `project_progress.md` if this project
+uses them — its own convention for its own content, not a requirement for anything else in this
+file.
 
 Whether this file is actually live on **this** machine right now is decided by one thing: does
 `.claude/hub_pointer.md` (gitignored, per-host, never itself tracked — regenerated by `"connect
@@ -62,6 +85,10 @@ line, and the `@import`/`@.claude/hub_pointer.md` line at the top of this file.
 Opted-in tools (wired {{DATE}}):
 
 {{SHARED_TOOLS_LIST}}
+
+### Adopted Shared Resources
+
+{{ADOPTED_SHARED_RESOURCES}}
 
 ## Shared Workflow Protocol
 

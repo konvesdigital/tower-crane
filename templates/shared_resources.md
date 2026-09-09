@@ -504,12 +504,28 @@ mechanical trigger is the right primary tool). A resource — or a whole Categor
 work is actually *about* is not: relying on autonomous triggering alone for something this central
 is exactly the failure mode that motivated this section (a real client SEO question, phrased with
 zero SEO jargon, answered from generic training-data knowledge because nothing backstopped the
-skill's own judgment). So every `reference`/`tool` Apply ends by writing (or updating) one entry in
-a `## Adopted Shared Resources` section in this project's own `CLAUDE.md` — a fixed location, below
-whatever hand-authored directives are already there, above `## Tower Crane In Use` — created the
-first time it's needed, mechanically maintained from then on (never hand-edited; treat any manual
-edit found there as drift to reconcile, same as any other mechanically-owned content in this
-mechanism).
+skill's own judgment). So every `reference`/`tool` Apply ends by writing (or updating) a `###
+Adopted Shared Resources` subsection in this project's own `CLAUDE.md` — mechanically maintained
+from then on (never hand-edited; treat any manual edit found there as drift to reconcile, same as
+any other mechanically-owned content in this mechanism).
+
+**Fixed location, and why it's fixed there specifically:** inside `## Tower Crane In Use`, between
+the "Opted-in tools" list and `## Shared Workflow Protocol` — never before `## Tower Crane In Use`,
+even though this content is itself project-specific like a hand-authored directive. Two reasons,
+both load-bearing:
+1. `## Tower Crane In Use` must stay the first Tower-Crane-related heading in the file — Tower
+   Crane may be adopted mid-lifecycle onto a `CLAUDE.md` that already carries any amount of
+   unrelated hand-authored content (a real, live consumer's `CLAUDE.md` has ten unrelated headings
+   before it), and this mechanism is Tower-Crane-owned content, not the user's own — it belongs
+   after that marker, not ahead of it, same as everything else Tower Crane manages.
+2. `disconnect_consumer.py`'s `replace_prose_sections()` finds the removal boundary by searching
+   for `## Tower Crane In Use` and sweeping to the next `## ` heading after `## Shared Workflow
+   Protocol` (or EOF). A `###` subsection sitting between those two headings is safely inside that
+   sweep and gets removed with everything else on disconnect; placed as a sibling `##` heading
+   either before `## Tower Crane In Use` or after `## Shared Workflow Protocol`, it would either
+   never be swept at all, or would itself become the false end-of-sweep boundary, leaving it behind
+   — either way, a disconnect that's supposed to remove every Tower Crane trace would silently miss
+   this one.
 
 **Before computing anything, two gates — both required — decide whether this entry's Category can
 ever be treated as project-defining at all:**
@@ -583,11 +599,13 @@ reset this project's behavior back to before adoption. If Claude's advice in som
 off, checking whether a relevant resource was ever adopted (via browse's in-use indicator) — and
 forgetting it if it's stale — is a reasonable first move.
 
-**Also update `## Adopted Shared Resources`** (see above) if this entry has a line or is covered by
+**Also update `### Adopted Shared Resources`** (see above) if this entry has a line or is covered by
 a Category paragraph there: a standalone Tier 2 line for this entry is removed outright; forgetting
 an entry that was covered by a Tier 1 Category paragraph (breaking that Category's 100% coverage)
-downgrades the paragraph back to individual Tier 2 lines for whatever remains adopted in it. An
-empty section is removed entirely, not left as a bare heading.
+downgrades the paragraph back to individual Tier 2 lines for whatever remains adopted in it. If
+this project's last shared_resources adoption anywhere is forgotten, revert the subsection body to
+its scaffolded fallback (`_None adopted yet._`) rather than deleting the `### Adopted Shared
+Resources` heading itself — the heading is a fixed, always-present part of the template.
 
 ### Adjusting triggers — recalibrating after living with them
 

@@ -84,6 +84,11 @@ TOOL_BLURBS = {
                           'string-key spelling (PostToolUse hook).',
 }
 
+# Scaffolding always precedes adoption (shared_resources.md's Apply/Forget procedures own this
+# subsection from the first real adoption onward) - the scaffolder itself only ever writes this
+# fallback, never real content.
+ADOPTED_SHARED_RESOURCES_NONE = '_None adopted yet._'
+
 # Toolkit-governed Track-1 skill pieces (design\\directive_economy.md): a piece name in here is
 # scaffolded as one or more project-local skill stubs (each sourced from
 # templates/skills/<skill>/SKILL.md) plus a still-@imported Track-2 "resume check" companion,
@@ -638,6 +643,7 @@ def main():
         live_sections = (live_sections
                           .replace('{{DATE}}', scaffold_date)
                           .replace('{{SHARED_TOOLS_LIST}}', tools_list)
+                          .replace('{{ADOPTED_SHARED_RESOURCES}}', ADOPTED_SHARED_RESOURCES_NONE)
                           .replace('{{PROTOCOL_IMPORTS}}', protocol_imports))
         text = text.rstrip('\n') + '\n\n' + live_sections
         write_utf8(claude_md_path, text)
@@ -674,6 +680,7 @@ def main():
                      .replace('{{PROJECT_NAME}}', project_name)
                      .replace('{{DATE}}', scaffold_date)
                      .replace('{{SHARED_TOOLS_LIST}}', tools_list)
+                     .replace('{{ADOPTED_SHARED_RESOURCES}}', ADOPTED_SHARED_RESOURCES_NONE)
                      .replace('{{PROTOCOL_IMPORTS}}', protocol_imports))
         write_utf8(claude_md_path, claude_md)
         print(f"  wrote  {claude_md_path}")
@@ -743,8 +750,8 @@ def main():
     # --- 3e. README.md (narrative skeleton, written once if absent) -------------------------
     # No Tower-Crane-owned markers to preserve here (unlike CLAUDE.md's TC_IN_USE_HEADING dance) -
     # every branch (brand-new/reconnect/adoption/host-merge) reduces to one check: write it if
-    # absent, otherwise leave whatever's there (a user's own narrative, or - like GRT - an
-    # inherited unrelated README) untouched. readme_written feeds needs_overview below, since a
+    # absent, otherwise leave whatever's there (a user's own narrative, or an inherited unrelated
+    # README predating Tower Crane) untouched. readme_written feeds needs_overview below, since a
     # fresh README also introduces an unfilled placeholder even when CLAUDE.md's own content is
     # already real (reconnect/adoption).
     readme_path = target_path / 'README.md'
