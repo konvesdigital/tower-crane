@@ -766,6 +766,10 @@ FIRST_RUN_FILENAME = 'FIRST_RUN.md'
 # FIRST_RUN_FILENAME (the one-time setup checklist, freshly written every time it's written at all,
 # wholly hub-owned like everything else in this tuple - design\connect_project_commit_gate.md's
 # addendum) - harmless no-op for the other writers, which never touch either filename.
+# README.md joins this tuple the same way FIRST_RUN.md does: new_consumer.py writes it wholesale,
+# once, only when absent (never appends to real pre-existing content), so it's safe to commit
+# alongside everything else here - unlike project_progress.md below, it never needs the narrower
+# append-then-commit path.
 # project_progress.md is deliberately NOT here despite new_consumer.py also writing it: unlike
 # every path above, it's not wholly hub-owned (the hub only ever prepends one dated note to an
 # otherwise user-owned continuity doc), so it needs its own narrower, pre-checked commit path -
@@ -773,7 +777,7 @@ FIRST_RUN_FILENAME = 'FIRST_RUN.md'
 # is tracked, host-invariant content - a real committable path, unlike HUB_POINTER_RELPATH, which
 # is gitignored and must NEVER appear here (an explicit `git add` of a gitignored path stages it
 # anyway, bypassing .gitignore).
-CONSUMER_OWNED_PATHS = ('CLAUDE.md', '.claude/settings.json', '.claude/skills',
+CONSUMER_OWNED_PATHS = ('CLAUDE.md', 'README.md', '.claude/settings.json', '.claude/skills',
                          HUB_DISPATCH_RELPATH, '.gitignore', DISCONNECT_NOTES_FILENAME,
                          FIRST_RUN_FILENAME)
 

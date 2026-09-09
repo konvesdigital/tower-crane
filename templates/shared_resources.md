@@ -114,7 +114,14 @@ organizational scheme applied on top of it.
 1. **Classify** — `kind`, `Category`, one-line description. `Category` is free text, discovered by
    checking whether any other `CATALOG.md` row already carries it — no separate registry lists
    valid values. No Category is a legitimate answer (leaves both columns blank, unaffected by
-   everything below). If the message that triggered this save itself carried a `shared_resources
+   everything below). **If this save introduces a Category no existing `CATALOG.md` row already
+   carries, also ask:** *"Should resources in `[Category]` be able to define a project's identity
+   once comprehensively adopted (a strong 'treat this as authoritative' directive in `CLAUDE.md`),
+   or is this a utility/occasional category?"* ("Adopted Shared Resources," below, needs this
+   answered once per Category — it's never inferred later from adoption counts, since a
+   single-member category would otherwise wrongly read as "100% adopted" the instant anyone
+   touches it.) Answer stored as `identity_eligible` — see step 6. If the message that triggered
+   this save itself carried a `shared_resources
    mechanical trigger` hit (the `additionalContext` block `shared_resources_trigger_match.py`
    injects, when opted in — `design\shared_resources_mechanical_trigger.md`), treat the entry it
    named as a live candidate for "this might not be new" — folding into that entry or tying an edge
@@ -262,7 +269,11 @@ organizational scheme applied on top of it.
    produced a group/slot draft — append a `resource`/`groups` entry to
    `shared_resources\trigger_index.yaml` (create the file with an `entries: []` skeleton first if it
    doesn't exist yet; add the new Category's slot-set to the top-level `categories:` block too, if
-   this save is that Category's first entry). **If step 2a's draft was source (1)** — this session's
+   this save is that Category's first entry). **If this save is that Category's first entry, also
+   write step 1's `identity_eligible` answer** into a top-level `identity_eligible:` block in
+   `shared_resources\resource_relationships.yaml` (create it with an empty mapping first if it
+   doesn't exist yet), keyed by Category name — e.g. `identity_eligible: {SEO: true}`. **If step
+   2a's draft was source (1)** — this session's
    own live conversation actually being why this entry exists — **append that real exchange's own
    wording to the new entry's `evidence:` list, tagged `[save]`** (`design\
    shared_resources_mechanical_trigger.md` Part 4's evidence bank; format documented in
@@ -478,9 +489,76 @@ distinct match.
         private-only by construction (see "Two homes within Track 1" in
         `design\directive_economy.md`): no canonical stub source for it ever lives in the public
         toolkit repo, not even the trigger wording or the target path.
+     6. **Then run the "Adopted Shared Resources" check, below** — every `reference`/`tool` Apply
+        ends here, not just the ones that turn out project-defining.
    - **`insight`** — see "Insights are different" below; never a plain pointer and not a
      lazily-loaded skill stub either in the `reference`/`tool` sense — an insight is content that
      gets consumed into the project, by a destination decided at apply time.
+
+### Adopted Shared Resources: a directive proportional to how central it is
+
+The skill stub above makes an adopted resource *reachable* (autonomous relevance-matching) — it
+doesn't make the model reach for it. A resource that's genuinely occasional in this project is
+fine relying on that alone (its own vocabulary is unusual enough in everyday conversation that the
+mechanical trigger is the right primary tool). A resource — or a whole Category — this project's
+work is actually *about* is not: relying on autonomous triggering alone for something this central
+is exactly the failure mode that motivated this section (a real client SEO question, phrased with
+zero SEO jargon, answered from generic training-data knowledge because nothing backstopped the
+skill's own judgment). So every `reference`/`tool` Apply ends by writing (or updating) one entry in
+a `## Adopted Shared Resources` section in this project's own `CLAUDE.md` — a fixed location, below
+whatever hand-authored directives are already there, above `## Tower Crane In Use` — created the
+first time it's needed, mechanically maintained from then on (never hand-edited; treat any manual
+edit found there as drift to reconcile, same as any other mechanically-owned content in this
+mechanism).
+
+**Before computing anything, two gates — both required — decide whether this entry's Category can
+ever be treated as project-defining at all:**
+
+1. **`identity_eligible: true`** for this entry's Category, read from `shared_resources\
+   resource_relationships.yaml`'s `identity_eligible:` block (written at Saving, step 1/6, when the
+   Category was first created). Missing or `false` → this gate fails. No Category at all → this
+   gate fails, trivially (there is nothing to be eligible).
+2. **More than one active `CATALOG.md` entry** in this Category. A 1-member category can't be
+   "comprehensively adopted" in any meaningful sense — 100% of one is degenerate, not a signal.
+
+**If either gate fails**, skip straight to the Tier 2 outcome below for this entry alone — no
+percentage of anything gets computed. This is what keeps something like `git_permission_allowlist`
+(an `insight` with no Category at all) from ever being mistaken for project-defining, no matter how
+many other resources this project goes on to adopt.
+
+**If both gates pass**, count this project's adopted entries in the Category (via `.claude\
+skills\*\SKILL.md` adoption markers, `private_opted_in:`, or a `private_categories:` subscription
+that already covers it wholesale — see `design\shared_resources_relationship_graph.md`'s "Category
+subscription" for that mapping) including the one just applied, against the Category's total
+active `CATALOG.md` entries:
+
+- **100%** — draft the Tier 1 paragraph and show it for confirmation before writing, same
+  discipline as every other write in this mechanism:
+  > `{{CATEGORY}}` represents canonical information around {{topic}}. For any matter pertaining to
+  > this topic, consult these resources first before providing what would otherwise likely be
+  > misinformation. A skill fires on the model's own judgment, not a guarantee — if a genuinely
+  > relevant question doesn't trigger it, that's a signal to invoke it manually, never a reason to
+  > assume it doesn't apply.
+
+  If this Category already has one or more standalone Tier 2 lines in the section (earlier
+  individual adoptions that hadn't yet reached 100%), **consolidate**: the confirmation draft
+  replaces those lines with the one Tier 1 paragraph rather than keeping both.
+- **A large majority but not all** (rule of thumb: roughly four-fifths or more, or "all but one or
+  two" for a small category) — draft nothing. Ask directly whether this project's identity centers
+  on the Category; if so, name the specific not-yet-adopted entries and offer to adopt them (each
+  adoption re-runs this same check). Only write the Tier 1 paragraph once coverage actually reaches
+  100%, whether via this prompt or independently later.
+- **Below that** — falls through to the Tier 2 outcome below.
+
+**Tier 2 (either gate failed, or coverage is below the majority threshold)** — draft a standalone
+line for just this entry and show it for confirmation:
+> `{{RESOURCE}}` represents information according to {{topic}}. Consult when the user surfaces
+> such topics.
+
+A `private_categories:` subscription grant is a parallel trigger point for this same check, not a
+separate mechanism — subscribing to a Category is an instant path to 100% coverage of it (present
+and future entries alike), so it runs the same two gates and, if both pass, drafts the same Tier 1
+paragraph.
 
 ### Forgetting
 
@@ -493,6 +571,12 @@ Use it when a resource was adopted for a one-off task and is now just `CLAUDE.md
 reset this project's behavior back to before adoption. If Claude's advice in some domain seems
 off, checking whether a relevant resource was ever adopted (via browse's in-use indicator) — and
 forgetting it if it's stale — is a reasonable first move.
+
+**Also update `## Adopted Shared Resources`** (see above) if this entry has a line or is covered by
+a Category paragraph there: a standalone Tier 2 line for this entry is removed outright; forgetting
+an entry that was covered by a Tier 1 Category paragraph (breaking that Category's 100% coverage)
+downgrades the paragraph back to individual Tier 2 lines for whatever remains adopted in it. An
+empty section is removed entirely, not left as a bare heading.
 
 ### Adjusting triggers — recalibrating after living with them
 

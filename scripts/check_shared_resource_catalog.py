@@ -8,7 +8,7 @@ edge-validity check) and found alongside it while scoping this script (the File-
 Tier-name checks) - all three are the same "hand-edited data trusted without a check" shape as
 design\\shared_resources_pipeline_reliability.md's Family B.
 
-Three checks, all notify-only (never blocks anything - nothing currently runs this automatically):
+Four checks, all notify-only (never blocks anything - nothing currently runs this automatically):
 
 1. File column - every CATALOG.md row's `File` cell must resolve to a real file in
    shared_resources\\, active or archived (an archived entry is still fully readable by design -
@@ -19,7 +19,12 @@ Three checks, all notify-only (never blocks anything - nothing currently runs th
    Tier names are expected to get renamed/split over time (the design doc: "Tier names/definitions
    stay revisable going forward"), and nothing enforces the two files staying in sync when that
    happens.
-3. Edge validity - every edge's `from`/`to` or `a`/`b` in resource_relationships.yaml must resolve
+3. identity_eligible declared - every (non-archived) Category on any CATALOG.md row must have a
+   corresponding entry in resource_relationships.yaml's `identity_eligible:` block (added
+   2026-09-09 alongside the "Adopted Shared Resources" tiered-directive mechanism -
+   templates\\shared_resources.md's Saving step 1 asks this the moment a new Category is
+   introduced; an undeclared Category means that question was skipped, not answered `false`).
+4. Edge validity - every edge's `from`/`to` or `a`/`b` in resource_relationships.yaml must resolve
    to some CATALOG.md row, by filename stem (the design doc's node-naming convention). An edge to
    an *archived* entry PASSes deliberately (decided 2026-09-02): the archived file still exists and
    is still fully readable, and the retrieval procedure doesn't filter graph neighbors by Status -
@@ -66,22 +71,32 @@ RELATIONSHIPS_PATH = PROJECT_ROOT / 'shared_resources' / 'resource_relationships
 
 CATEGORY_KEY_RE = re.compile(r'^  (\S+):\s*$')
 TIER_NAME_RE = re.compile(r'^    - name:\s*(.+?)\s*$')
+IDENTITY_ELIGIBLE_ITEM_RE = re.compile(r'^  (\S+):\s*(true|false)\s*$')
 EDGE_START_RE = re.compile(r'^  - type:\s*(\S+)\s*$')
 EDGE_FIELD_RE = re.compile(r'^    (from|to|a|b):\s*(\S+)\s*$')
 
 
 def parse_relationships(text):
-    """Hand-rolled parser for resource_relationships.yaml's two top-level keys. Returns
-    (tiers_by_category: dict[str, list[str]], edges: list[dict]). Relies on the file's always-
-    consistent machine-written indentation (2-space top-level keys/list items, 4-space nested
-    fields) - see module docstring for why this isn't a real yaml parse."""
+    """Hand-rolled parser for resource_relationships.yaml's three top-level keys. Returns
+    (tiers_by_category: dict[str, list[str]], identity_eligible: dict[str, bool], edges:
+    list[dict]). Relies on the file's always-consistent machine-written indentation (2-space
+    top-level keys/list items, 4-space nested fields) - see module docstring for why this isn't a
+    real yaml parse."""
     lines = text.splitlines()
     tiers_idx = next((i for i, l in enumerate(lines) if l.strip() == 'tiers:'), None)
+    identity_idx = next((i for i, l in enumerate(lines) if l.strip() == 'identity_eligible:'), None)
     edges_idx = next((i for i, l in enumerate(lines) if l.strip() == 'edges:'), None)
+
+    # Each section's own end is whichever of the other two top-level keys comes next in the file
+    # (identity_eligible/edges can appear in either order relative to each other, tiers is always
+    # first) - never assume a fixed key order beyond "tiers: first, edges: last" (true today).
+    def section_end(start_idx, *other_idxs):
+        later = [i for i in other_idxs if i is not None and i > start_idx]
+        return min(later) if later else len(lines)
 
     tiers_by_category = {}
     if tiers_idx is not None:
-        end = edges_idx if edges_idx is not None else len(lines)
+        end = section_end(tiers_idx, identity_idx, edges_idx)
         current_category = None
         for line in lines[tiers_idx + 1:end]:
             cat_m = CATEGORY_KEY_RE.match(line)
@@ -92,6 +107,14 @@ def parse_relationships(text):
             name_m = TIER_NAME_RE.match(line)
             if name_m and current_category:
                 tiers_by_category[current_category].append(name_m.group(1))
+
+    identity_eligible = {}
+    if identity_idx is not None:
+        end = section_end(identity_idx, tiers_idx, edges_idx)
+        for line in lines[identity_idx + 1:end]:
+            item_m = IDENTITY_ELIGIBLE_ITEM_RE.match(line)
+            if item_m:
+                identity_eligible[item_m.group(1)] = item_m.group(2) == 'true'
 
     edges = []
     if edges_idx is not None:
@@ -106,7 +129,7 @@ def parse_relationships(text):
             if field_m and current is not None:
                 current[field_m.group(1)] = field_m.group(2)
 
-    return tiers_by_category, edges
+    return tiers_by_category, identity_eligible, edges
 
 
 def check_file_column(rows):
@@ -141,6 +164,30 @@ def check_tier_consistency(rows, tiers_by_category):
                 f'Claude will not reliably surface "{row["name"]}" for "{tier}" because "{tier}" '
                 f'has been renamed or removed. Fix: update {row["name"]}\'s tier to match what '
                 f'"{tier}" has been renamed to, or add "{tier}" back as a tier.'))
+    return results
+
+
+def check_identity_eligible_declared(rows, identity_eligible):
+    """Every Category that appears on any active CATALOG.md row must have a corresponding
+    identity_eligible: entry in resource_relationships.yaml (templates\\shared_resources.md's
+    Saving step 1 asks this the moment a save introduces a new Category - an undeclared Category
+    means that question was skipped, not that the answer is "false"). Archived rows are excluded:
+    an archived entry's Category no longer needs a live identity-eligibility answer."""
+    results = []
+    seen = set()
+    for row in rows:
+        category = row['category']
+        if not category or row['status'].lower().startswith('archived') or category in seen:
+            continue
+        seen.add(category)
+        if category in identity_eligible:
+            results.append(('OK', category, f"Category '{category}' has a declared identity_eligible value."))
+        else:
+            results.append(('UNDECLARED', category,
+                f'Claude has no answer for whether "{category}" can ever define a project\'s '
+                f'identity (the "Adopted Shared Resources" tiered directive can\'t apply Tier 1 to '
+                f'it either way until this is set). Fix: add "{category}" to '
+                'resource_relationships.yaml\'s identity_eligible: block (true or false).'))
     return results
 
 
@@ -188,26 +235,30 @@ def main():
         sys.exit(0)
 
     rows = parse_catalog(CATALOG_PATH.read_text(encoding='utf-8'))
-    tiers_by_category, edges = ({}, [])
+    tiers_by_category, identity_eligible, edges = ({}, {}, [])
     if RELATIONSHIPS_PATH.exists():
-        tiers_by_category, edges = parse_relationships(RELATIONSHIPS_PATH.read_text(encoding='utf-8'))
+        tiers_by_category, identity_eligible, edges = parse_relationships(
+            RELATIONSHIPS_PATH.read_text(encoding='utf-8'))
 
     # Quiet when clean, matching this hub's other resume-time checks (check_multi_machine.py/
     # check_stale_paths.py print "(nothing to report)" rather than one OK line per item) - a
     # CATALOG.md row count that only grows shouldn't mean a resume that only gets noisier.
     file_fails = [r for r in check_file_column(rows) if r[0] == 'FAIL']
     tier_mismatches = [r for r in check_tier_consistency(rows, tiers_by_category) if r[0] == 'MISMATCH']
+    undeclared_identity = [r for r in check_identity_eligible_declared(rows, identity_eligible)
+                            if r[0] == 'UNDECLARED']
     edge_fails = check_edges(edges, rows)  # already FAIL-only, see its own docstring/return shape
 
-    for _, _, message in file_fails + tier_mismatches + edge_fails:
+    for _, _, message in file_fails + tier_mismatches + undeclared_identity + edge_fails:
         print(f"[!] {message}")
 
-    total = len(file_fails) + len(tier_mismatches) + len(edge_fails)
+    total = len(file_fails) + len(tier_mismatches) + len(undeclared_identity) + len(edge_fails)
     print()
     if total:
         print(f"=== {total} issue(s) found across {len(rows)} catalog row(s)/{len(edges)} edge(s): "
               f"{len(file_fails)} broken file reference(s), {len(tier_mismatches)} tier "
-              f"mismatch(es), {len(edge_fails)} broken edge(s) (notify only, not a failure) ===")
+              f"mismatch(es), {len(undeclared_identity)} undeclared identity_eligible categor"
+              f"y(ies), {len(edge_fails)} broken edge(s) (notify only, not a failure) ===")
     else:
         print(f"=== no catalog/graph inconsistencies found across {len(rows)} catalog row(s)/"
               f"{len(edges)} edge(s) ===")

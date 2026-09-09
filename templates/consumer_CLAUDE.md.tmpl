@@ -5,6 +5,8 @@ Used by the scaffolder (scripts\new_consumer.py) to write a NEW consumer's CLAUD
 This is a TEMPLATE, not an imported float-on-HEAD file: the scaffolder materializes a
 copy into the new project once, doing token substitution below. Editing this template does
 NOT retroactively change existing consumers (unlike the @import protocol pieces, which do).
+Paired with consumer_README.md.tmpl (project narrative - this file is directives only) -
+scaffolded alongside this one, same non-float status.
 
 Substitution tokens the scaffolder replaces:
   {{PROJECT_NAME}}        - full title in Title Case (e.g. "My Cool Project")
@@ -19,9 +21,20 @@ The scaffolder strips this comment block from the materialized copy.
 
 # Project: {{PROJECT_NAME}}
 
-<!-- FIRST_RUN: replace this block with a real project overview — what this project is,
-     who it's for, and any constraints an agent must know. Delete this comment when done. -->
-_Project overview goes here (see `FIRST_RUN.md`)._
+Agent directives only. Project narrative/background: `README.md`. Decisions/activity log:
+`project_progress.md`.
+
+<!-- FIRST_RUN: replace this block with this project's agent directives — standing constraints,
+     domain policies, and anything an agent must act on. Directives only: what this project is,
+     who it's for, and other narrative belongs in README.md instead. A directive naming an
+     adopted skill/shared resource must be imperative ("read X before answering Y", "treat X as
+     authoritative for Y") — never a descriptive claim that it "fires automatically" or "needs no
+     manual reference": a Skill fires on the model's own judgment, not a guarantee, and a false
+     automatic-coverage claim licenses silently skipping verification. (A `shared_resources`
+     adoption that reaches project-defining status gets its own mechanically-maintained "Adopted
+     Shared Resources" section below, via `shared_resources.md`'s Apply procedure — don't hand-author
+     one here.) Delete this comment when done. -->
+_Agent directives go here (see `FIRST_RUN.md`)._
 
 ## Tower Crane In Use
 

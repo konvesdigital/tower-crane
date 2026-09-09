@@ -6,6 +6,8 @@ Creates ALL files a new consumer needs so it works like existing consumers from 
 session (consumer_platform design, decision 10):
   <target>/.claude/settings.json   - opt-in hook snippet(s) for the chosen tools (merged)
   <target>/CLAUDE.md               - from templates/consumer_CLAUDE.md.tmpl, with @import lines
+  <target>/README.md               - from templates/consumer_README.md.tmpl, once, if absent
+                                     (project narrative - CLAUDE.md stays directives-only)
   <target>/.claude/skills/<name>/  - Track-1 skill stub(s) for toolkit-governed pieces in
                                      SKILL_PIECES (design\\directive_economy.md) - `filing`,
                                      `checkpoint`, `archive`, `shared_resources` so far - plus every
@@ -36,7 +38,7 @@ This script does NOT run git - git init + first commit is a FIRST_RUN.md step in
 OS-reach Tier 2 port of new_consumer.ps1 (design\\portability.md, "OS-reach Tier 2: full
 cross-platform design"). Logic is a direct translation - see that doc's Build order for the
 parity-check approach used to verify ports in this series. Generated files (settings.json,
-CLAUDE.md, project_progress.md, FIRST_RUN.md, registry entry) now use LF line endings universally
+CLAUDE.md, README.md, project_progress.md, FIRST_RUN.md, registry entry) now use LF line endings universally
 (the locked line-endings decision, bundled into this port).
 """
 
@@ -70,6 +72,7 @@ TEMPLATES_DIR = SHARED_ROOT / 'templates'
 OPTINS_DIR = TEMPLATES_DIR / 'optins'
 CONSUMERS_DIR = PROJECT_ROOT / 'consumers'
 TMPL_PATH = TEMPLATES_DIR / 'consumer_CLAUDE.md.tmpl'
+README_TMPL_PATH = TEMPLATES_DIR / 'consumer_README.md.tmpl'
 # design\private_tools.md - private, automatic tools living outside toolkit\, never shipped.
 PRIVATE_ROOT = PROJECT_ROOT / 'toolkit_private'
 PRIVATE_OPTINS_DIR = PRIVATE_ROOT / 'templates' / 'optins'
@@ -190,8 +193,10 @@ def build_first_run_checklist(has_git, remote, needs_overview):
                  "if prompted. Declining disables `@import` permanently, so the shared protocol "
                  "pieces (filing, compliance, shared_resources, continuity) won't load.")
     if needs_overview:
-        items.append("- [ ] Fill in the project-overview placeholder near the top of `CLAUDE.md` "
-                      "(what this project is, who it's for, key constraints).")
+        items.append("- [ ] Fill in the project narrative placeholder in `README.md` (what this "
+                      "project is, who it's for, background).")
+        items.append("- [ ] Fill in the agent-directives placeholder near the top of `CLAUDE.md` "
+                      "(standing constraints, domain policies — imperative, not narrative).")
     items.append("- [ ] Delete this file (`FIRST_RUN.md`) once the above are done.")
     return items
 
@@ -735,6 +740,25 @@ def main():
         write_utf8(stub_path, materialize_skill_stub(stub_src))
         print(f"  wrote  {stub_path}")
 
+    # --- 3e. README.md (narrative skeleton, written once if absent) -------------------------
+    # No Tower-Crane-owned markers to preserve here (unlike CLAUDE.md's TC_IN_USE_HEADING dance) -
+    # every branch (brand-new/reconnect/adoption/host-merge) reduces to one check: write it if
+    # absent, otherwise leave whatever's there (a user's own narrative, or - like GRT - an
+    # inherited unrelated README) untouched. readme_written feeds needs_overview below, since a
+    # fresh README also introduces an unfilled placeholder even when CLAUDE.md's own content is
+    # already real (reconnect/adoption).
+    readme_path = target_path / 'README.md'
+    readme_written = False
+    if readme_path.exists():
+        print(f"  skip   {readme_path} exists (not touched - narrative content is yours)")
+    else:
+        readme_tmpl = README_TMPL_PATH.read_text(encoding='utf-8')
+        readme_tmpl = re.sub(r'^\s*<!--.*?-->\s*', '', readme_tmpl, count=1, flags=re.DOTALL)
+        readme_content = readme_tmpl.replace('{{PROJECT_NAME}}', project_name)
+        write_utf8(readme_path, readme_content)
+        print(f"  wrote  {readme_path}")
+        readme_written = True
+
     # --- 4. project_progress.md skeleton (continuity only) -----------------------------------
     # progress_pre_clean (design\connect_project_commit_gate.md addendum): captured BEFORE either
     # branch below touches project_progress.md, since it's not wholly hub-owned like the rest of
@@ -842,7 +866,10 @@ def main():
             print("  skip   FIRST_RUN.md exists (use --force to overwrite)")
             remaining_checklist = ["- [ ] (see the existing `FIRST_RUN.md` - not overwritten this run)"]
         else:
-            needs_overview = not (claude_md_existed and (is_reconnect or is_adoption))
+            # readme_written ORed in: a reconnect/adoption run can preserve real CLAUDE.md content
+            # (claude_md_existed True) while still writing a fresh README.md placeholder - the
+            # checklist item must still appear for that half even when CLAUDE.md's own is settled.
+            needs_overview = not (claude_md_existed and (is_reconnect or is_adoption)) or readme_written
             checklist = build_first_run_checklist(has_git, remote, needs_overview)
             remaining_checklist = checklist
             if is_reconnect:
@@ -954,10 +981,10 @@ Notes: scaffolded by `scripts/new_consumer.py` on {scaffold_date}. Registry form
     if is_new_connection:
         has_git_now = (target_path / '.git').exists()
         if existing_consumer is not None:
-            needs_overview_now = False
+            needs_overview_now = readme_written
             commit_msg = f"Tower Crane: connected via 'connect project' (host: {config['host_id']})"
         else:
-            needs_overview_now = not (claude_md_existed and (is_reconnect or is_adoption))
+            needs_overview_now = not (claude_md_existed and (is_reconnect or is_adoption)) or readme_written
             commit_msg = ("Tower Crane: reconnected via 'connect project'" if is_reconnect
                           else "Tower Crane: connected via 'connect project'")
 
