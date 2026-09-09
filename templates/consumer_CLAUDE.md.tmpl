@@ -12,10 +12,15 @@ Substitution tokens the scaffolder replaces:
   {{PROJECT_NAME}}              - full title in Title Case (e.g. "My Cool Project")
   {{DATE}}                      - scaffold date, YYYY-MM-DD
   {{SHARED_TOOLS_LIST}}         - bullet list of opted-in tools (or a "none yet" line)
-  {{ADOPTED_SHARED_RESOURCES}}  - "Adopted Shared Resources" body (or a "none yet" line) -
-                                  mechanically maintained by shared_resources.md's Apply/Forget
-                                  procedures from here on, never hand-edited once real content
-                                  exists
+  {{ADOPTED_SHARED_RESOURCES}}  - the "what's been adopted" LISTING under Adopted Shared
+                                  Resources' own fixed general paragraph (below) - a "none yet"
+                                  line, or real Tier 1/Tier 2 content - mechanically maintained by
+                                  shared_resources.md's Apply/Forget procedures from here on. The
+                                  general paragraph itself is fixed template text, never a
+                                  substitution target and never edited by Apply/Forget - it's
+                                  true regardless of what (if anything) is adopted, so it's part of
+                                  the scaffold, not conditionally written later (see that
+                                  paragraph's own rationale, below).
   {{PROTOCOL_IMPORTS}}          - the single @.claude/hub_pointer.md indirection line
                                   (design\consumer_reference_indirection.md) - that gitignored,
                                   per-host file carries the real @import lines for the selected
@@ -26,18 +31,30 @@ Deliberately NOT in this template: any top-of-file assertion like "this file is 
 Tower Crane may be adopted mid-lifecycle onto a CLAUDE.md that already carries any amount of
 unrelated hand-authored content (a real, live consumer's `CLAUDE.md` has ten unrelated `## `
 headings before `## Tower Crane In Use` even appears - confirmed against actual connected-project
-state, not a hypothetical) - Tower Crane keeps its own
-directive-only/narrative-in-README convention for what IT manages below this heading, but never
-claims it governs the rest of the file, since a user is never required to follow Tower Crane's own
-internal conventions just for adopting it. `## Tower Crane In Use` must stay the first
-Tower-Crane-related heading in the file, full stop - `disconnect_consumer.py`'s
-`replace_prose_sections()` finds it by literal string search and sweeps everything from there
-through the next `## ` heading after `## Shared Workflow Protocol` (or EOF); anything Tower-Crane-
-owned placed before it (Adopted Shared Resources included) would silently survive a disconnect
-instead of being removed with the rest. This is why Adopted Shared Resources is a `###` subsection
-INSIDE this section (between Opted-in tools and Shared Workflow Protocol), not its own `##`
-heading before or after it - either alternative risks breaking that sweep, see the Apply procedure's
-own note on this in shared_resources.md.
+state, not a hypothetical) - Tower Crane keeps its own directive-only/narrative-in-README
+convention for what IT manages below this heading, but never claims it governs the rest of the
+file, since a user is never required to follow Tower Crane's own internal conventions just for
+adopting it. `## Tower Crane In Use` must stay the first Tower-Crane-related heading in the file,
+full stop - `disconnect_consumer.py`'s `replace_prose_sections()` finds it by literal string
+search and sweeps everything from there through the next `## ` heading after `## Shared Workflow
+Protocol` (or EOF, which is where it lands today, since nothing after that heading is itself a
+`## ` heading). This is why `### Adopted Shared Resources` is a `###` subsection, never its own
+`##` heading - a `##` heading anywhere in [`## Tower Crane In Use`, EOF) either becomes the sweep's
+premature end boundary (if placed after `## Shared Workflow Protocol`) or sits entirely outside the
+sweep (if placed before `## Tower Crane In Use`), either way surviving a disconnect it should not.
+A `###` heading is invisible to that boundary search regardless of where it sits in between, which
+is also why this subsection is ordered general-to-specific, LAST in the file rather than between
+Opted-in tools and Shared Workflow Protocol: `shared_resources` is itself one of the pieces
+imported by Shared Workflow Protocol (a specific kind of shared workflow, in turn a specific
+facility Tower Crane provides), so introducing it before that heading read backwards - specific
+before the general mechanism it's part of. See shared_resources.md's own "Adopted Shared
+Resources" section for the full ordering rationale and the general paragraph's exact text.
+
+Redundancy note: float-on-HEAD (referenced live, not copied, updates arrive automatically) is
+stated exactly once, in Tower Crane In Use's opening sentence, covering everything Tower Crane
+manages in this file - Shared Workflow Protocol's own prose doesn't repeat it, only what's
+specific to that section. Keep it that way when editing either section; don't let a shared fact
+drift back into being said twice.
 -->
 
 # Project: {{PROJECT_NAME}}
@@ -50,24 +67,23 @@ own note on this in shared_resources.md.
      skill/shared resource works better imperative ("read X before answering Y", "treat X as
      authoritative for Y") than descriptive ("fires automatically", "needs no manual reference") —
      a Skill fires on the model's own judgment, not a guarantee, and a false automatic-coverage
-     claim licenses silently skipping verification. (A `shared_resources` adoption that reaches
-     project-defining status gets its own mechanically-maintained "Adopted Shared Resources"
-     subsection under `## Tower Crane In Use`, below, via `shared_resources.md`'s Apply procedure —
-     don't hand-author one here.) Delete this comment when done. -->
+     claim licenses silently skipping verification. (Any `shared_resources` adoption is covered
+     by "Adopted Shared Resources," below, via `shared_resources.md`'s Apply procedure — don't
+     hand-author anything about it here.) Delete this comment when done. -->
 _Agent directives go here (see `FIRST_RUN.md`)._
 
 ## Tower Crane In Use
 
-This project opts into reusable Claude Code tooling from the Tower Crane hub. These are
-referenced (float-on-HEAD), not copied — an update ratified in the hub reaches this project the
-next time it runs. This machine's copy of the hub lives wherever `.claude/hub_pointer.md` (this
-project's own gitignored, per-host pointer file) currently records — see that file's
-`shared_root:` value for the real path, or the hub's own `MENU.md` there for the full catalog. Do
-not edit the shared files; to report a bug or request an improvement, follow the filing protocol
-imported below. Tower Crane keeps everything it manages in this file directive-only, with
-narrative in `README.md` and a decisions/activity log in `project_progress.md` if this project
-uses them — its own convention for its own content, not a requirement for anything else in this
-file.
+This project opts into reusable Claude Code tooling from the Tower Crane hub, referenced live
+(float-on-HEAD) rather than copied — an update ratified in the hub reaches this project the next
+time it runs, for everything Tower Crane manages in this file. This machine's copy of the hub
+lives wherever `.claude/hub_pointer.md` (this project's own gitignored, per-host pointer file)
+currently records — see that file's `shared_root:` value for the real path, or the hub's own
+`MENU.md` there for the full catalog. Do not edit the shared files directly; to report a bug or
+request an improvement, follow the filing protocol below. Tower Crane keeps everything it manages
+in this file directive-only, with narrative in `README.md` and a decisions/activity log in
+`project_progress.md` if this project uses them — its own convention for its own content, not a
+requirement for the rest of this file.
 
 Whether this file is actually live on **this** machine right now is decided by one thing: does
 `.claude/hub_pointer.md` (gitignored, per-host, never itself tracked — regenerated by `"connect
@@ -86,20 +102,27 @@ Opted-in tools (wired {{DATE}}):
 
 {{SHARED_TOOLS_LIST}}
 
-### Adopted Shared Resources
-
-{{ADOPTED_SHARED_RESOURCES}}
-
 ## Shared Workflow Protocol
 
-The following operating conventions are imported from the Tower Crane hub and float on HEAD —
-edits ratified there reach this project automatically. The first launch triggers a one-time
-import-approval dialog; accept it (see `FIRST_RUN.md`). The one line below indirects through this
-project's own `.claude/hub_pointer.md` (gitignored, regenerated per host — never hand-edit it) to
-the real per-piece import lines, so this file itself never bakes in an absolute path to the hub.
-To opt a piece out, edit its line inside `.claude/hub_pointer.md` (the shared checker will note
-the drift, but it is not blocked) — that file is regenerated wholesale on the next `"connect
-project"`/`relocate.py` pass, so a manual opt-out there is not durable across a hub move; file a
+The pieces below are imported via `.claude/hub_pointer.md` (this project's own gitignored,
+per-host indirection file — never hand-edit it directly; regenerated by `"connect
+project"`/`relocate.py`). The first launch triggers a one-time import-approval dialog; accept it
+(see `FIRST_RUN.md`). To opt a piece out, edit its line inside `hub_pointer.md` instead (the
+shared checker will note the drift but won't block it) — not durable across a hub move, so file a
 registry-update note if it needs to stick.
 
 {{PROTOCOL_IMPORTS}}
+
+### Adopted Shared Resources
+
+One of the pieces above, `shared_resources`, governs a cross-project reference library the
+operator maintains centrally in the hub and reuses across projects — search, adopt, save, and
+retrieval all follow that piece's own mechanism. Adopting something turns it into a Skill that
+fires on this model's own judgment when a live question looks relevant, not a guarantee and not a
+standing import. What's actually been adopted into this project, and how much weight each carries,
+is listed below: a resource covering this project's defining domain is a mandate — consult it
+before answering, since a missed trigger there is a real gap, not a shrug. Anything else defaults
+the other way — useful when its own topic comes up, not something to weight into every answer
+regardless of relevance.
+
+{{ADOPTED_SHARED_RESOURCES}}

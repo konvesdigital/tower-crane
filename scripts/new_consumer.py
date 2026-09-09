@@ -84,9 +84,11 @@ TOOL_BLURBS = {
                           'string-key spelling (PostToolUse hook).',
 }
 
-# Scaffolding always precedes adoption (shared_resources.md's Apply/Forget procedures own this
-# subsection from the first real adoption onward) - the scaffolder itself only ever writes this
-# fallback, never real content.
+# Scaffolding always precedes adoption. The "Adopted Shared Resources" subsection's own general
+# paragraph is fixed template text (true regardless of what's adopted, so it ships with every
+# scaffold, never written conditionally later) - this fallback is only the "what's been adopted"
+# LISTING underneath it, which shared_resources.md's Apply/Forget procedures own from the first
+# real adoption onward. The scaffolder itself only ever writes this fallback, never real content.
 ADOPTED_SHARED_RESOURCES_NONE = '_None adopted yet._'
 
 # Toolkit-governed Track-1 skill pieces (design\\directive_economy.md): a piece name in here is

@@ -504,28 +504,59 @@ mechanical trigger is the right primary tool). A resource — or a whole Categor
 work is actually *about* is not: relying on autonomous triggering alone for something this central
 is exactly the failure mode that motivated this section (a real client SEO question, phrased with
 zero SEO jargon, answered from generic training-data knowledge because nothing backstopped the
-skill's own judgment). So every `reference`/`tool` Apply ends by writing (or updating) a `###
-Adopted Shared Resources` subsection in this project's own `CLAUDE.md` — mechanically maintained
-from then on (never hand-edited; treat any manual edit found there as drift to reconcile, same as
-any other mechanically-owned content in this mechanism).
+skill's own judgment). So this project's own `CLAUDE.md` carries a `### Adopted Shared Resources`
+subsection, mechanically maintained from the first adoption onward (never hand-edited; treat any
+manual edit found there as drift to reconcile, same as any other mechanically-owned content in
+this mechanism) — every `reference`/`tool` Apply ends by writing/updating its **listing** (below).
 
-**Fixed location, and why it's fixed there specifically:** inside `## Tower Crane In Use`, between
-the "Opted-in tools" list and `## Shared Workflow Protocol` — never before `## Tower Crane In Use`,
-even though this content is itself project-specific like a hand-authored directive. Two reasons,
-both load-bearing:
+**Two parts, only one of them ever changes.** The subsection opens with a **fixed general
+paragraph** — what `shared_resources` is, how adoption works, and the two possible outcomes
+(mandate vs. situational) — true regardless of what's actually been adopted, so it ships as part
+of the scaffolded template itself (`consumer_CLAUDE.md.tmpl`), never written or edited by Apply/
+Forget. Underneath it sits the **listing** — a `_None adopted yet._` fallback, or real Tier 1/Tier
+2 content — which is the only part Apply/Forget ever touch. This split exists specifically so
+nothing here only reads correctly in one adoption state: a project with zero adoptions, one
+occasional resource, or a fully-adopted defining domain all get the same correct general framing,
+because that framing was never conditional on adoption state to begin with.
+
+**Fixed location, and why it's fixed there specifically:** as the last subsection in the file,
+after `## Shared Workflow Protocol`'s `{{PROTOCOL_IMPORTS}}` line — never before `## Tower Crane In
+Use`, even though this content is itself project-specific like a hand-authored directive. Three
+reasons, all load-bearing:
 1. `## Tower Crane In Use` must stay the first Tower-Crane-related heading in the file — Tower
    Crane may be adopted mid-lifecycle onto a `CLAUDE.md` that already carries any amount of
    unrelated hand-authored content (a real, live consumer's `CLAUDE.md` has ten unrelated headings
    before it), and this mechanism is Tower-Crane-owned content, not the user's own — it belongs
    after that marker, not ahead of it, same as everything else Tower Crane manages.
-2. `disconnect_consumer.py`'s `replace_prose_sections()` finds the removal boundary by searching
+2. **General before specific, all the way down.** `shared_resources` is itself one of the pieces
+   `## Shared Workflow Protocol` imports — a specific kind of shared workflow, which is in turn a
+   specific facility `## Tower Crane In Use` provides. Placing this subsection ahead of `## Shared
+   Workflow Protocol` would introduce the specific mechanism before the general one it belongs to;
+   placing it ahead of `## Tower Crane In Use` entirely would introduce it before Tower Crane
+   itself. Last, after everything more general, is the only position consistent with that ordering
+   — and it's also why the subsection's own internal ordering mirrors it: the fixed general
+   paragraph (what `shared_resources` is, in general) before the listing's own project-specific
+   entries (what *this* project has actually adopted).
+3. `disconnect_consumer.py`'s `replace_prose_sections()` finds the removal boundary by searching
    for `## Tower Crane In Use` and sweeping to the next `## ` heading after `## Shared Workflow
-   Protocol` (or EOF). A `###` subsection sitting between those two headings is safely inside that
-   sweep and gets removed with everything else on disconnect; placed as a sibling `##` heading
-   either before `## Tower Crane In Use` or after `## Shared Workflow Protocol`, it would either
-   never be swept at all, or would itself become the false end-of-sweep boundary, leaving it behind
-   — either way, a disconnect that's supposed to remove every Tower Crane trace would silently miss
-   this one.
+   Protocol` (or EOF — where it lands today, since nothing after that heading is itself a `## `
+   heading). A `###` subsection is invisible to that search regardless of where it sits in
+   between, so it's always safely inside the sweep; a sibling `##` heading would either sit
+   entirely outside the sweep (before `## Tower Crane In Use`) or become the sweep's own premature
+   end boundary (right after `## Shared Workflow Protocol`), either way surviving a disconnect that
+   should have removed it.
+
+**The fixed general paragraph, verbatim** (part of `consumer_CLAUDE.md.tmpl` — reproduced here so
+this file's own reasoning above stays checkable against the real text):
+> One of the pieces above, `shared_resources`, governs a cross-project reference library the
+> operator maintains centrally in the hub and reuses across projects — search, adopt, save, and
+> retrieval all follow that piece's own mechanism. Adopting something turns it into a Skill that
+> fires on this model's own judgment when a live question looks relevant, not a guarantee and not
+> a standing import. What's actually been adopted into this project, and how much weight each
+> carries, is listed below: a resource covering this project's defining domain is a mandate —
+> consult it before answering, since a missed trigger there is a real gap, not a shrug. Anything
+> else defaults the other way — useful when its own topic comes up, not something to weight into
+> every answer regardless of relevance.
 
 **Before computing anything, two gates — both required — decide whether this entry's Category can
 ever be treated as project-defining at all:**
@@ -560,12 +591,15 @@ one-skill, whole-category fallback adoption as a sliver of coverage. Instead:
   Tier at once, present and future, the same as the fallback. Include the entry/skill just applied.
 
 - **100%** — draft the Tier 1 paragraph and show it for confirmation before writing, same
-  discipline as every other write in this mechanism:
-  > `{{CATEGORY}}` represents canonical information around {{topic}}. For any matter pertaining to
-  > this topic, consult these resources first before providing what would otherwise likely be
-  > misinformation. A skill fires on the model's own judgment, not a guarantee — if a genuinely
-  > relevant question doesn't trigger it, that's a signal to invoke it manually, never a reason to
-  > assume it doesn't apply.
+  discipline as every other write in this mechanism. The general paragraph above already covers
+  *why* a missed trigger matters and that firing isn't guaranteed — this paragraph only needs the
+  project-specific mandate itself:
+  > **{{CATEGORY}}** is this project's defining domain — {{topic}}. Consult it first (reached via
+  > {{ADOPTED_SKILLS}}) before providing what would otherwise likely be misinformation; if a
+  > genuinely {{CATEGORY}}-relevant question doesn't trigger one of those skills, that's a signal
+  > to invoke it manually, never a reason to assume it doesn't apply. If a real decision turns on a
+  > principle no existing entry covers, say so explicitly rather than filling the gap silently —
+  > that's the moment to save a new entry, not reason around quietly.
 
   If this Category already has one or more standalone Tier 2 lines in the section (earlier
   individual adoptions that hadn't yet reached 100%), **consolidate**: the confirmation draft
@@ -599,13 +633,14 @@ reset this project's behavior back to before adoption. If Claude's advice in som
 off, checking whether a relevant resource was ever adopted (via browse's in-use indicator) — and
 forgetting it if it's stale — is a reasonable first move.
 
-**Also update `### Adopted Shared Resources`** (see above) if this entry has a line or is covered by
-a Category paragraph there: a standalone Tier 2 line for this entry is removed outright; forgetting
-an entry that was covered by a Tier 1 Category paragraph (breaking that Category's 100% coverage)
-downgrades the paragraph back to individual Tier 2 lines for whatever remains adopted in it. If
-this project's last shared_resources adoption anywhere is forgotten, revert the subsection body to
-its scaffolded fallback (`_None adopted yet._`) rather than deleting the `### Adopted Shared
-Resources` heading itself — the heading is a fixed, always-present part of the template.
+**Also update `### Adopted Shared Resources`'s listing** (see above — never its fixed general
+paragraph, which stays exactly as scaffolded regardless of what's adopted) if this entry has a
+line or is covered by a Category paragraph there: a standalone Tier 2 line for this entry is
+removed outright; forgetting an entry that was covered by a Tier 1 Category paragraph (breaking
+that Category's 100% coverage) downgrades the paragraph back to individual Tier 2 lines for
+whatever remains adopted in it. If this project's last shared_resources adoption anywhere is
+forgotten, revert the listing to its scaffolded fallback (`_None adopted yet._`) — the general
+paragraph above it and the `### Adopted Shared Resources` heading itself never change.
 
 ### Adjusting triggers — recalibrating after living with them
 
@@ -704,6 +739,11 @@ own — there's no future Apply coming for something already fully adopted. Trig
 like *"shared resources — backfill Adopted Shared Resources"* (every consumer) or *"...for
 `<consumer>`"* (one project):
 
+0. If this project's `CLAUDE.md` predates this mechanism entirely (scaffolded before `### Adopted
+   Shared Resources` existed, or missing it for any other reason), first add the section itself —
+   the `### Adopted Shared Resources` heading plus its fixed general paragraph, verbatim from
+   `consumer_CLAUDE.md.tmpl`, positioned per "Fixed location" above — before drafting any listing
+   content. Confirm before writing, same as everything else here.
 1. For the project(s) in scope, read its effective adopted set (`private_opted_in:` plus any
    `private_categories:` subscription's current members, per `design\
    shared_resources_relationship_graph.md`'s "Category subscription") and group by Category.
