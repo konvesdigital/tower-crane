@@ -526,11 +526,22 @@ percentage of anything gets computed. This is what keeps something like `git_per
 (an `insight` with no Category at all) from ever being mistaken for project-defining, no matter how
 many other resources this project goes on to adopt.
 
-**If both gates pass**, count this project's adopted entries in the Category (via `.claude\
-skills\*\SKILL.md` adoption markers, `private_opted_in:`, or a `private_categories:` subscription
-that already covers it wholesale — see `design\shared_resources_relationship_graph.md`'s "Category
-subscription" for that mapping) including the one just applied, against the Category's total
-active `CATALOG.md` entries:
+**If both gates pass, measure Tier coverage, not entry coverage.** The adoption unit in this
+mechanism is a *skill* (Saving step 7's Category-level fallback, or a narrower Tier-scoped skill
+split out of it), and a single skill can legitimately cover every entry in a whole Tier — or, for
+the fallback, the whole Category — live off `CATALOG.md`/`resource_relationships.yaml`, with no
+per-entry adoption step at all. Counting individual `CATALOG.md` rows would wrongly read a
+one-skill, whole-category fallback adoption as a sliver of coverage. Instead:
+
+- **Denominator**: every distinct `Tier` value with at least one active `CATALOG.md` entry in this
+  Category (for SEO: Primary, Evaluation, Planning, Process — 4).
+- **Numerator**: how many of those Tiers this project has an adopted skill actually covering.
+  Read this project's own `.claude\skills\*\SKILL.md` stubs tagged with this Category (`category:`
+  frontmatter) to see which Tier(s) each one's own scope names — a Category's first-ever skill is
+  typically the whole-Category fallback and covers every Tier by itself; a later-split Tier-scoped
+  skill covers just its own (see "Discovery: search or browse, then select, then apply" and Saving
+  step 7 for how these get built). A `private_categories:` subscription counts as covering every
+  Tier at once, present and future, the same as the fallback. Include the entry/skill just applied.
 
 - **100%** — draft the Tier 1 paragraph and show it for confirmation before writing, same
   discipline as every other write in this mechanism:
@@ -543,11 +554,11 @@ active `CATALOG.md` entries:
   If this Category already has one or more standalone Tier 2 lines in the section (earlier
   individual adoptions that hadn't yet reached 100%), **consolidate**: the confirmation draft
   replaces those lines with the one Tier 1 paragraph rather than keeping both.
-- **A large majority but not all** (rule of thumb: roughly four-fifths or more, or "all but one or
-  two" for a small category) — draft nothing. Ask directly whether this project's identity centers
-  on the Category; if so, name the specific not-yet-adopted entries and offer to adopt them (each
-  adoption re-runs this same check). Only write the Tier 1 paragraph once coverage actually reaches
-  100%, whether via this prompt or independently later.
+- **A large majority but not all** (rule of thumb: roughly four-fifths or more, or "all but one" of
+  a small Tier count) — draft nothing. Ask directly whether this project's identity centers on the
+  Category; if so, name the specific not-yet-covered Tier(s) and offer to adopt a skill for each
+  (each adoption re-runs this same check). Only write the Tier 1 paragraph once coverage actually
+  reaches 100%, whether via this prompt or independently later.
 - **Below that** — falls through to the Tier 2 outcome below.
 
 **Tier 2 (either gate failed, or coverage is below the majority threshold)** — draft a standalone
@@ -665,6 +676,30 @@ that gap without a separate registration step
 4. Write every approved entry to `trigger_index.yaml` in one pass, then **propagate once for the
    whole batch** (a single commit covering the sweep, not one per entry — this is maintenance, not
    an ongoing stream of individual saves).
+
+### Backfilling "Adopted Shared Resources" for pre-existing adoptions
+
+Same shape as trigger backfill above, for the same reason: "Adopted Shared Resources" only runs
+*during* an Apply or a `private_categories:` grant, so any resource a project adopted before this
+mechanism existed has no line/paragraph for it yet, and nothing will ever trigger the check on its
+own — there's no future Apply coming for something already fully adopted. Triggered by something
+like *"shared resources — backfill Adopted Shared Resources"* (every consumer) or *"...for
+`<consumer>`"* (one project):
+
+1. For the project(s) in scope, read its effective adopted set (`private_opted_in:` plus any
+   `private_categories:` subscription's current members, per `design\
+   shared_resources_relationship_graph.md`'s "Category subscription") and group by Category.
+2. For each Category with any adoption at all, run the same two gates and the same Tier-coverage
+   computation as Apply's own check, above — reading each adopted `.claude\skills\*\SKILL.md`
+   stub's own scope to determine which Tier(s) it actually covers, never assuming skill-count
+   equals Tier-count (a whole-Category fallback is one skill covering every Tier at once).
+3. Draft the resulting state for the whole project in one pass — every Category's outcome (a Tier 1
+   paragraph, a Tier 2 line, or nothing) — and show it for confirmation before writing, same as any
+   other write here. This can *replace* a hand-authored "Adopted Shared Resources" section (or an
+   older CLAUDE.md paragraph pre-dating this mechanism entirely) with the mechanism's own real
+   output — the point of running a backfill is to confirm the mechanical result matches, not to
+   trust a hand-written guess at what it would say.
+4. Write, then propagate once per project (not once per Category).
 
 ### Retrieval Audit — noticing, comparing, and fixing a gap in one pass
 
