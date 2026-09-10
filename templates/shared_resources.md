@@ -513,8 +513,9 @@ this mechanism) — every `reference`/`tool` Apply ends by writing/updating its 
 paragraph** — what `shared_resources` is, how adoption works, and the two possible outcomes
 (mandate vs. situational) — true regardless of what's actually been adopted, so it ships as part
 of the scaffolded template itself (`consumer_CLAUDE.md.tmpl`), never written or edited by Apply/
-Forget. Underneath it sits the **listing** — a `_None adopted yet._` fallback, or real Tier 1/Tier
-2 content — which is the only part Apply/Forget ever touch. This split exists specifically so
+Forget. Underneath it sits the **listing** — a `_None yet._` roster-line fallback, or a real
+roster line plus, once a Category reaches 100% coverage, a Project-defining paragraph — which is
+the only part Apply/Forget ever touch. This split exists specifically so
 nothing here only reads correctly in one adoption state: a project with zero adoptions, one
 occasional resource, or a fully-adopted defining domain all get the same correct general framing,
 because that framing was never conditional on adoption state to begin with.
@@ -550,13 +551,16 @@ reasons, all load-bearing:
 this file's own reasoning above stays checkable against the real text):
 > One of the pieces above, `shared_resources`, governs a cross-project reference library the
 > operator maintains centrally in the hub and reuses across projects — search, adopt, save, and
-> retrieval all follow that piece's own mechanism. Adopting something turns it into a Skill that
-> fires on this model's own judgment when a live question looks relevant, not a guarantee and not
-> a standing import. What's actually been adopted into this project, and how much weight each
-> carries, is listed below: a resource covering this project's defining domain is a mandate —
-> consult it before answering, since a missed trigger there is a real gap, not a shrug. Anything
-> else defaults the other way — useful when its own topic comes up, not something to weight into
-> every answer regardless of relevance.
+> retrieval all follow that piece's own mechanism.
+>
+> 1. **General directive.** If a shared resource has been opted into, consult it whenever the
+>    current question is relevant to its topic.
+> 2. **Project-defining directive.** If an opted-in shared resource is project-defining, default
+>    to consulting it before gathering other information or answering — do not first judge
+>    whether the question is "relevant enough" to warrant the check; treat the check itself as the
+>    default action, not a conditional one. This default governs only *whether* to consult the
+>    resource, not *which part* of it to read — leave that selection to the resource's own
+>    skill(s)/mechanism.
 
 **Before computing anything, two gates — both required — decide whether this entry's Category can
 ever be treated as project-defining at all:**
@@ -568,10 +572,10 @@ ever be treated as project-defining at all:**
 2. **More than one active `CATALOG.md` entry** in this Category. A 1-member category can't be
    "comprehensively adopted" in any meaningful sense — 100% of one is degenerate, not a signal.
 
-**If either gate fails**, skip straight to the Tier 2 outcome below for this entry alone — no
-percentage of anything gets computed. This is what keeps something like `git_permission_allowlist`
-(an `insight` with no Category at all) from ever being mistaken for project-defining, no matter how
-many other resources this project goes on to adopt.
+**If either gate fails**, this entry just joins the roster line (below) with no Project-defining
+paragraph — no percentage of anything gets computed. This is what keeps something like
+`git_permission_allowlist` (an `insight` with no Category at all) from ever being mistaken for
+project-defining, no matter how many other resources this project goes on to adopt.
 
 **If both gates pass, measure Tier coverage, not entry coverage.** The adoption unit in this
 mechanism is a *skill* (Saving step 7's Category-level fallback, or a narrower Tier-scoped skill
@@ -590,36 +594,50 @@ one-skill, whole-category fallback adoption as a sliver of coverage. Instead:
   step 7 for how these get built). A `private_categories:` subscription counts as covering every
   Tier at once, present and future, the same as the fallback. Include the entry/skill just applied.
 
-- **100%** — draft the Tier 1 paragraph and show it for confirmation before writing, same
+**The listing has two pieces, both mechanically maintained:**
+- **Roster line** — always present once at least one resource is adopted, superseding the
+  `_None yet._` fallback the scaffolder writes:
+  > **Shared resources adopted for this project:** {{ADOPTED_RESOURCES}}.
+
+  where `{{ADOPTED_RESOURCES}}` is every currently-adopted resource's own identifier (its skill
+  name where adoption produced one, else its `CATALOG.md` entry name), comma-separated and each in
+  backticks — regardless of Tier 1/Tier 2 status. Every Apply appends this entry's identifier to
+  the existing list (order doesn't matter); every Forget removes it (see "Forgetting," below).
+- **Project-defining paragraph** — present only when at least one Category has reached 100% Tier
+  coverage (below); absent entirely otherwise, since Tier 2 items need nothing beyond the roster
+  line above and the general paragraph's own "General directive." No separate per-resource topic
+  sentence for Tier 2 items — the roster line's name plus the resource's own skill/mechanism is
+  enough for the general directive to act on; don't add one back.
+
+- **100%** — draft the Project-defining paragraph and show it for confirmation before writing, same
   discipline as every other write in this mechanism. The general paragraph above already covers
-  *why* a missed trigger matters and that firing isn't guaranteed — this paragraph only needs the
-  project-specific mandate itself:
-  > **{{CATEGORY}}** is this project's defining domain — {{topic}}. Consult it first (reached via
-  > {{ADOPTED_SKILLS}}) before providing what would otherwise likely be misinformation; if a
-  > genuinely {{CATEGORY}}-relevant question doesn't trigger one of those skills, that's a signal
-  > to invoke it manually, never a reason to assume it doesn't apply. If a real decision turns on a
-  > principle no existing entry covers, say so explicitly rather than filling the gap silently —
-  > that's the moment to save a new entry, not reason around quietly.
+  *why* a missed trigger matters and what the mandate directive requires — this paragraph only
+  needs to name the domain and scope the assumption:
+  > **Project-defining shared resource(s) for this project:** {{CATEGORY}}, reached via the skills
+  > above. Assume most matters discussed in this project are at least adjacent to this resource
+  > unless the session's topic clearly falls outside its domain.
+  >
+  > If a real decision turns on a principle no existing entry covers, say so explicitly rather than
+  > filling the gap silently — that's the moment to save a new entry, not reason around quietly.
 
-  If this Category already has one or more standalone Tier 2 lines in the section (earlier
-  individual adoptions that hadn't yet reached 100%), **consolidate**: the confirmation draft
-  replaces those lines with the one Tier 1 paragraph rather than keeping both.
+  If more than one Category has independently reached 100%, list them comma-separated after the
+  label (`{{CATEGORY_1}}, {{CATEGORY_2}}, reached via the skills above.`) rather than writing a
+  separate paragraph per Category — one shared closing sentence covers all of them (this mechanism
+  favors speed over precision; see `design\shared_resources_mechanical_trigger.md`). If this
+  Category is newly reaching 100% and the Project-defining paragraph doesn't exist yet, add it;
+  the roster line itself never needed to change to get here, so there is nothing to consolidate.
 - **A large majority but not all** (rule of thumb: roughly four-fifths or more, or "all but one" of
-  a small Tier count) — draft nothing. Ask directly whether this project's identity centers on the
-  Category; if so, name the specific not-yet-covered Tier(s) and offer to adopt a skill for each
-  (each adoption re-runs this same check). Only write the Tier 1 paragraph once coverage actually
-  reaches 100%, whether via this prompt or independently later.
-- **Below that** — falls through to the Tier 2 outcome below.
-
-**Tier 2 (either gate failed, or coverage is below the majority threshold)** — draft a standalone
-line for just this entry and show it for confirmation:
-> `{{RESOURCE}}` represents information according to {{topic}}. Consult when the user surfaces
-> such topics.
+  a small Tier count) — draft nothing beyond the roster-line addition. Ask directly whether this
+  project's identity centers on the Category; if so, name the specific not-yet-covered Tier(s) and
+  offer to adopt a skill for each (each adoption re-runs this same check). Only write the
+  Project-defining paragraph once coverage actually reaches 100%, whether via this prompt or
+  independently later.
+- **Below that** — the entry's identifier joins the roster line and nothing else is written.
 
 A `private_categories:` subscription grant is a parallel trigger point for this same check, not a
 separate mechanism — subscribing to a Category is an instant path to 100% coverage of it (present
-and future entries alike), so it runs the same two gates and, if both pass, drafts the same Tier 1
-paragraph.
+and future entries alike), so it runs the same two gates and, if both pass, drafts the same
+Project-defining paragraph.
 
 ### Forgetting
 
@@ -634,13 +652,15 @@ off, checking whether a relevant resource was ever adopted (via browse's in-use 
 forgetting it if it's stale — is a reasonable first move.
 
 **Also update `### Adopted Shared Resources`'s listing** (see above — never its fixed general
-paragraph, which stays exactly as scaffolded regardless of what's adopted) if this entry has a
-line or is covered by a Category paragraph there: a standalone Tier 2 line for this entry is
-removed outright; forgetting an entry that was covered by a Tier 1 Category paragraph (breaking
-that Category's 100% coverage) downgrades the paragraph back to individual Tier 2 lines for
-whatever remains adopted in it. If this project's last shared_resources adoption anywhere is
-forgotten, revert the listing to its scaffolded fallback (`_None adopted yet._`) — the general
-paragraph above it and the `### Adopted Shared Resources` heading itself never change.
+paragraph, which stays exactly as scaffolded regardless of what's adopted): remove this entry's
+identifier from the roster line, and, if it was part of a Category currently covered by the
+Project-defining paragraph, recompute that Category's Tier coverage — dropping below 100% removes
+the Category from the Project-defining paragraph (or removes the paragraph entirely if no Category
+still qualifies), while the forgotten entry's identifier simply disappears from the roster line
+along with it. If this project's last shared_resources adoption anywhere is forgotten, revert the
+roster line to its scaffolded fallback (`**Shared resources adopted for this project:** _None
+yet._`) — the general paragraph above it and the `### Adopted Shared Resources` heading itself
+never change.
 
 ### Adjusting triggers — recalibrating after living with them
 
@@ -751,9 +771,10 @@ like *"shared resources — backfill Adopted Shared Resources"* (every consumer)
    computation as Apply's own check, above — reading each adopted `.claude\skills\*\SKILL.md`
    stub's own scope to determine which Tier(s) it actually covers, never assuming skill-count
    equals Tier-count (a whole-Category fallback is one skill covering every Tier at once).
-3. Draft the resulting state for the whole project in one pass — every Category's outcome (a Tier 1
-   paragraph, a Tier 2 line, or nothing) — and show it for confirmation before writing, same as any
-   other write here. This can *replace* a hand-authored "Adopted Shared Resources" section (or an
+3. Draft the resulting state for the whole project in one pass — the roster line naming every
+   adopted resource, plus a Project-defining paragraph for whichever Category(ies) reach 100% (or
+   none) — and show it for confirmation before writing, same as any other write here. This can
+   *replace* a hand-authored "Adopted Shared Resources" section (or an
    older CLAUDE.md paragraph pre-dating this mechanism entirely) with the mechanism's own real
    output — the point of running a backfill is to confirm the mechanical result matches, not to
    trust a hand-written guess at what it would say.

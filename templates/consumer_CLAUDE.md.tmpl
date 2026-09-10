@@ -117,12 +117,14 @@ registry-update note if it needs to stick.
 
 One of the pieces above, `shared_resources`, governs a cross-project reference library the
 operator maintains centrally in the hub and reuses across projects — search, adopt, save, and
-retrieval all follow that piece's own mechanism. Adopting something turns it into a Skill that
-fires on this model's own judgment when a live question looks relevant, not a guarantee and not a
-standing import. What's actually been adopted into this project, and how much weight each carries,
-is listed below: a resource covering this project's defining domain is a mandate — consult it
-before answering, since a missed trigger there is a real gap, not a shrug. Anything else defaults
-the other way — useful when its own topic comes up, not something to weight into every answer
-regardless of relevance.
+retrieval all follow that piece's own mechanism.
+
+1. **General directive.** If a shared resource has been opted into, consult it whenever the
+   current question is relevant to its topic.
+2. **Project-defining directive.** If an opted-in shared resource is project-defining, default to
+   consulting it before gathering other information or answering — do not first judge whether the
+   question is "relevant enough" to warrant the check; treat the check itself as the default
+   action, not a conditional one. This default governs only *whether* to consult the resource, not
+   *which part* of it to read — leave that selection to the resource's own skill(s)/mechanism.
 
 {{ADOPTED_SHARED_RESOURCES}}

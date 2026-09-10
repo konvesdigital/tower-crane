@@ -89,7 +89,7 @@ TOOL_BLURBS = {
 # scaffold, never written conditionally later) - this fallback is only the "what's been adopted"
 # LISTING underneath it, which shared_resources.md's Apply/Forget procedures own from the first
 # real adoption onward. The scaffolder itself only ever writes this fallback, never real content.
-ADOPTED_SHARED_RESOURCES_NONE = '_None adopted yet._'
+ADOPTED_SHARED_RESOURCES_NONE = '**Shared resources adopted for this project:** _None yet._'
 
 # Toolkit-governed Track-1 skill pieces (design\\directive_economy.md): a piece name in here is
 # scaffolded as one or more project-local skill stubs (each sourced from
