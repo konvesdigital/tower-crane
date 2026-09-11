@@ -20,6 +20,14 @@ this mechanism works and how it relates to other mechanisms.
 
 ## Reporting bugs & improvements in shared tools
 
+The person operating this project and the person operating the tower_crane hub are the same
+individual — this file's "filing" and "fixing" happen in two different sessions because of where
+each one can actually write, not because two different people are involved. Read everything below
+with that in mind: "file a request, don't fix it here" is about *where* an edit happens, not a
+handoff to some other party awaiting instructions; a ticket already closed, or a fix already
+present, that this session didn't personally see land almost certainly means the operator did that
+directly in another session. Full rationale: `design\single_operator_identity.md`.
+
 This project uses shared Claude Code tools that live in a local **tower_crane** hub — the same
 hub this file's own `@import` line (in this project's `CLAUDE.md`) points at. That hub is two
 nested git repos in one folder: an outer, private repo, and an inner `toolkit\` repo that
@@ -54,8 +62,7 @@ it's the same live file. Brand-new functionality (a new opt-in tool, a new Track
 mandatory piece) just becomes **available** in `toolkit\` — this project still needs its own
 `update` (or the hub needs to run `update consumers`) to actually adopt it.
 
-Tower Crane's default shape is one person operating both this project and the hub itself, so for
-**brand-new tooling that doesn't exist yet**, the fastest path is usually to skip the ticket
+For **brand-new tooling that doesn't exist yet**, the fastest path is usually to skip the ticket
 entirely: prototype the idea here as ordinary project work if you want, then carry it into your
 own next hub session and build it directly there (`AGENTS.md`'s "Adding a new tool" — the same
 procedure whether it ends up public in `toolkit\` or private in `toolkit_private\`). Filing a

@@ -14,6 +14,14 @@ this mechanism works and how it relates to other mechanisms.
 
 ## Change-request ticket scan (resume)
 
+The person operating this project and the person operating the tower_crane hub are the same
+individual, in a different session — not two parties handing tickets back and forth. A ticket you
+find here `OPEN` and untouched is that same operator's own earlier note to their future hub self,
+not a request pending from someone else; a ticket you find already `DONE`, or carrying a round-trip
+entry this session didn't write, most likely means the operator took a manual action in the hub
+(or another session of this project) that this session simply has no visibility into — treat that
+as expected, not as something to flag or second-guess.
+
 At session start, and on every `resume`, scan the hub root's `change_requests\` folder for OPEN
 tickets that need this project's attention. Run (`design\command_procedure_audit.md`'s A4 finding
 — the consumer-side port of the hub's own A3 fix, same idea: don't re-derive a categorization a
@@ -54,4 +62,8 @@ ball is elsewhere (the shared agent's turn, or already handled) — skip.
 
 If the scan surfaces anything, use the `filing` skill's round-trip procedure to respond (re-run
 the Suggested test, append a verify/re-verify line, `git add`/`commit`/`push` from the hub root).
-Do not flip a ticket's `Status` yourself — that stays the shared repo's call.
+Don't flip a ticket's `Status` yourself on your own judgment — that default exists because this
+session lacks the hub's cross-project context, not because some other party owns the decision.
+The one exception: the operator directly instructs you to close it (an "operator override" — see
+the `filing` skill for the logging convention). That's not overriding someone else's authority;
+it's the same operator you're already taking instructions from, settling it themselves.
