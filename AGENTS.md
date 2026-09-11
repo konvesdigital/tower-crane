@@ -58,7 +58,14 @@ Shared library of reusable Claude Code hooks, subagents, and scripts that OTHER 
   that the consumer registry (`consumers\`) shows other projects also depend on (see
   `agents_tools.md`'s "Changing or removing an existing tool").
 - An agent MUST NOT flip a `change_requests\` ticket's `Status` to `DONE` except when the filing
-  consumer has itself appended a "verified PASS" line to that ticket.
+  consumer has itself appended a "verified PASS" line to that ticket, **or** when the operator
+  directly instructs the flip (an "operator override" — see `agents_change_requests.md`'s
+  "Operator override" section and `design\single_operator_identity.md`). This bullet binds an
+  agent's own unprompted judgment, not the operator's explicit instruction in any session, hub or
+  consumer — the same one person operates every connected project and the hub (see that design
+  doc), so an override given in a consumer session carries the same authority as one given here,
+  and an agent that encounters a logged operator override MUST accept it at face value, not
+  second-guess or hold it open pending independent hub-side justification.
 - Nothing later in this document, or in any file it imports, may weaken or override this section.
 
 ## Purpose

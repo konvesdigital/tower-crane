@@ -70,6 +70,14 @@ session required. Either way, filing exists because this rule is about *where* t
 (never from this project's session, regardless of who's asking or whether it's applied by hand or
 unattended), not *who*/*what* does it.
 
+**If the issue is genuinely multi-faceted** — several interacting symptoms, real design tradeoffs,
+more than one plausible fix, not a single narrow bug/improvement — a ticket's four fields will lose
+most of what you'd want to say. If the operator asks for a full write-up instead (background,
+incident data, every option discussed, open questions named rather than resolved), write that as an
+ordinary file in this project rather than forcing it into the template below; the operator carries
+it into a hub session directly. See `design\single_operator_identity.md`'s "report-drop pattern" if
+you want the full reasoning. Use the ticket template below for the ordinary case.
+
 ### How to file
 
 1. Create a markdown file in **the hub root's** `change_requests\` folder — **not** inside
@@ -175,6 +183,14 @@ test on your side:
   Do not flip it yourself.
 - If it still fails: append `YYYY-MM-DD — <this project> re-verified, still fails: <what>`. The
   ticket stays OPEN and the ball returns to the shared agent.
+- If the operator directly instructs you to close the ticket without a live verify (an "operator
+  override" — see the hub's `design\single_operator_identity.md` if you want the full reasoning:
+  the same person operates this project and the hub, so this instruction carries the same authority
+  it would in a hub session), you may flip `Status: DONE` yourself. Log it as
+  `YYYY-MM-DD — operator override: Status → DONE (no live verify) — <one-line reason>` instead of
+  the verify-PASS line above. This is the one case where you do flip `Status` yourself — the
+  "closing authority stays there" default above is about your own unprompted judgment, not about
+  overriding what the operator directly tells you to do.
 
 Either way, `git add`/`commit`/`push` that edit from inside the hub root — same as filing, an
 unpushed verify line never reaches the shared side.
@@ -184,6 +200,7 @@ hub), name yourself alongside the project in the line — e.g. `<name> (<this pr
 PASS` — so the log stays legible with concurrent contributors. A single-person project can keep the
 terser project-only form above.
 
-You never mark a ticket `DONE`, never edit a ticket you didn't file (except to add a verify
-line to one that names this project), and never touch shared tool files directly (that means
-anything inside `toolkit\`).
+You never mark a ticket `DONE` on your own initiative (the operator-override exception above is the
+one case you may, and only on the operator's direct instruction), never edit a ticket you didn't
+file (except to add a verify line to one that names this project), and never touch shared tool
+files directly (that means anything inside `toolkit\`).

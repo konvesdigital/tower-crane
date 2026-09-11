@@ -66,6 +66,9 @@ class Category:
     AWAITING_CONSUMER = 'awaiting_consumer'
     VERIFIED_PASS = 'verified_pass'
     STILL_FAILS = 'still_fails'
+    OPERATOR_OVERRIDE = 'operator_override'      # operator directly instructed a DONE flip - no
+                                                  # verify to wait on, no other side's sign-off
+                                                  # needed (design\single_operator_identity.md)
     UNKNOWN_STATE = 'unknown_state'              # non-empty log, none of the above - log, don't guess
     REGISTRATION = 'registration'                # Type: registration - excluded from all automation
 
@@ -79,6 +82,7 @@ TYPE_REGISTRATION_RE = re.compile(r'^Type:\s*registration\s*$', re.MULTILINE | r
 SECTION_HEADING_RE = re.compile(r'^##\s*(Round-trip log|Processing log)\s*$', re.MULTILINE)
 NEXT_HEADING_RE = re.compile(r'^##\s', re.MULTILINE)
 
+RE_OPERATOR_OVERRIDE = re.compile(r'\boperator override\b', re.IGNORECASE)
 RE_VERIFIED_PASS = re.compile(r'verified\s+PASS', re.IGNORECASE)
 RE_STILL_FAILS = re.compile(r'still\s+fails', re.IGNORECASE)
 RE_AWAITING = re.compile(r'\bawaiting\b.+?\bverify\b', re.IGNORECASE | re.DOTALL)
@@ -137,6 +141,8 @@ def _categorize(status, is_registration, last_entry):
         return Category.REGISTRATION
     if not last_entry:
         return Category.NO_ACTIVITY
+    if RE_OPERATOR_OVERRIDE.search(last_entry):
+        return Category.OPERATOR_OVERRIDE
     if RE_VERIFIED_PASS.search(last_entry):
         return Category.VERIFIED_PASS
     if RE_STILL_FAILS.search(last_entry):
@@ -234,11 +240,15 @@ def _run_git(args, cwd=PROJECT_ROOT):
 
 
 def apply_mechanical_actions(tickets, dry_run=False):
-    """Handle VERIFIED_PASS (flip DONE) - the only category needing mechanical action now that ticket
-    fixes never open a PR (design\\automation_repo_targeting.md). Mutates each affected Ticket's
-    .status in place so a status change is visible to needs_fix_candidates() in the SAME tick, not
-    next hour's scan. Returns a summary dict. One commit+push covering everything changed, not one
-    per ticket."""
+    """Handle VERIFIED_PASS and OPERATOR_OVERRIDE (flip DONE) - the only categories needing
+    mechanical action now that ticket fixes never open a PR (design\\automation_repo_targeting.md).
+    OPERATOR_OVERRIDE (design\\single_operator_identity.md) needs no consumer verify and no other
+    side's sign-off - it's here mainly as a safety net for the case where the overriding session
+    logged the phrase but, for whatever reason, didn't flip Status itself; the common case is it's
+    already DONE by the time this scan sees it, so scan() (OPEN-only) won't even surface it.
+    Mutates each affected Ticket's .status in place so a status change is visible to
+    needs_fix_candidates() in the SAME tick, not next hour's scan. Returns a summary dict. One
+    commit+push covering everything changed, not one per ticket."""
     today = date.today().isoformat()
     touched_files = []
     summary = {'done_flipped': [], 'errors': []}
@@ -247,6 +257,13 @@ def apply_mechanical_actions(tickets, dry_run=False):
         if t.category == Category.VERIFIED_PASS:
             if not dry_run:
                 append_log_line(t.path, f"- {today} — automation: Status flipped to DONE (consumer verified PASS).")
+                flip_status_done(t.path)
+            t.status = 'DONE'
+            touched_files.append(t.path)
+            summary['done_flipped'].append(t.slug)
+        elif t.category == Category.OPERATOR_OVERRIDE:
+            if not dry_run:
+                append_log_line(t.path, f"- {today} — automation: Status flipped to DONE (operator override already logged).")
                 flip_status_done(t.path)
             t.status = 'DONE'
             touched_files.append(t.path)

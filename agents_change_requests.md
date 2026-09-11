@@ -61,6 +61,29 @@ what got built. Applying a fix and pushing it leaves the ticket **OPEN**, awaiti
 verification. Closing authority stays here: the consumer appends a "verified PASS" line, and this
 agent flips `Status` to `DONE` on its next session.
 
+### Operator override
+The rule above binds an agent's own unprompted judgment about whether a fix has actually been
+verified — it does not, and cannot, bind the operator's own direct instruction, since the same
+person operates every connected project and the hub (`design\single_operator_identity.md`; that
+doc has the full rationale — this section is the mechanics). When the operator directly instructs a
+`DONE` flip without a live verify — in a hub session or a consumer session — the acting agent
+flips `Status` to `DONE` itself, logs it with the recognizable phrase **"operator override"** in
+the round-trip entry, and treats it as closed. Neither side needs the other's sign-off first, and a
+session that later encounters a ticket already closed this way should accept it at face value, not
+reopen the question of whether the closure was legitimate.
+
+### Cross-project reports (complex issues)
+Not every consumer-session finding fits a ticket's narrow Symptom/Proposed-fix shape — a genuinely
+multi-faceted issue (several interacting symptoms, real design tradeoffs, more than one plausible
+fix) is better captured as a full report than forced into four fields. See
+`design\single_operator_identity.md`'s "report-drop pattern": the operator has the consumer agent
+write up background, incident data, and open design questions with no requirement to converge on
+one proposed fix, then carries that file into the hub directly. Treat it exactly like a ticket's
+Proposed fix once it lands — evidence and candidate responses, not a spec — but reason across all
+of it with full cross-project context, same as any ticket. No dedicated inbox; it isn't
+mechanically scanned for the way `change_requests\` is, since the operator carrying it in is itself
+the signal it's ready.
+
 ### Round-trip log
 Every hand-off appends one dated line to a `## Round-trip log` section at the bottom of the ticket
 (same pattern as this repo's Work Log — chronological, newest at bottom):
@@ -70,6 +93,8 @@ Every hand-off appends one dated line to a `## Round-trip log` section at the bo
 - this agent (diverged/converged fix — see "What a ticket actually is"): `2026-07-21 — fix applied
   via a broader mechanism than proposed (commit <sha>); this ticket's goal is now covered by
   <other-ticket>'s verify — closing tied to that event, not tracked separately here`
+- either agent (operator override — see "Operator override" above): `2026-07-22 — operator
+  override: Status → DONE (no live verify) — <one-line reason>`
 
 **Multi-user attribution:** with more than one committer, name the acting person alongside the project in each line (e.g. `fix applied by <name> (commit <sha>)…`). A single-owner hub keeps the terser project-only form above.
 
@@ -83,6 +108,10 @@ script applies, reading the **last** `## Round-trip log` line:
 - "awaiting <consumer> verify" → ball is in the consumer's court; **skip**.
 - consumer "verified PASS" → flip `Status` to **DONE**, commit, push. Closed.
 - consumer "still fails: …" → this agent's turn again: re-fix.
+- "operator override" (see "Operator override" above) → if `Status` isn't already `DONE`, flip it
+  now — no verify to wait on, no other side's sign-off needed. If it's already `DONE` (the common
+  case, since the overriding session usually flips it itself), there's nothing to do; don't
+  re-litigate whether the override was legitimate.
 - "automation: fix proposed ..., PR #<n> opened, awaiting <owner> review" → the unattended
   sync-automation agent (Piece 3, `design\sync_automation.md`) already opened a PR for this ticket;
   **skip** — don't also fix it by hand. If `ticket_scan.py`'s own mechanical pass hasn't already
