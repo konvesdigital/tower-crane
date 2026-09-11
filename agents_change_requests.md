@@ -58,8 +58,10 @@ Suggested test, or a replacement the round-trip log names when the shipped fix d
 proposal (see "What a ticket actually is" above) — and confirmed the underlying need is met. It
 does NOT mean this agent applied a fix, and it does NOT require that the literal Proposed fix was
 what got built. Applying a fix and pushing it leaves the ticket **OPEN**, awaiting the consumer's
-verification. Closing authority stays here: the consumer appends a "verified PASS" line, and this
-agent flips `Status` to `DONE` on its next session.
+verification. By default, the flip happens here, not because this session has more authority than
+a consumer session, but because it's the one with cross-project context to trust a "verified PASS"
+line at face value: the consumer appends that line, and this agent flips `Status` to `DONE` on its
+next session.
 
 ### Operator override
 The rule above binds an agent's own unprompted judgment about whether a fix has actually been
@@ -68,9 +70,10 @@ person operates every connected project and the hub (`design\single_operator_ide
 doc has the full rationale — this section is the mechanics). When the operator directly instructs a
 `DONE` flip without a live verify — in a hub session or a consumer session — the acting agent
 flips `Status` to `DONE` itself, logs it with the recognizable phrase **"operator override"** in
-the round-trip entry, and treats it as closed. Neither side needs the other's sign-off first, and a
+the round-trip entry, and treats it as closed. No other session needs to sign off first, and a
 session that later encounters a ticket already closed this way should accept it at face value, not
-reopen the question of whether the closure was legitimate.
+reopen the question of whether the closure was legitimate — it's the same operator who could have
+made the same call here, having made it there instead.
 
 ### Cross-project reports (complex issues)
 Not every consumer-session finding fits a ticket's narrow Symptom/Proposed-fix shape — a genuinely
@@ -85,7 +88,8 @@ mechanically scanned for the way `change_requests\` is, since the operator carry
 the signal it's ready.
 
 ### Round-trip log
-Every hand-off appends one dated line to a `## Round-trip log` section at the bottom of the ticket
+Every session that touches a ticket appends one dated line to a `## Round-trip log` section at the
+bottom of the ticket
 (same pattern as this repo's Work Log — chronological, newest at bottom):
 - this agent: `2026-07-18 — fix applied (commit <sha>), affects: <slug>; awaiting <slug> verify`
 - consumer:   `2026-07-19 — <slug> re-verified, still fails: <what>`   (ticket stays OPEN)
@@ -105,11 +109,11 @@ report; don't re-derive the categorization by hand. A `register` ticket (`Type: 
 handled by "Registration tickets" below instead. For a normal fix ticket, this is the rule the
 script applies, reading the **last** `## Round-trip log` line:
 - No round-trip activity yet → this agent's turn: fix it (Applying a fix, below).
-- "awaiting <consumer> verify" → ball is in the consumer's court; **skip**.
+- "awaiting <consumer> verify" → the next entry is expected from a consumer session; **skip**.
 - consumer "verified PASS" → flip `Status` to **DONE**, commit, push. Closed.
 - consumer "still fails: …" → this agent's turn again: re-fix.
 - "operator override" (see "Operator override" above) → if `Status` isn't already `DONE`, flip it
-  now — no verify to wait on, no other side's sign-off needed. If it's already `DONE` (the common
+  now — no verify to wait on, no other session's sign-off needed. If it's already `DONE` (the common
   case, since the overriding session usually flips it itself), there's nothing to do; don't
   re-litigate whether the override was legitimate.
 - "automation: fix proposed ..., PR #<n> opened, awaiting <owner> review" → the unattended

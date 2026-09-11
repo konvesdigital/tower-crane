@@ -418,8 +418,8 @@ restating the same prose instruction more emphatically:
 
 ### Discovery: search or browse, then select, then apply
 
-Once something exists to find — either saved here just now, or by someone else in another session
-— three explicit steps — never collapsed into one, since a query can turn up more than one genuinely
+Once something exists to find — either saved here just now, or in an earlier session — three
+explicit steps — never collapsed into one, since a query can turn up more than one genuinely
 distinct match.
 
 1. **Search or browse** the catalog:

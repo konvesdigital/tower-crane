@@ -58,7 +58,7 @@ Three categories need this project's attention now:
   confirm-before-acting step as above.
 
 Every other category (`no_activity`, `still_fails`, `verified_pass`) on a filtered hit means the
-ball is elsewhere (the shared agent's turn, or already handled) — skip.
+next move belongs to a hub session, or the ticket's already handled — skip.
 
 If the scan surfaces anything, use the `filing` skill's round-trip procedure to respond (re-run
 the Suggested test, append a verify/re-verify line, `git add`/`commit`/`push` from the hub root).

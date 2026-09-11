@@ -172,8 +172,8 @@ you want the full reasoning. Use the ticket template below for the ordinary case
 
 A ticket has only two statuses, `OPEN` and `DONE`, and **`DONE` means *you* verified the fix**,
 not that the shared repo applied one. The ticket stays **OPEN through the entire round-trip**.
-Every hand-off appends one dated line to the ticket's `## Round-trip log` (newest at the
-bottom).
+Every session that touches the ticket appends one dated line to its `## Round-trip log` (newest at
+the bottom).
 
 **Finding which tickets need your attention at resume is handled by the always-resident
 `filing_resume_check.md` piece** (imported alongside this skill, mandatory for every consumer) —
@@ -185,18 +185,19 @@ a new Track-1 skill) rather than a fix to something already in use, run `update`
 Suggested test can't pass on something this project doesn't have yet. Then re-run its Suggested
 test on your side:
 
-- If it works: append `YYYY-MM-DD — <this project> verified PASS`. **Leave `Status: OPEN`** —
-  the tower_crane agent flips it to `DONE` on its next session (closing authority stays there).
-  Do not flip it yourself.
+- If it works: append `YYYY-MM-DD — <this project> verified PASS`. **Leave `Status: OPEN`** — a
+  hub session flips it to `DONE` next. That's not because it has more say than this session; it's
+  the session with cross-project context to trust your "verified PASS" line at face value. Don't
+  flip it yourself.
 - If it still fails: append `YYYY-MM-DD — <this project> re-verified, still fails: <what>`. The
-  ticket stays OPEN and the ball returns to the shared agent.
+  ticket stays OPEN, for a hub session to pick up again.
 - If the operator directly instructs you to close the ticket without a live verify (an "operator
   override" — see the hub's `design\single_operator_identity.md` if you want the full reasoning:
   the same person operates this project and the hub, so this instruction carries the same authority
   it would in a hub session), you may flip `Status: DONE` yourself. Log it as
   `YYYY-MM-DD — operator override: Status → DONE (no live verify) — <one-line reason>` instead of
-  the verify-PASS line above. This is the one case where you do flip `Status` yourself — the
-  "closing authority stays there" default above is about your own unprompted judgment, not about
+  the verify-PASS line above. This is the one case where you do flip `Status` yourself — the default
+  above is about your own unprompted judgment when you lack cross-project context, not about
   overriding what the operator directly tells you to do.
 
 Either way, `git add`/`commit`/`push` that edit from inside the hub root — same as filing, an
