@@ -148,12 +148,41 @@ def scan_hooks(cfg, state):
     return items
 
 
-def scan_skills(state):
+def _skill_current(project_root, name, canon_path, import_base=None):
+    """True if project_root/.claude/skills/<name>/SKILL.md exists and matches the canonical
+    source content exactly - either accepted rendering (direct-substitution or
+    pointer-indirected) when import_base is given, or the single copy-only rendering when it's
+    None (a private, toolkit_private skill). Mirrors check_tower_crane.py's test_consumer() skill-
+    stub drift comparison, so "already adopted" here means "adopted and current," not just "a
+    folder with this name exists" - closes the presence-vs-currency gap tracked in
+    project_progress.md's Current Status / design\\shared_resources_pipeline_reliability.md
+    (Family B): a stub can be present but stale (e.g. a changed trigger description, or the
+    2026-09-14 SEO Primary-tier chain-load fix) and previously stayed invisible to both
+    `update`/`update consumers` because presence alone was treated as proof of currency."""
+    stub_path = project_root / '.claude' / 'skills' / name / 'SKILL.md'
+    if not stub_path.exists():
+        return False
+    actual = stub_path.read_text(encoding='utf-8')
+    if import_base is None:
+        return actual == materialize_skill_stub(canon_path)
+    expected_direct = materialize_skill_stub(canon_path, import_base, use_pointer=False)
+    expected_pointer = materialize_skill_stub(canon_path, import_base, use_pointer=True)
+    return actual in (expected_direct, expected_pointer)
+
+
+def scan_skills(state, project_root, cfg):
     items = []
     for name in STANDALONE_SKILLS:
-        if name in state['have_skills'] or not (SKILLS_DIR / name).is_dir():
+        canon_path = SKILLS_DIR / name / 'SKILL.md'
+        if not (SKILLS_DIR / name).is_dir():
             continue
-        items.append({'category': 'skill', 'name': name, 'detail': f'templates/skills/{name}/SKILL.md'})
+        detail = f'templates/skills/{name}/SKILL.md'
+        if name in state['have_skills']:
+            if _skill_current(project_root, name, canon_path, cfg['import_base']):
+                continue
+            items.append({'category': 'skill', 'name': name, 'detail': detail, 'drifted': True})
+            continue
+        items.append({'category': 'skill', 'name': name, 'detail': detail})
     return items
 
 
@@ -188,13 +217,20 @@ def scan_private(cfg, state, project_root):
     if PRIVATE_SKILLS_DIR.is_dir():
         for skill_dir in sorted(d for d in PRIVATE_SKILLS_DIR.iterdir() if d.is_dir()):
             name = skill_dir.name
-            if name in state['have_skills'] or not (skill_dir / 'SKILL.md').exists():
+            canon_path = skill_dir / 'SKILL.md'
+            if not canon_path.exists():
                 continue
-            skill_category = read_skill_category(skill_dir / 'SKILL.md')
-            items.append({'category': 'private', 'kind': 'skill', 'name': name,
-                           'detail': f'toolkit_private/templates/skills/{name}/SKILL.md',
-                           'skill_category': skill_category,
-                           'subscribed': skill_category is not None and skill_category in subscribed_categories})
+            skill_category = read_skill_category(canon_path)
+            item = {'category': 'private', 'kind': 'skill', 'name': name,
+                    'detail': f'toolkit_private/templates/skills/{name}/SKILL.md',
+                    'skill_category': skill_category,
+                    'subscribed': skill_category is not None and skill_category in subscribed_categories}
+            if name in state['have_skills']:
+                if _skill_current(project_root, name, canon_path):
+                    continue
+                items.append({**item, 'drifted': True})
+                continue
+            items.append(item)
     return items
 
 
@@ -229,7 +265,12 @@ def print_items(items):
         # design\shared_resources_relationship_graph.md "Category subscription": call out a
         # private skill matching one of this project's own private_categories: subscriptions,
         # rather than leaving it just another anonymous number the operator must recognize by name.
-        tag = f" [{it['skill_category']} — subscribed]" if it.get('subscribed') else ''
+        tags = []
+        if it.get('subscribed'):
+            tags.append(f"{it['skill_category']} — subscribed")
+        if it.get('drifted'):
+            tags.append('drifted — needs re-sync')
+        tag = f" [{', '.join(tags)}]" if tags else ''
         print(f"  [{i}] {it['name']}{tag}  ({it['detail']})")
     print("=== END AVAILABLE ===")
 
@@ -412,7 +453,7 @@ def main():
 
     cfg = get_shared_config(SHARED_ROOT)
     state = read_consumer_state(project_root)
-    items = (scan_hooks(cfg, state) + scan_skills(state) + scan_pieces(state)
+    items = (scan_hooks(cfg, state) + scan_skills(state, project_root, cfg) + scan_pieces(state)
               + scan_private(cfg, state, project_root))
 
     if args.apply is None:

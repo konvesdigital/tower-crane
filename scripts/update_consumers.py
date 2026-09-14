@@ -78,7 +78,8 @@ def scan_all(cfg, consumers, this_host):
             print(f"  [skip] {c['name']}: no CLAUDE.md at {this_path} - path stale or moved?")
             continue
         state = read_consumer_state(project_root)
-        items = scan_hooks(cfg, state) + scan_skills(state) + scan_pieces(state) + scan_private(cfg, state, project_root)
+        items = (scan_hooks(cfg, state) + scan_skills(state, project_root, cfg) + scan_pieces(state)
+                  + scan_private(cfg, state, project_root))
         if items:
             slug = Path(c['file']).stem
             result.append((slug, {'consumer': c, 'project_root': project_root, 'items': items}))
@@ -107,7 +108,14 @@ def print_all(scanned):
             if it['category'] != current_cat:
                 current_cat = it['category']
                 print(f"   [{labels[current_cat]}]")
-            print(f"  [{n}] {it['name']}  ({it['detail']})")
+            # Mirrors scan_consumer_update.py's print_items() tag rendering - keep in sync.
+            tags = []
+            if it.get('subscribed'):
+                tags.append(f"{it['skill_category']} — subscribed")
+            if it.get('drifted'):
+                tags.append('drifted — needs re-sync')
+            tag = f" [{', '.join(tags)}]" if tags else ''
+            print(f"  [{n}] {it['name']}{tag}  ({it['detail']})")
     print("=== END AVAILABLE ===")
     return global_index
 
