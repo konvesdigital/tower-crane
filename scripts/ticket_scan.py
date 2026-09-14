@@ -28,7 +28,10 @@ Two responsibilities, both importable (no `claude` subprocess calls live here):
     precedent: a filed ticket / its own metadata is inert until acted on, so it stays ungated). Runs
     against PROJECT_ROOT, not SHARED_ROOT - change_requests\\ lives in the outer repo, a sibling of
     the inner toolkit\\ repo this module's SHARED_ROOT points at (design\\local_first_reframe.md's
-    outer/inner split).
+    outer/inner split). The CLI's `--apply` also prints the remaining OPEN tickets' categorization
+    right after applying, so an interactive (human) session's resume-time scan is one call instead
+    of a dry-run-then-hand-apply round trip - `run_automation.py` never uses the CLI at all, only
+    the importable functions, so this is purely an interactive-session convenience.
 
   Attempt-tracking (load_state/record_attempt/is_backed_off) is separate from categorization so a
     ticket whose fix keeps failing check_tower_crane.py backs off after max_attempts instead of
@@ -330,12 +333,18 @@ def main():
         tickets = filter_by_project(tickets, args.project)
     if args.apply:
         summary = apply_mechanical_actions(tickets)
+        remaining = [t for t in tickets if t.status == 'OPEN']
         if args.json:
-            print(json.dumps(summary, indent=2))
+            print(json.dumps({
+                'summary': summary,
+                'remaining': [{'slug': t.slug, 'category': t.category} for t in remaining],
+            }, indent=2))
         else:
             print("=== ticket_scan.py --apply ===")
             for k, v in summary.items():
                 print(f"  {k}: {v}")
+            print("--- remaining OPEN tickets (categorized) ---")
+            _cli_report(remaining)
         return
 
     if args.json:

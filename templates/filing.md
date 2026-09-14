@@ -160,11 +160,17 @@ you want the full reasoning. Use the ticket template below for the ordinary case
    (the same lightweight cross-reference shape a regression ticket already uses with
    `Regression of:`). This still isn't a mandate — the shared repo's session owns the final call on
    whether it becomes the default, same as any other proposal.
-3. **From inside the hub root** — not `toolkit\`; `change_requests\` belongs to a different git
-   repo with a different remote — `git add` the new ticket file, commit (e.g.
-   `git commit -m "File ticket: <slug>"`), and `git push`. Filing isn't done until the ticket
-   reaches the hub root repo's GitHub remote — an uncommitted file sitting on your own disk never
-   reaches the shared side. This requires write access to that repo, not just read.
+3. Commit it via the hub's own hardened commit script, never raw `git add`/`commit`/`push` directly
+   (fragile, and skips the leak-scan-first gate this script already runs):
+   ```
+   <python_launcher> "<hub root>\toolkit\scripts\checkpoint_git.py" --message "File ticket: <slug>"
+   --include "change_requests\<filename>.md"
+   ```
+   (`--include` names your new ticket file explicitly — the script treats any other untracked file
+   in the hub root as a conscious decision it won't make for you, so it can't accidentally sweep in
+   something unrelated.) Filing isn't done until the ticket reaches the hub root repo's GitHub
+   remote — an uncommitted file sitting on your own disk never reaches the shared side. This
+   requires write access to that repo, not just read.
 4. Do **not** apply the fix yourself, and do **not** edit the shared repo's progress doc. Your
    job ends at filing until the shared repo ships a fix.
 
@@ -200,8 +206,12 @@ test on your side:
   above is about your own unprompted judgment when you lack cross-project context, not about
   overriding what the operator directly tells you to do.
 
-Either way, `git add`/`commit`/`push` that edit from inside the hub root — same as filing, an
-unpushed verify line never reaches the shared side.
+Either way, commit that edit the same way as filing (step 3 above) — never raw git directly:
+```
+<python_launcher> "<hub root>\toolkit\scripts\checkpoint_git.py" --message "<slug>: verify/override"
+```
+This ticket file is already tracked, so no `--include` is needed — an unpushed verify line never
+reaches the shared side otherwise.
 
 **Multi-user attribution:** if more than one person works in this project (or files against this
 hub), name yourself alongside the project in the line — e.g. `<name> (<this project>) verified

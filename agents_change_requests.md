@@ -103,19 +103,18 @@ bottom of the ticket
 **Multi-user attribution:** with more than one committer, name the acting person alongside the project in each line (e.g. `fix applied by <name> (commit <sha>)…`). A single-owner hub keeps the terser project-only form above.
 
 ### Scanning at session start (including on `resume` — see `AGENTS.md`) or when asked to process requests
-Run `python scripts\ticket_scan.py` (no flags) from inside `toolkit\` first — it categorizes every
-`Status: OPEN` ticket in `change_requests\` using exactly the rule below and prints it as a dry-run
-report; don't re-derive the categorization by hand. A `register` ticket (`Type: registration`) is
-handled by "Registration tickets" below instead. For a normal fix ticket, this is the rule the
-script applies, reading the **last** `## Round-trip log` line:
+Run `python scripts\ticket_scan.py --apply` from inside `toolkit\` first — it categorizes every
+`Status: OPEN` ticket in `change_requests\`, mechanically flips any `verified_pass`/
+`operator_override` ticket to `DONE` itself (its own log line, its own scoped commit+push — no
+separate git step, and nothing to hand-read first: those two categories need no judgment), then
+prints the categorized list of whatever's still `OPEN` afterward. Don't re-derive the categorization
+by hand, and don't hand-apply a DONE flip yourself for either of those two categories — by the time
+you see the output, the script already did. A `register` ticket (`Type: registration`) is handled by
+"Registration tickets" below instead. For a normal fix ticket, this is the rule for whatever the
+script's "remaining OPEN" list still shows, reading the **last** `## Round-trip log` line:
 - No round-trip activity yet → this agent's turn: fix it (Applying a fix, below).
 - "awaiting <consumer> verify" → the next entry is expected from a consumer session; **skip**.
-- consumer "verified PASS" → flip `Status` to **DONE**, commit, push. Closed.
 - consumer "still fails: …" → this agent's turn again: re-fix.
-- "operator override" (see "Operator override" above) → if `Status` isn't already `DONE`, flip it
-  now — no verify to wait on, no other session's sign-off needed. If it's already `DONE` (the common
-  case, since the overriding session usually flips it itself), there's nothing to do; don't
-  re-litigate whether the override was legitimate.
 - "automation: fix proposed ..., PR #<n> opened, awaiting <owner> review" → the unattended
   sync-automation agent (Piece 3, `design\sync_automation.md`) already opened a PR for this ticket;
   **skip** — don't also fix it by hand. If `ticket_scan.py`'s own mechanical pass hasn't already
@@ -127,6 +126,10 @@ script applies, reading the **last** `## Round-trip log` line:
   "done" — this is exactly the shape a diverged/converged-fix closing note takes (see "What a
   ticket actually is"), so don't treat the category itself as a problem to fix; read the actual
   log and act on what it says.
+
+If `--apply`'s own summary reports a commit/push error for the bookkeeping it just tried to do,
+treat that like any other blocked git action — surface it and let the operator decide, don't
+retry by hand.
 
 Round-trip lines an unattended `scripts\run_automation.py` run writes are prefixed `automation:` to
 distinguish them from live-session lines. It never flips `Status` to DONE itself except via
@@ -141,7 +144,8 @@ append a short documentary note to the existing `consumers\<slug>.md` entry (sam
 prior such notes) recording what was adopted and when — `check_tower_crane.py` won't catch a
 skipped note, this convention isn't mechanically checked. Then run
 `scripts\check_tower_crane.py --consumer <slug>` (confirms no unrelated drift), flip `Status` to
-**DONE**, log it in `project_progress.md`, commit, and push.
+**DONE**, log it in `project_progress.md`, and commit via
+`python scripts\checkpoint_git.py --message "<summary>"` — never raw git directly.
 
 (A *new* project joining the platform no longer files a ticket here at all — retired 2026-08-12
 alongside `templates\register.md`; `"connect project"` now writes `consumers\<slug>.md` directly
@@ -162,7 +166,10 @@ in the same hub session via `scripts\new_consumer.py`'s adoption branch. See
    explicitly per "What a ticket actually is" above — name the replacement Suggested test if the
    original no longer applies, and name the other ticket if verification is now shared with it.
    Leave `Status: OPEN`. Log it in `project_progress.md`, naming affected consumers there too.
-   Commit and push — the ticket closes only when the consumer verifies.
+   Commit via `python scripts\checkpoint_git.py --message "<summary>"` — never raw `git commit`/
+   `push` directly (fragile, and skips the leak-scan-first gate this script already runs). It
+   covers both the fix itself (`toolkit\`) and the ticket/progress-doc edit (outer repo) in one
+   call. The ticket closes only when the consumer verifies.
 
 ### Cross-consumer verify tickets (only when 2+ consumers exist)
 When a behavior-changing fix ships and the registry (`consumers\`) lists consumers *other* than the

@@ -151,8 +151,9 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
      graph edge pointing at a name no `CATALOG.md` row resolves to; mention it and offer to fix the
      named file (a hand edit, not a script-driven repair — the check only detects, per its own
      docstring). Silent (the "no catalog/graph inconsistencies found" line) → say nothing.
-4. Read `project_progress.md`: Current Status, Next Up, Decisions table, most recent Work Log
-   entry only.
+4. Run `python scripts\progress_sections.py` — prints `project_progress.md`'s Current Status, Next
+   Up, Decisions table, and most recent Work Log entry in one call; read its output rather than
+   grepping for headings and re-deriving section boundaries by hand.
 5. Scan `change_requests\` per `agents_change_requests.md`'s "Scanning at session start" section —
    this is what surfaces a Piece 3 automation PR (`design\sync_automation.md`).
 6. State status and next step in 1-3 lines, leading with the machine identity from step 1, folding
@@ -163,7 +164,6 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
 a session opened moments after its own `checkpoint`'s push has nothing new to find. No staleness
 tag by design. Use plain `resume` for a day-start or any longer gap.
 1. Read `host_id` from `toolkit\config.local.json`.
-2. Read `project_progress.md`: Current Status, Next Up, Decisions table, most recent Work Log
-   entry only.
+2. Run `python scripts\progress_sections.py` (same call `resume` step 4 uses).
 3. State status and next step in 1-3 lines, leading with the machine identity from step 1. Do not
    replay full history.

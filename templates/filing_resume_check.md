@@ -61,7 +61,8 @@ Every other category (`no_activity`, `still_fails`, `verified_pass`) on a filter
 next move belongs to a hub session, or the ticket's already handled — skip.
 
 If the scan surfaces anything, use the `filing` skill's round-trip procedure to respond (re-run
-the Suggested test, append a verify/re-verify line, `git add`/`commit`/`push` from the hub root).
+the Suggested test, append a verify/re-verify line, commit via `checkpoint_git.py` from the hub
+root — see the `filing` skill, never raw git directly).
 Don't flip a ticket's `Status` yourself on your own judgment — that default exists because this
 session lacks the hub's cross-project context, not because some other party owns the decision.
 The one exception: the operator directly instructs you to close it (an "operator override" — see
