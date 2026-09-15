@@ -77,7 +77,10 @@ reached) read whatever is present.
    Status**/**Current Focus**, **Next Up**, the **Decisions** (table or Locked/Open), the active
    **Phase** if phased, and the **most recent Work Log entry** only.
 6. State status and next step in 1–3 lines, leading with the host identity from step 1 (when
-   available — see that step's skip condition). Do not replay full history.
+   available — see that step's skip condition), **folding in anything step 3 surfaced** (the hub
+   falling behind its own upstream, or a `check_tower_crane.py --write-guidance` finding) — a
+   step-3 finding is not satisfied by having run the check, only by this line actually saying so.
+   Do not replay full history.
 
 ### "quick resume"
 
