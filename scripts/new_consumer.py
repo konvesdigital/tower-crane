@@ -857,6 +857,15 @@ def main():
                   "until then (design\\connect_project_commit_gate.md).")
             remaining_checklist = ["- [ ] `git init` (or finish cloning), then commit the setup "
                                     "changes this run made."]
+        if readme_written:
+            # This branch never writes FIRST_RUN.md (see above), so a freshly-created README.md
+            # placeholder (step 3e) - which also holds back step 6c's auto-commit, same as the
+            # brand-new/reconnect branches' own needs_overview gate - would otherwise have no
+            # user-facing signal at all telling them it's there or that it's uncommitted.
+            remaining_checklist = (remaining_checklist or []) + [
+                "- [ ] Fill in the project narrative placeholder in `README.md` (freshly created "
+                "by this run), then commit the setup changes this run made (no FIRST_RUN.md "
+                "checklist exists for a host-merge connection to track this)."]
         remaining_checklist = (remaining_checklist or []) + [
             "- [ ] Open the project in a fresh Claude Code session and accept the CLAUDE.md "
             "import-approval dialog if prompted (this machine hasn't opened it before)."]
@@ -1037,9 +1046,16 @@ Notes: scaffolded by `scripts/new_consumer.py` on {scaffold_date}. Registry form
             # wrote (or the pre-existing CLAUDE.md itself) still carries an unfilled overview
             # placeholder. Never framed as a warning - nothing is wrong, just deferred to the
             # user's own next action in that project (FIRST_RUN.md's checklist already produces a
-            # covering commit as a side effect once completed).
-            print(f"  note   {project_name}'s setup changes are uncommitted - completing "
-                  "FIRST_RUN.md there finishes that.")
+            # covering commit as a side effect once completed - except the host-merge branch,
+            # which never writes FIRST_RUN.md at all, so it gets its own message instead of
+            # pointing at a file that branch doesn't create).
+            if existing_consumer is not None:
+                print(f"  note   {project_name}'s setup changes (including a fresh README.md "
+                      "placeholder) are uncommitted - fill it in, then commit them yourself (no "
+                      "FIRST_RUN.md checklist exists for a host-merge connection).")
+            else:
+                print(f"  note   {project_name}'s setup changes are uncommitted - completing "
+                      "FIRST_RUN.md there finishes that.")
 
     # --- 7. next steps -------------------------------------------------------------------------
     # Branched, not one-size-fits-all: the import-approval dialog is a Claude Code trust decision
