@@ -121,20 +121,31 @@ explicit go-ahead before running.
 ## Removing this machine
 **Trigger: "remove" / "uninstall"** — reciprocal with `setup_machine`. Reverses this machine's
 setup entirely: disconnects every consumer connected here (this-only, so any other machine's own
-connection to the same consumer is untouched), then clears this machine's own gitignored state
+connection to the same consumer is untouched), clears this machine's own gitignored state
 (`config.local.json`, `.claude\settings.local.json`, `.claude\self_hooks_status.md`,
-`.claude\automation_state.json`, `.claude\skills\`). Never touches `.claude\hooks\` (tracked
-personal content, not this hub's to delete) or the hub folder itself — physically deleting that,
-if wanted, is a manual step afterward, the same "can't finish mid-session" shape
-`setup_machine.md`'s own "Bootstrapping the outer hub" scenario already has.
+`.claude\automation_state.json`, `.claude\skills\`), and removes the `origin` remote from **both**
+the outer hub repo and `toolkit\` — local-only and fully reversible (`git remote add origin <url>`
+reattaches), never touching GitHub or any other machine's own clone. Never touches `.claude\hooks\`
+(tracked personal content, not this hub's to delete) or any tracked file content in either repo.
+
+The script itself reports, plainly, whether the folder is actually safe to delete yet: it checks
+both repos for uncommitted changes or commits never pushed to `origin` (captured before `origin` is
+removed) and lists them as blockers if found, telling you to run `checkpoint` first. If neither repo
+has anything unsaved, it states outright that this machine is now fully disconnected and these files
+are safe to delete — physically deleting the folder, if wanted, stays a manual step you do
+yourself; this command never deletes anything on its own. Deleting the actual GitHub repos, if ever
+wanted, is a separate decision outside this command's scope entirely — running `"uninstall"` on
+every machine that has this hub is what "stopped using Tower Crane everywhere" already means.
 
 **Before running: list every consumer that will be disconnected here, by name, and get explicit
-go-ahead** — same discipline as above. State the reversal path honestly too: `setup_machine.md`
-run again on this machine, then reconnecting whichever consumers are wanted via `"connect
-project"` — a rebuild, not a restore.
+go-ahead** — same discipline as above; also mention that both repos' `origin` will be removed
+(reversible) unless the dirty/unpushed check blocks it. State the reversal path honestly too:
+`setup_machine.md` run again on this machine (re-attaching `origin`), then reconnecting whichever
+consumers are wanted via `"connect project"` — a rebuild, not a restore.
 
 Then run `scripts\remove_hub.py` (no args — operates on this machine via its own
-`config.local.json`) from inside `toolkit\`. Full design: `design\connect_disconnect.md`.
+`config.local.json`) from inside `toolkit\`. Full design: `design\connect_disconnect.md`,
+`design\hub_uninstall_end_state.md`.
 
 ## Migrating an already-connected host to reference-indirection
 **Trigger: "migrate consumer to reference-indirection"** — a one-time, explicit action, distinct

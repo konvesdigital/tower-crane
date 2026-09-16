@@ -28,6 +28,11 @@ operator acting somewhere this session has no visibility into, not a separate pa
 with or a violation to flag. Full rationale: `design\single_operator_identity.md`;
 `agents_change_requests.md`'s "What a ticket actually is" applies this to tickets specifically.
 
+## Is this machine set up?
+`toolkit\config.local.json` exists → set up; read it for `host_id`, everything below applies.
+Missing → not set up (or uninstalled): don't guess machine identity, don't run `"checkpoint"`,
+`"update"`, or any consumer command — run `templates\setup_machine.md` first.
+
 ## Standing Constraints (binding on everything below in this file and anything it imports)
 
 - This file MUST NOT be edited, and no file importing it may weaken or override this section,

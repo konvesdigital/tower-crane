@@ -1,19 +1,25 @@
 #!/usr/bin/env python3
 """
-remove_hub.py - reverses setup_machine.md for THIS machine (design\\connect_disconnect.md). Disconnects
-every consumer connected on this machine (this-only mode, so any OTHER machine's connection to the
-same consumer is left alone), then clears this machine's own gitignored per-machine hub state, so
-a later setup_machine.md run here starts genuinely clean - no consumer thinks this machine is
-still connected, and nothing here remembers this machine was ever configured.
+remove_hub.py - reverses setup_machine.md for THIS machine (design\\connect_disconnect.md,
+design\\hub_uninstall_end_state.md). Disconnects every consumer connected on this machine (this-only
+mode, so any OTHER machine's connection to the same consumer is left alone), clears this machine's
+own gitignored per-machine hub state, and removes the 'origin' remote from both the outer hub repo
+and toolkit\\ - so a later setup_machine.md run here starts genuinely clean - no consumer thinks
+this machine is still connected, nothing here remembers this machine was ever configured, and this
+clone can no longer push/pull at all.
 
-Deliberately does NOT touch anything git-tracked: the outer/toolkit repos themselves, or
-.claude\\hooks\\ (Rung 2's tracked-across-this-operator's-own-machines personal hook content,
-design\\resource_sharing_model.md's three-rung ladder - not this hub's to delete). Physically
-deleting the hub folder tree afterward, if wanted, is left to the user - this script only clears
-state and connections, it never rm -rf's its own running directory.
+Never touches tracked FILE CONTENT or history in either repo, or .claude\\hooks\\ (Rung 2's tracked-
+across-this-operator's-own-machines personal hook content, design\\resource_sharing_model.md's
+three-rung ladder - not this hub's to delete) - only the 'origin' remote entry, which is local-only
+and fully reversible (`git remote add origin <url>` reattaches). Never touches GitHub or any other
+machine's own clone. Physically deleting the hub folder tree afterward, if wanted, is left to the
+user - this script only clears state/connections and reports whether that's actually safe yet
+(design\\hub_uninstall_end_state.md's dirty/unpushed check); it never rm -rf's its own running
+directory.
 """
 
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -85,6 +91,55 @@ def _print_consumer_summary(slug, host_result):
     print(f"  committed to this consumer's own repo: {commit_label}")
     if local['left_uncommitted']:
         print(f"  left uncommitted: {', '.join(local['left_uncommitted'])}")
+
+
+def _repo_status(repo_path):
+    """Advisory-only snapshot of a repo's dirty/unpushed state, used to decide whether declaring
+    this folder "safe to delete" is honest (design\\hub_uninstall_end_state.md). Never blocks or
+    mutates anything by itself - same spirit as update_toolkit.py's cmd_notify(). Fetches origin
+    (if present) so the ahead-count is accurate; call this BEFORE _remove_origin() removes it.
+
+    Returns {'is_repo': bool, 'dirty': bool, 'had_origin': bool, 'ahead': str|None} - 'ahead' is a
+    digit-string commit count, or None if unknown/unverifiable (no origin, unresolvable branch, or
+    the fetch itself failed - e.g. offline). An unknown ahead-count is treated as a blocker by the
+    caller, same as a nonzero one - can't claim "safe" without being able to check."""
+    repo_path = Path(repo_path)
+    result = {'is_repo': False, 'dirty': False, 'had_origin': False, 'ahead': None}
+    if not (repo_path / '.git').is_dir():
+        return result
+    result['is_repo'] = True
+
+    def _git(args):
+        return subprocess.run(['git', '-C', str(repo_path)] + args, capture_output=True, text=True)
+
+    result['dirty'] = bool(_git(['status', '--porcelain', '--untracked-files=no']).stdout.strip())
+    result['had_origin'] = 'origin' in _git(['remote']).stdout.split()
+    if not result['had_origin']:
+        return result
+
+    branch = _git(['rev-parse', '--abbrev-ref', 'HEAD']).stdout.strip()
+    if not branch or branch == 'HEAD':
+        return result
+    if _git(['fetch', 'origin']).returncode != 0:
+        return result  # offline/unreachable - ahead stays None (unverifiable)
+    counts = _git(['rev-list', f'origin/{branch}..HEAD', '--count']).stdout.strip()
+    result['ahead'] = counts if counts.isdigit() else None
+    return result
+
+
+def _remove_origin(repo_path):
+    """Removes the 'origin' remote from repo_path if present - local-only, fully reversible
+    (`git remote add origin <url>` reattaches), never touches GitHub or any other clone
+    (design\\hub_uninstall_end_state.md). Returns True if a remote was actually removed."""
+    repo_path = Path(repo_path)
+    if not (repo_path / '.git').is_dir():
+        return False
+    remotes = subprocess.run(['git', '-C', str(repo_path), 'remote'],
+                              capture_output=True, text=True).stdout.split()
+    if 'origin' not in remotes:
+        return False
+    subprocess.run(['git', '-C', str(repo_path), 'remote', 'remove', 'origin'], capture_output=True)
+    return True
 
 
 def print_close_out_summary(this_host, host_results, per_machine_removed):
@@ -159,12 +214,54 @@ def main():
     else:
         print("No per-machine state found to clear (already clean).")
 
+    # Repo status must be captured BEFORE removing origin, so the ahead-count still has a remote
+    # to compare against (design\hub_uninstall_end_state.md).
+    outer_status = _repo_status(PROJECT_ROOT)
+    toolkit_status = _repo_status(SHARED_ROOT)
+    outer_origin_removed = _remove_origin(PROJECT_ROOT)
+    toolkit_origin_removed = _remove_origin(SHARED_ROOT)
+
     print()
-    print("Done. This machine no longer appears connected to any consumer, and has no local "
-          "config.local.json / self-use state left. .claude\\hooks\\ (tracked, personal content) "
-          "was left alone - it isn't Tower Crane's to delete. If you also want the hub folder "
-          "itself gone, delete it now (both outer and toolkit\\ - config.local.json won't come "
-          "back on a fresh clone; setup_machine.md will treat this exactly like a new machine).")
+    print("Git remotes:")
+    for label, status, origin_removed in (
+        ("outer hub repo", outer_status, outer_origin_removed),
+        ("toolkit\\", toolkit_status, toolkit_origin_removed),
+    ):
+        if not status['is_repo']:
+            print(f"  {label}: not a git repo - nothing to disconnect")
+        elif origin_removed:
+            print(f"  {label}: 'origin' remote removed (reversible - `git remote add origin "
+                  "<url>` reattaches)")
+        elif not status['had_origin']:
+            print(f"  {label}: already had no 'origin' remote")
+
+    blockers = []
+    for label, status in (("outer hub repo", outer_status), ("toolkit\\", toolkit_status)):
+        if not status['is_repo']:
+            continue
+        if status['dirty']:
+            blockers.append(f"{label} has uncommitted changes")
+        if status['had_origin'] and status['ahead'] not in (None, '0'):
+            blockers.append(f"{label} has {status['ahead']} commit(s) that were never pushed")
+        elif status['had_origin'] and status['ahead'] is None:
+            blockers.append(f"{label}'s unpushed-commit status could not be verified (offline?)")
+
+    print()
+    if blockers:
+        print("NOT safe to delete this folder yet:")
+        for b in blockers:
+            print(f"  - {b}")
+        print("Run `checkpoint` (which commits and pushes) to clear these, then re-run "
+              "\"uninstall\" to confirm, before deleting anything.")
+    else:
+        print("This machine is now fully disconnected from Tower Crane: no consumers connected "
+              "here, no per-machine state left, and both repos' 'origin' remote removed. Nothing "
+              "here depends on GitHub or any other machine anymore - these files are safe to "
+              "delete whenever you want. That's a manual step you do yourself; this command "
+              "never deletes anything on its own. (.claude\\hooks\\ - tracked, personal content, "
+              "not Tower Crane's to begin with - is included in that, same as everything else "
+              "here. Deleting the actual GitHub repos, if you ever want that too, is a separate "
+              "decision this command has no part in.)")
 
     print_close_out_summary(this_host, host_results, removed)
 
