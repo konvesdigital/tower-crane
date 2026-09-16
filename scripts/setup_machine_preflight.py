@@ -69,6 +69,7 @@ after --nest/--attach-existing/--new-outer has run) correctly resolves against t
 """
 
 import argparse
+import json
 import re
 import shutil
 import subprocess
@@ -77,6 +78,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from registry_lib import parse_registry
+from config_lib import get_shared_config, merge_bash_allowlist
 
 TOOLKIT_SIGNATURE = ['hooks', 'scripts', 'templates', 'AGENTS.md', 'config.example.json']
 OUTER_SIGNATURE = ['project_progress.md', 'consumers', 'change_requests']
@@ -310,6 +312,28 @@ def cmd_known_hosts(cwd):
           "connected before under one of them or a different name (C6) - don't infer it.")
 
 
+def cmd_write_bash_allowlist(cwd):
+    """--write-bash-allowlist (design\\bash_permission_allowlist.md): merges the hub-scope Bash/
+    PowerShell rules from templates\\bash_allowlist.json into THIS machine's own, gitignored
+    .claude\\settings.local.json - so the routine resume/checkpoint/update commands AGENTS.md
+    already documents never reach the ambient auto-mode permission classifier. Self-locating like
+    every other command here (ignores cwd); safe to re-run any time (append-if-missing)."""
+    toolkit_root = Path(__file__).resolve().parent.parent
+    project_root = toolkit_root.parent
+    cfg = get_shared_config(toolkit_root)
+    settings_path = project_root / '.claude' / 'settings.local.json'
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    settings = {}
+    if settings_path.exists():
+        try:
+            settings = json.loads(settings_path.read_text(encoding='utf-8')) or {}
+        except json.JSONDecodeError:
+            settings = {}
+    merge_bash_allowlist(settings, 'hub', cfg)
+    settings_path.write_text(json.dumps(settings, indent=2), encoding='utf-8', newline='\n')
+    print(f"[OK] hub Bash/PowerShell allowlist merged into {settings_path}")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="templates\\setup_machine.md's Step 0 pre-flight sequence, mechanized "
@@ -324,6 +348,9 @@ def main():
                         help="Attach an existing outer remote to cwd (the C2 workaround).")
     group.add_argument('--known-hosts', action='store_true',
                         help="List host identities already known to this hub (C6).")
+    group.add_argument('--write-bash-allowlist', action='store_true',
+                        help="Merge the hub-scope Bash allowlist into this machine's own "
+                             "settings.local.json (design\\bash_permission_allowlist.md).")
     parser.add_argument('--git-remote-url', default=None,
                          help="Used by --new-outer (optional) and --attach-existing (required).")
     args = parser.parse_args()
@@ -340,6 +367,8 @@ def main():
         cmd_attach_existing(cwd, args.git_remote_url)
     elif args.known_hosts:
         cmd_known_hosts(cwd)
+    elif args.write_bash_allowlist:
+        cmd_write_bash_allowlist(cwd)
 
 
 if __name__ == '__main__':

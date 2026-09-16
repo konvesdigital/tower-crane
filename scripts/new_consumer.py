@@ -60,7 +60,7 @@ from config_lib import (
     get_dispatch_optin, build_hub_pointer_content, build_dispatch_cmd_map,
     write_new_connection_files, collapse_imports_to_pointer, fix_imports, commit_hub_changes,
     commit_consumer_changes, path_is_clean, commit_consumer_progress_note, scoped_status_paths,
-    sync_consumer_repo,
+    sync_consumer_repo, merge_bash_allowlist,
 )
 import registry_lib
 
@@ -516,6 +516,10 @@ def main():
     read_rule = f"Read({import_base}/**)"
     if read_rule not in allow_list:
         allow_list.append(read_rule)
+    # design\bash_permission_allowlist.md: the fixed, host-invariant set of Bash/PowerShell
+    # commands consumer-side resume/checkpoint already documents (git pull, consumer_resume_check.py,
+    # checkpoint_consumer.py) - so they never hit the ambient auto-mode permission classifier.
+    merge_bash_allowlist(settings, 'consumer')
 
     for t in tools:
         # Expand config placeholders into the concrete command - dispatch-wrapper form for a new

@@ -34,7 +34,10 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from config_lib import get_shared_config, get_dispatch_optin, materialize_skill_stub, _LEADING_COMMENT_RE
+from config_lib import (
+    get_shared_config, get_dispatch_optin, materialize_skill_stub, _LEADING_COMMENT_RE,
+    merge_bash_allowlist,
+)
 from registry_lib import parse_registry, host_path
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent  # toolkit\
@@ -250,12 +253,47 @@ def scan_pieces(state):
     return items
 
 
+def scan_permissions(state):
+    """design\\bash_permission_allowlist.md: the consumer-scope Bash/PowerShell allowlist in
+    templates\\bash_allowlist.json - one aggregate item (like a hook's whole event block) if
+    ANY pattern in it is still missing from this project's own settings.json, never one item per
+    pattern."""
+    allowlist_path = TEMPLATES_DIR / 'bash_allowlist.json'
+    if not allowlist_path.is_file():
+        return []
+    patterns = json.loads(allowlist_path.read_text(encoding='utf-8')).get('consumer', [])
+    if not patterns:
+        return []
+    existing = (state['settings'].get('permissions', {}).get('allow', [])
+                if isinstance(state['settings'], dict) else [])
+    missing = any(f'Bash({p})' not in existing or f'PowerShell({p})' not in existing for p in patterns)
+    if not missing:
+        return []
+    return [{'category': 'permission', 'name': 'bash_allowlist',
+             'detail': 'templates/bash_allowlist.json (consumer)'}]
+
+
+def apply_permissions(project_root, cfg, item):
+    settings_path = project_root / '.claude' / 'settings.json'
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    settings = {}
+    if settings_path.exists():
+        try:
+            settings = json.loads(settings_path.read_text(encoding='utf-8')) or {}
+        except json.JSONDecodeError:
+            settings = {}
+    merge_bash_allowlist(settings, 'consumer')
+    settings_path.write_text(json.dumps(settings, indent=2), encoding='utf-8', newline='\n')
+    print("  [applied] consumer Bash/PowerShell allowlist merged into .claude/settings.json")
+    return True  # audit-trail note only (update_registry_entry treats 'permission' like 'skill')
+
+
 def print_items(items):
     if not items:
         print("Nothing available - this project already has everything the hub currently offers.")
         return
     labels = {'hook': 'Hook opt-ins', 'skill': 'Toolkit skills', 'piece': 'Protocol pieces',
-              'private': 'Private tools (toolkit_private)'}
+              'private': 'Private tools (toolkit_private)', 'permission': 'Permission allowlist'}
     print(f"=== AVAILABLE ({len(items)}) ===")
     current_cat = None
     for i, it in enumerate(items, 1):
@@ -428,6 +466,8 @@ def do_apply(project_root, cfg, items, spec):
         elif item['category'] == 'private':
             if apply_private(project_root, cfg, item):
                 writeback.append(item['name'])
+        elif item['category'] == 'permission':
+            apply_permissions(project_root, cfg, item)
     if writeback:
         print()
         print("[reminder] The hub's consumers/<slug>.md registry doesn't know about this yet - file "
@@ -454,7 +494,7 @@ def main():
     cfg = get_shared_config(SHARED_ROOT)
     state = read_consumer_state(project_root)
     items = (scan_hooks(cfg, state) + scan_skills(state, project_root, cfg) + scan_pieces(state)
-              + scan_private(cfg, state, project_root))
+              + scan_private(cfg, state, project_root) + scan_permissions(state))
 
     if args.apply is None:
         print_items(items)

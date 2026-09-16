@@ -39,7 +39,8 @@ from check_tower_crane import parse_registry, CONSUMERS_DIR
 from registry_lib import host_path, reconcile_scope_floor
 from scan_consumer_update import (
     SKILL_PIECES, read_consumer_state, scan_hooks, scan_skills, scan_pieces, scan_private,
-    apply_hook, apply_skill, apply_piece, apply_private, resolve_selection,
+    scan_permissions, apply_hook, apply_skill, apply_piece, apply_private, apply_permissions,
+    resolve_selection,
 )
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent  # toolkit\
@@ -79,7 +80,7 @@ def scan_all(cfg, consumers, this_host):
             continue
         state = read_consumer_state(project_root)
         items = (scan_hooks(cfg, state) + scan_skills(state, project_root, cfg) + scan_pieces(state)
-                  + scan_private(cfg, state, project_root))
+                  + scan_private(cfg, state, project_root) + scan_permissions(state))
         if items:
             slug = Path(c['file']).stem
             result.append((slug, {'consumer': c, 'project_root': project_root, 'items': items}))
@@ -94,7 +95,7 @@ def print_all(scanned):
               "hub currently offers.")
         return []
     labels = {'hook': 'Hook opt-ins', 'skill': 'Toolkit skills', 'piece': 'Protocol pieces',
-              'private': 'Private tools (toolkit_private)'}
+              'private': 'Private tools (toolkit_private)', 'permission': 'Permission allowlist'}
     global_index = []
     n = 0
     print(f"=== AVAILABLE across {len(scanned)} consumer(s) ===")
@@ -171,6 +172,7 @@ def update_registry_entry(registry_path, entries, today):
     piece_names = [name for cat, name in entries if cat == 'piece']
     skill_names = [name for cat, name in entries if cat == 'skill']
     private_names = [name for cat, name in entries if cat == 'private']
+    permission_names = [name for cat, name in entries if cat == 'permission']
 
     for tool in hook_names:
         if f"tool: {tool}" in yaml_text:
@@ -195,7 +197,7 @@ def update_registry_entry(registry_path, entries, today):
 
     new_raw = raw[:m.start(2)] + yaml_text + raw[m.end(2):]
 
-    note_items = hook_names + piece_names + skill_names + private_names
+    note_items = hook_names + piece_names + skill_names + private_names + permission_names
     if note_items:
         note = (f"\n**`update consumers` applied {', '.join(note_items)} — {today}, pushed "
                 f"directly from the hub (no filing ticket needed; the hub owns this file).**\n")
@@ -230,6 +232,9 @@ def do_apply(cfg, scanned, global_index, spec, today):
         elif item['category'] == 'private':
             if apply_private(project_root, cfg, item):
                 per_consumer_writeback.setdefault(slug, []).append(('private', item['name']))
+        elif item['category'] == 'permission':
+            if apply_permissions(project_root, cfg, item):
+                per_consumer_writeback.setdefault(slug, []).append(('permission', item['name']))
 
     # design\resource_sharing_model.md's "Saving now propagates itself" fix, one level down
     # (project_progress.md's 2026-08-11 Work Log): this pushes into a consumer's own repo with no

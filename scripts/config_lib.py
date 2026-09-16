@@ -236,6 +236,25 @@ HUB_DISPATCH_RELPATH = '.claude/hooks/_hub_dispatch.py'
 HUB_DISPATCH_TEMPLATE = 'hooks/_hub_dispatch.py'
 
 
+def merge_bash_allowlist(settings, scope, cfg=None):
+    """design\\bash_permission_allowlist.md: merges templates\\bash_allowlist.json's `scope`
+    ('hub' or 'consumer') pattern list into settings's own permissions.allow, as both Bash(...)
+    and PowerShell(...) forms so the two tool-namespaces can never drift apart. Append-if-missing,
+    same shape as new_consumer.py's existing Read(<import base>/**) rule merge. `cfg` is required
+    only for scope='hub' (its patterns carry {{PYTHON_LAUNCHER}}; consumer-scope patterns are
+    already host-invariant and need no expansion). Mutates settings in place and returns it.
+    """
+    allowlist_path = Path(__file__).resolve().parent.parent / 'templates' / 'bash_allowlist.json'
+    patterns = json.loads(allowlist_path.read_text(encoding='utf-8')).get(scope, [])
+    allow_list = settings.setdefault('permissions', {}).setdefault('allow', [])
+    for p in patterns:
+        expanded = expand_optin_command(p, cfg) if cfg is not None else p
+        for rule in (f'Bash({expanded})', f'PowerShell({expanded})'):
+            if rule not in allow_list:
+                allow_list.append(rule)
+    return settings
+
+
 def get_dispatch_optin(optin_path, tool_name, config):
     """Same hooks event/matcher SHAPE as get_expanded_optin() (read from the same canonical
     templates\\optins\\<tool>.json - one file, no duplicated second canonical source), but every
