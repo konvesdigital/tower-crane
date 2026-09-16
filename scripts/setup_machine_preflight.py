@@ -62,6 +62,20 @@ Subcommands (mutually exclusive):
       exact "designed around our own artifacts" mistake C6 explicitly rejected. Empty output is
       expected and fine on a genuinely first-ever machine.
 
+  --reattach-origin --git-remote-url URL
+      Mutating (design\\hub_uninstall_end_state.md). Restores a removed 'origin' remote on an
+      already-nested, already-historied repo - unlike --attach-existing (the C2 workaround for a
+      repo with NO local history yet), this never runs `git init`/`checkout -b`: local `main` and
+      its history are untouched, just `remote add` + `fetch` + restoring the upstream-tracking
+      relationship. Never merges or resets - any real divergence from being disconnected is left for
+      the ordinary `update`/`checkpoint` flow to surface, same as any other remote reconnect. `cmd_
+      detect`'s NESTED output reports `[ORIGIN-MISSING]` per-repo when this is needed.
+
+  --clear-uninstall-note
+      Mutating (design\\hub_uninstall_end_state.md). Deletes a stale TOWER_CRANE_UNINSTALLED.md
+      from cwd (the outer hub root) if present - the note a prior "uninstall" wrote, now stale since
+      this machine is being set up again. No-op, not an error, if the file isn't there.
+
 Self-locating like every other script here: TOOLKIT_ROOT/PROJECT_ROOT are computed fresh from this
 file's own current location on each run, never cached - so --known-hosts (which only makes sense
 after --nest/--attach-existing/--new-outer has run) correctly resolves against the now-nested
@@ -96,6 +110,36 @@ def has_outer_signature(folder):
     return [name for name in OUTER_SIGNATURE if (folder / name).exists()]
 
 
+def _origin_status(repo_dir):
+    """None if repo_dir isn't a git repo; else True/False for whether 'origin' is configured."""
+    if not (repo_dir / '.git').exists():
+        return None
+    return 'origin' in _git(repo_dir, ['remote']).stdout.split()
+
+
+def _report_origin_and_note(outer_dir, toolkit_dir):
+    """Shared by both NESTED branches of cmd_detect() (design\\hub_uninstall_end_state.md): reports
+    each repo's 'origin' status and whether a stale uninstall note is sitting in the outer root -
+    both only ever missing/present because a prior "uninstall" ran here, never on a first-ever
+    machine (whose repos always have 'origin' from --new-outer/--attach-existing)."""
+    for label, repo_dir in (("outer hub repo", outer_dir), ("toolkit\\", toolkit_dir)):
+        status = _origin_status(repo_dir)
+        if status is None:
+            continue
+        if status:
+            print(f"[ORIGIN-OK] {label} ({repo_dir}) has an 'origin' remote configured.")
+        else:
+            print(f"[ORIGIN-MISSING] {label} ({repo_dir}) has no 'origin' remote - likely a prior "
+                  "\"uninstall\" on this exact clone (design\\hub_uninstall_end_state.md). Ask the "
+                  "user for this repo's remote URL, then run `--reattach-origin --git-remote-url "
+                  f"<url>` from inside {repo_dir}.")
+    note_path = outer_dir / 'TOWER_CRANE_UNINSTALLED.md'
+    if note_path.exists():
+        print(f"[UNINSTALL-NOTE] {note_path} is present (left by a prior uninstall) - stale now "
+              "that this machine is being set up again. Run --clear-uninstall-note from the outer "
+              "root once any reattachment above is done.")
+
+
 def cmd_detect(cwd):
     missing_here = has_toolkit_signature(cwd)
     toolkit_sub = cwd / 'toolkit'
@@ -107,8 +151,9 @@ def cmd_detect(cwd):
         parent_found = has_outer_signature(cwd.parent)
         if parent_found:
             print(f"[NESTED] cwd ({cwd}) is a toolkit\\ checkout; its parent ({cwd.parent}) already "
-                  f"has outer-hub markers: {', '.join(parent_found)}. Nothing further needed here - "
-                  "proceed to setup_machine.md Step 1.")
+                  f"has outer-hub markers: {', '.join(parent_found)}. Proceed to setup_machine.md "
+                  "Step 1 once anything reported below is resolved.")
+            _report_origin_and_note(cwd.parent, cwd)
         else:
             print(f"[FLAT] cwd ({cwd}) IS the toolkit content itself (all of "
                   f"{', '.join(TOOLKIT_SIGNATURE)} present directly here), with no outer wrapper "
@@ -118,8 +163,9 @@ def cmd_detect(cwd):
     if not missing_sub:
         # cwd/toolkit is a toolkit clone - cwd itself is the outer root, already correctly nested.
         print(f"[NESTED] cwd ({cwd}) is the outer hub root; `toolkit\\` subfolder found and looks "
-              "like a real toolkit checkout. Nothing further needed here - proceed to "
-              "setup_machine.md Step 1.")
+              "like a real toolkit checkout. Proceed to setup_machine.md Step 1 once anything "
+              "reported below is resolved.")
+        _report_origin_and_note(cwd, toolkit_sub)
         return
 
     print(f"[AMBIGUOUS] Neither cwd ({cwd}) nor cwd\\toolkit\\ looks like a toolkit checkout.")
@@ -277,6 +323,66 @@ def cmd_attach_existing(cwd, git_remote_url):
     print(f"[ATTACHED] {cwd} now tracks origin/main.\n{checkout.stdout.strip()}")
 
 
+def cmd_reattach_origin(cwd, git_remote_url):
+    """--reattach-origin --git-remote-url URL (design\\hub_uninstall_end_state.md): restores a
+    removed 'origin' remote on an already-nested, already-historied repo. Unlike
+    cmd_attach_existing (the C2 workaround for a repo with NO local history yet), never runs
+    `git init`/`checkout -b` - local main and its history are untouched, just `remote add` +
+    `fetch` + restoring the upstream-tracking relationship. Never merges or resets - any real
+    divergence from being disconnected is left for the ordinary `update`/`checkpoint` flow to
+    surface, same as any other remote reconnect."""
+    if not git_remote_url:
+        print("[ABORT] --reattach-origin requires --git-remote-url.")
+        sys.exit(1)
+    if not (cwd / '.git').exists():
+        print(f"[ABORT] {cwd} is not a git repo - nothing to reattach.")
+        sys.exit(1)
+    if 'origin' in _git(cwd, ['remote']).stdout.split():
+        print(f"[ABORT] {cwd} already has an 'origin' remote - nothing to do. Re-run --detect if "
+              "this is unexpected.")
+        sys.exit(1)
+
+    remote = _git(cwd, ['remote', 'add', 'origin', git_remote_url])
+    if remote.returncode != 0:
+        print(f"[ABORT] could not add remote: {remote.stderr.strip()}")
+        sys.exit(1)
+    print(f"[REMOTE] origin -> {git_remote_url}")
+
+    fetch = _git(cwd, ['fetch', 'origin'])
+    if fetch.returncode != 0:
+        print(f"[WARN] fetch failed: {fetch.stderr.strip()} - remote added but not fetched; retry "
+              "`git fetch origin` by hand, or run `update`/`checkpoint` later, which will surface "
+              "the same problem.")
+        return
+    print("[FETCHED] origin.")
+
+    branch = _git(cwd, ['rev-parse', '--abbrev-ref', 'HEAD']).stdout.strip()
+    if branch and branch != 'HEAD':
+        track = _git(cwd, ['branch', f'--set-upstream-to=origin/{branch}', branch])
+        if track.returncode == 0:
+            print(f"[TRACKING] {branch} -> origin/{branch}")
+        else:
+            print(f"[WARN] could not set upstream tracking: {track.stderr.strip()} - `origin/"
+                  f"{branch}` may not exist yet on the remote, or the local branch name differs. "
+                  "Resolve by hand.")
+    print(f"[REATTACHED] {cwd} is connected to origin again. Local history untouched - if it has "
+          "diverged from origin while disconnected, the ordinary `update`/`checkpoint` flow will "
+          "surface that normally.")
+
+
+def cmd_clear_uninstall_note(cwd):
+    """--clear-uninstall-note (design\\hub_uninstall_end_state.md): deletes a stale
+    TOWER_CRANE_UNINSTALLED.md from cwd (the outer hub root) if present - the note a prior
+    "uninstall" wrote, now stale since this machine is being set up again. No-op, not an error, if
+    the file isn't there."""
+    note_path = cwd / 'TOWER_CRANE_UNINSTALLED.md'
+    if note_path.exists():
+        note_path.unlink()
+        print(f"[REMOVED] {note_path} (stale now that this machine is set up again).")
+    else:
+        print(f"[OK] no {note_path.name} found in {cwd} - nothing to clear.")
+
+
 HOST_TAG_RE = re.compile(
     r'^\*\*\d{4}-\d{2}-\d{2}\s*—\s*([A-Za-z][A-Za-z0-9_]*)\s+session', re.MULTILINE)
 
@@ -351,8 +457,15 @@ def main():
     group.add_argument('--write-bash-allowlist', action='store_true',
                         help="Merge the hub-scope Bash allowlist into this machine's own "
                              "settings.local.json (design\\bash_permission_allowlist.md).")
+    group.add_argument('--reattach-origin', action='store_true',
+                        help="Restore a removed 'origin' remote on an already-nested repo "
+                             "(design\\hub_uninstall_end_state.md).")
+    group.add_argument('--clear-uninstall-note', action='store_true',
+                        help="Delete a stale TOWER_CRANE_UNINSTALLED.md from the outer root, if "
+                             "present.")
     parser.add_argument('--git-remote-url', default=None,
-                         help="Used by --new-outer (optional) and --attach-existing (required).")
+                         help="Used by --new-outer (optional), --attach-existing (required), and "
+                              "--reattach-origin (required).")
     args = parser.parse_args()
 
     cwd = Path.cwd()
@@ -369,6 +482,10 @@ def main():
         cmd_known_hosts(cwd)
     elif args.write_bash_allowlist:
         cmd_write_bash_allowlist(cwd)
+    elif args.reattach_origin:
+        cmd_reattach_origin(cwd, args.git_remote_url)
+    elif args.clear_uninstall_note:
+        cmd_clear_uninstall_note(cwd)
 
 
 if __name__ == '__main__':

@@ -72,8 +72,13 @@ flat, or if cwd is `toolkit\` itself) first, then `toolkit\scripts\setup_machine
 doesn't exist. If **neither** path exists at all, that's the ambiguous case below — nothing to run,
 go straight to asking. Whichever one resolves reports one of:
 - `[NESTED]` — already correctly structured (either cwd is the outer root with a `toolkit\`
-  subfolder, or cwd is `toolkit\` itself with a populated outer folder one level up). Nothing further
-  needed — skip straight to Step 1.
+  subfolder, or cwd is `toolkit\` itself with a populated outer folder one level up). The same output
+  also reports each repo's `origin` status and any stale `TOWER_CRANE_UNINSTALLED.md`
+  (`design\hub_uninstall_end_state.md` — both only ever show up after a prior `"uninstall"` on this
+  exact clone). For an `[ORIGIN-MISSING]` line: ask the user for that repo's remote URL, then run
+  `--reattach-origin --git-remote-url <url>` from inside it. For an `[UNINSTALL-NOTE]` line: run
+  `--clear-uninstall-note` from the outer root once any reattachment above is done. Otherwise,
+  nothing further needed — skip straight to Step 1.
 - `[FLAT]` — cwd **is** the toolkit content itself (`hooks\`, `scripts\`, `templates\`, `AGENTS.md`,
   `config.example.json` all present directly here), no outer wrapper around it yet. Continue to 0c.
 - `[AMBIGUOUS]` — neither shape found (C5). Don't assume cwd is the right place — ask the user
