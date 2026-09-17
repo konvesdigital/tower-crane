@@ -1,19 +1,6 @@
 <!--
 Canonical Track-1 skill stub source: filing (toolkit-governed).
 Home: ~\Documents\Claude\tower_crane\toolkit\templates\skills\filing\SKILL.md
-Scaffolded into a consumer's own project-local .claude\skills\filing\SKILL.md — not @imported;
-a consumer re-copies this file (materialize_skill_stub() with {{IMPORT_BASE}} resolved to its own
-home-relative import path AND use_pointer set per its own connection style (reference-indirection
-migration status), 2026-08) to pick up a changed trigger description here. The
-{{READ_INSTRUCTION:filing.md}} placeholder below renders to ONE of two forms depending on
-use_pointer: the direct-substitution wording (not-yet-migrated consumers, the default) or the
-.claude\hub_pointer.md-indirected wording (new connections). Both are independently valid
-canonical shapes - check_tower_crane.py's Pass B accepts either.
-The target this stub points at (templates\filing.md) still floats on HEAD normally; only this
-stub's own trigger wording is a point-in-time copy taken at scaffold/hand-wire time. Drift
-check: check_tower_crane.py's Pass B compares each consumer's stub against this file verbatim
-(rendered under whichever form that consumer actually uses) and FAILs on any mismatch —
-re-copy this file to clear it.
 -->
 ---
 name: filing

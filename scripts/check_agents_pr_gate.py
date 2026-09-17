@@ -1,62 +1,33 @@
 #!/usr/bin/env python3
 """
-check_agents_pr_gate.py - the merge-time CODEOWNERS + branch protection + mechanical-checks gate's
-mechanical half. Runs as
-a GitHub Actions status check on any PR touching `AGENTS.md`, alongside CODEOWNERS-required human
-review - this script is the deterministic teeth that give Checkpoint 2 real substance beyond "a
-human eyeballed it," mirroring check_tower_crane.py's PASS/WARN/FAIL discipline aimed at code.
+check_agents_pr_gate.py - GitHub Actions status check for any PR touching AGENTS.md or one of its
+structural companion files.
 
 No-ops (prints "not applicable", exits 0) if the diff between --base-sha and --head-sha doesn't
-touch AGENTS.md or one of its structural companion files at all - this gate only ever fires on the
-files it's scoped to.
+touch AGENTS.md or a companion file (COMPANION_FILES below).
 
-AGENTS.md's own 2026-08-11 split (the single-file vs. split-into-pieces decision) moved most of
-its procedure content into four companion files
-(COMPANION_FILES below) that AGENTS.md points to by plain filename, not @import - AGENTS.md itself
-stays the one file carrying frontmatter and the Standing Constraints section. Checks 1-3 are about
-that specific structure and stay scoped to AGENTS_FILE only; checks 4-6 are content-agnostic
-(a keyword scan, a line-count diff, a PR-body string check) and run against every file in
-ALL_GATED_FILES, so a PR touching only a companion still gets the same mechanical scrutiny a PR
-touching AGENTS.md itself always got.
+Checks 1-3 apply to AGENTS_FILE only; checks 4-6 run against every touched file in ALL_GATED_FILES.
 
-Six checks, split hard-fail (exit 1, blocks the status check) vs soft-flag (WARN, never fails the
-build - same convention as check_tower_crane.py):
+Six checks, hard-fail (exit 1) vs soft-flag (WARN, never fails the build):
   1. Filename invariant           HARD  - AGENTS.md must still exist, at that path, at head.
                                            AGENTS_FILE only.
   2. Frontmatter schema           HARD  - the 4 required keys, correct shape, all present.
                                            AGENTS_FILE only - the companions carry no frontmatter.
   3. Standing Constraints match   HARD  - reuses check_standing_constraints.py's exact-text compare;
-                                           unconditional, no exceptions (Locked 2026-07-27 - corrects
-                                           a build drift: the doc's original design always specified
-                                           hard-fail here, the 2026-07-27 build had incorrectly given
-                                           it Checkpoint 1's overridable-warning treatment instead).
-                                           No exception logic exists anywhere in this check - it
-                                           can't distinguish a weakening edit from a legitimate
-                                           tightening, so a blanket fail is the only version of "hard"
-                                           that means anything. The amendment path is external to this
-                                           script entirely: GitHub's own admin-override-merge action.
-                                           AGENTS_FILE only - no companion carries this section.
-  4. Capability-vs-content        SOFT  - heuristic keyword scan; a heuristic can't safely hard-fail.
+                                           unconditional, no exceptions. The only way to merge a
+                                           change to this section is GitHub's own admin-override-merge
+                                           action. AGENTS_FILE only - no companion carries this section.
+  4. Capability-vs-content        SOFT  - heuristic keyword scan against added lines.
                                            Runs against every touched file in ALL_GATED_FILES.
-  5. Diff-size gate               SOFT  - Locked threshold (2026-07-26): >60 changed lines of a
-                                           gated file. AGENTS_FILE additionally flags growing past
-                                           its own declared max_lines; the companions carry no such
-                                           declared cap, so only the flat line-count threshold
-                                           applies to them.
+  5. Diff-size gate               SOFT  - flags >60 changed lines of a gated file. AGENTS_FILE
+                                           additionally flags growing past its own declared max_lines.
   6. Required PR trailer          HARD  - PR body must carry both authoring-assistant headings
                                            ("### Contributor statement" / "### Independent read")
-                                           whenever any file in ALL_GATED_FILES is touched. This is
-                                           the one check that actually enforces Checkpoint 1 having
-                                           been followed (or its output manually reproduced) -
-                                           everything else here is advisory, so without this check
-                                           Checkpoint 2 would have no real teeth of its own beyond
-                                           CODEOWNERS review.
+                                           whenever any file in ALL_GATED_FILES is touched.
 
 Reads the PR body from an environment variable (name given by --pr-body-env) rather than a CLI
-argument - PR titles/bodies are attacker-controlled text, and interpolating them directly into a
-shell command (including via GitHub Actions' `${{ github.event.pull_request.body }}` inside a
-`run:` block) is a known script-injection vector. The calling workflow must pass it via `env:`
-instead; see .github/workflows/agents_md_gate.yml.
+argument, since PR titles/bodies are attacker-controlled text. The calling workflow must pass it
+via `env:`; see .github/workflows/agents_md_gate.yml.
 
 Usage: python scripts\\check_agents_pr_gate.py --base-sha <sha> --head-sha <sha> [--pr-body-env PR_BODY]
 Run from anywhere; always resolves paths against this toolkit\\ repo, not the caller's cwd.
@@ -73,7 +44,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from check_standing_constraints import extract_section  # noqa: E402  (path insert above)
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
-TARGET_FILE = 'AGENTS.md'  # AGENTS_FILE alias below - kept for checks 1-3, which are AGENTS.md-only
+TARGET_FILE = 'AGENTS.md'  # AGENTS_FILE alias below - checks 1-3 are AGENTS.md-only
 AGENTS_FILE = TARGET_FILE
 COMPANION_FILES = [
     'agents_tools.md', 'agents_consumers.md', 'agents_change_requests.md', 'agents_continuity.md',
@@ -186,10 +157,9 @@ def check_standing_constraints(base_text, head_text):
     if base_section == head_section:
         report('PASS', "Standing Constraints section unchanged from base.")
         return
-    report('FAIL', "Standing Constraints section DIFFERS from base - unconditional hard-fail "
-                   "(Locked 2026-07-27), no exceptions. The only legitimate way for this PR to merge "
-                   "is the repo owner's own admin-override-merge on GitHub - a distinct, logged "
-                   "action, never something this script grants:")
+    report('FAIL', "Standing Constraints section DIFFERS from base - unconditional hard-fail, "
+                   "no exceptions. The only way for this PR to merge is the repo owner's own "
+                   "admin-override-merge on GitHub, never something this script grants:")
     print("  --- BEFORE (base) ---")
     print(f"  {base_section!r}" if base_section is not None else "  (section absent)")
     print("  --- AFTER (head) ---")
@@ -261,15 +231,14 @@ def check_pr_trailer(pr_body, touched_files):
         report('FAIL', f"PR body is missing required heading(s): {', '.join(missing)}. Any PR "
                        f"touching {', '.join(touched_files)} must carry both the contributor's own "
                        "statement and Claude's independent read (AGENTS.md's \"propose upstream\" "
-                       "step 2a-c) - this is the one check that actually enforces Checkpoint 1 was "
-                       "followed.")
+                       "step 2a-c).")
         return
     report('PASS', "PR body carries both required authoring-assistant headings.")
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Fix 3 Checkpoint 2's mechanical merge-time gate for AGENTS.md PRs."
+        description="Mechanical merge-time gate for AGENTS.md PRs."
     )
     parser.add_argument('--base-sha', required=True, help="Base ref/SHA of the PR (e.g. main).")
     parser.add_argument('--head-sha', default='HEAD', help="Head ref/SHA of the PR (default: HEAD).")

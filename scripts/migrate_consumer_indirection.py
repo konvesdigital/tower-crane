@@ -3,31 +3,15 @@
 migrate_consumer_indirection.py - one-time migration of an ALREADY-CONNECTED host onto the
 consumer-reference-indirection pointer form.
 
-The original 2026-08-14 decision applied the pointer-file
-model to NEW connections only - a brand-new consumer, or a genuinely new host joining an
-already-registered one - on the reasoning that new_consumer.py's host-merge branch already
-re-scaffolds a joining host's files, so it gets the new form for free. An ALREADY-connected host
-was left on the old direct-baked-path form indefinitely - not a considered permanent policy, just
-cheap and low-risk at the time. That gap is what produced a real cross-host skill-stub collision
-(two hosts each baking their own absolute path into the identical tracked files); this
-script is the missing one-time conversion path, confirmed against the actual code (not assumed) -
-neither new_consumer.py's re-scaffold branch nor relocate.py ever converts an already-connected
-host from direct to pointer form on their own.
-
 Because CLAUDE.md's pointer line / hook command / skill-stub prose are shared, tracked content
 (identical on every host once written), only ONE connected host needs to run this. Every other
-already-connected host converges automatically on its own next relocate.py/resume pass -
-config_lib.fix_hub_pointer() already bootstraps a missing hub_pointer.md (not just refreshes an
-existing one - confirmed by reading its body), so nothing further is needed there.
+already-connected host converges automatically on its own next relocate.py/resume pass.
 
-Deliberately NOT folded into "connect project" (new_consumer.py) - a command already run routinely
-on an already-connected consumer shouldn't silently start rewriting shared tracked content that
-affects every other connected host too. This is a separate, explicitly-named, one-time action -
-trigger phrase "migrate consumer to reference-indirection" (toolkit\\agents_consumers.md).
+Not run by "connect project" (new_consumer.py). Trigger phrase: "migrate consumer to
+reference-indirection" (toolkit\\agents_consumers.md).
 
-No script-level interactive prompt - matching disconnect_consumer.py/remove_hub.py's documented
-convention, the confirmation gate is conversational: the calling agent states exactly what will be
-rewritten before running this.
+No script-level interactive prompt - the calling agent states exactly what will be rewritten
+before running this.
 """
 
 import argparse

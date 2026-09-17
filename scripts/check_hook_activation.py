@@ -1,34 +1,19 @@
 #!/usr/bin/env python3
 """
-check_hook_activation.py - narrow notify-only check for the rung-2 half of
-this project's three-rung settings ladder (machine-only /
-private-ecosystem / public-default).
+check_hook_activation.py - notify-only check: is every tracked `.claude\\hooks\\` script wired
+into this machine's `.claude\\settings.local.json`?
 
-Rung 2 (private ecosystem: synced across the operator's own machines, never public) is built as
-Option D: `.claude\\hooks\\` is tracked in the outer private repo (no longer gitignored), so a hook
-script written on one machine reaches every other machine the operator owns via the ordinary
-`git pull` `resume` already does. That solves syncing the ARTIFACT. It does not solve ACTIVATION -
-`.claude\\settings.local.json` (Claude Code's own personal/local-settings file) stays gitignored by
-design, so a hook file arriving via git pull is not automatically wired into a `PreToolUse`/
-`PostToolUse` block on the machine that just received it.
-
-This script answers two mechanical questions - nothing broader:
+Answers two mechanical questions:
   1. Does every tracked hook script have a line somewhere in settings.local.json referencing it?
   2. Does that reference actually RESOLVE to this file on disk right now?
 
-Question 2 was added 2026-08-08 after a real incident: a folder rename left a hook command's
-baked absolute path pointing at nothing, and the original filename-substring-only check reported
-[WIRED] the entire time - the string was still present, it just no longer resolved to a real file,
-so every Bash/PowerShell call was silently failing the hook before this script ever got a chance
-to say anything. Command strings may use Claude Code's own $CLAUDE_PROJECT_DIR env var (this
-script's own project_root) or a literal ~/-relative or absolute path; all three are resolved
-before the existence check.
+Command strings may use Claude Code's own $CLAUDE_PROJECT_DIR env var (this script's own
+project_root) or a literal ~/-relative or absolute path; all three are resolved before the
+existence check.
 
 Usage: python scripts\\check_hook_activation.py [--project-root <path>]
-Defaults --project-root to the current working directory (the outer repo root, matching how
-`resume` invokes this). Prints [WIRED]/[BROKEN]/[UNWIRED]/[N/A] lines. Always exits 0 - this is a
-heads-up, not a hard gate; either failure mode is a one-time fix (add a hook block / fix a path),
-not a broken state that blocks work.
+Defaults --project-root to the current working directory. Prints [WIRED]/[BROKEN]/[UNWIRED]/[N/A]
+lines. Always exits 0 - notify-only, never a hard gate.
 """
 
 import argparse

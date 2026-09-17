@@ -2,35 +2,24 @@
 # shared_resources_read_tracker.py
 # SHARED TOOL - lives in tower_crane\hooks\, referenced by any project that opts in.
 #
-# The companion
-# hook to shared_resources_trigger_match.py's edge-assist feature. Edge-assist needs to know which
-# shared_resources\ entries are already "in play" this session (a cross-turn fact) before it can
-# relax or waive another resource's own trigger bar - this hook is what actually tracks that.
+# Companion hook to shared_resources_trigger_match.py's edge-assist feature: tracks which
+# shared_resources\ entries are "in play" this session.
 #
 # Triggered by Claude Code's PostToolUse hook, matched to Read|Grep calls only. On a Read whose
 # file_path (or a Grep whose path) resolves to a specific file under this hub's own
-# shared_resources\ folder, appends that file's stem to a small per-session state file. A directory-
-# wide Grep (no specific file resolved) records nothing - the design's own reasoning for using a
-# Read/Grep hit at all is that the resource's actual content is genuinely sitting in the agent's
-# context, which a directory-wide grep hit across many files doesn't establish for any one of them.
+# shared_resources\ folder, appends that file's stem to a small per-session state file. A
+# directory-wide Grep (no specific file resolved) records nothing.
 #
-# Deliberately does NOT re-read the target file's content (unlike consistency_check.py, which reads
-# a file's content to analyze it) - only the resolved path itself is needed to identify which
-# resource stem was read, so this hook does strictly less work than consistency_check.py already
-# does on every relevant tool call today.
+# Does not re-read the target file's content - only the resolved path is used to identify which
+# resource stem was read.
 #
 # State file: <CLAUDE_PROJECT_DIR>\logs\shared_resources_session_state\<session_id>.txt, one
-# resource stem per line, deduplicated - colocated with this project's own logs\ folder, same
-# convention consistency_check.py already uses for ITS log output, keyed by session_id since "in
-# play" is scoped to one running Claude Code session, not the whole project. Read back by
+# resource stem per line, deduplicated, keyed by session_id. Read back by
 # shared_resources_trigger_match.py's own read_in_play_resources().
 #
-# HARD CONTRACT, same as shared_resources_trigger_match.py's: this hook must NEVER exit 2 and must
-# never print anything that could be mistaken for a guardrail failure - it is silent, best-effort
-# plumbing, not a check. Any error (missing CLAUDE_PROJECT_DIR, missing session_id, unreadable/
-# unwritable state path, malformed stdin JSON) fails open: no output, exit 0. Prints nothing on
-# success either - a Read/Grep call happens far more often than a shared_resources\ hit, and this
-# hook's whole job is to be invisible plumbing, not something the agent has to read past every time.
+# Fails open, silently: any error (missing CLAUDE_PROJECT_DIR, missing session_id, unreadable/
+# unwritable state path, malformed stdin JSON) exits 0 with no output. Prints nothing on success
+# either.
 #
 # To use in a project: add a PostToolUse hook (matcher "Read|Grep") in that project's
 # .claude\settings.json pointing at this file (see MENU.md / templates\optins\
@@ -49,9 +38,7 @@ import sys
 from pathlib import Path
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
-# Same outer/inner split convention as shared_resources_trigger_match.py - shared_resources\ lives
-# at the hub root, one level above SHARED_ROOT (toolkit\), computed from this script's own fixed
-# location rather than the calling (consuming) project's directory.
+# shared_resources\ lives at the hub root, one level above SHARED_ROOT (toolkit\).
 HUB_ROOT = SHARED_ROOT.parent
 HUB_SHARED_RESOURCES = (HUB_ROOT / 'shared_resources').resolve()
 
@@ -111,7 +98,7 @@ def main():
 
         sys.exit(0)
     except Exception:
-        # Fail open, always - this is best-effort plumbing, never allowed to block a Read/Grep call.
+        # Fail open, always.
         sys.exit(0)
 
 

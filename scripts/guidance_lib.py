@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 """
-guidance_lib.py - shared read/write helpers for a consumer's COMPLIANCE_GUIDANCE.md, the
-two-way compliance channel's down-direction courier file.
+guidance_lib.py - shared read/write helpers for a consumer's COMPLIANCE_GUIDANCE.md.
 
 Two independent writers share one file, each owning a separate named section:
   - check_tower_crane.py  -> '## Checker deviations' (derived - computed by auditing a consumer)
   - broadcast_guidance.py -> '## Broadcast'           (authored - hand-written guidance prose)
 
-Namespacing (the "Collision fix", locked 2026-07-23): each writer
-replaces only its own named section and preserves whatever the other section currently holds,
-regardless of run order. The file is deleted entirely once both sections are empty, so "file
-present = something pending" holds for either writer, not just one.
+Each writer replaces only its own named section and preserves whatever the other section
+currently holds, regardless of run order. The file is deleted entirely once both sections are
+empty.
 
 Import it:  from guidance_lib import read_sections, write_section, SECTION_BROADCAST, SECTION_CHECKER
 """

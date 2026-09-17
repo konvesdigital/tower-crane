@@ -2,15 +2,11 @@
 """
 check_scripts_gate.py - runs hooks\\consistency_check.py (static analysis - undefined names, arity
 mismatches, string-key drift) against every new/changed .py file under hooks\\/scripts\\/agents\\
-between two refs. The PR-facing sibling of update_toolkit.py's own consistency sweep (used during
-`update`'s pre-merge worktree check): that one needs a throwaway worktree because it runs against
-content that was only ever fetched, never checked out. This one is meant to run inside a GitHub
-Actions checkout of a PR's head, where the files are already on disk at their real paths - no
-worktree trick needed, just read what's there.
+between two refs. Reads files directly off disk at their real paths (a GitHub Actions checkout of
+a PR's head), no worktree needed.
 
 Exit 0 if every changed script passes consistency_check.py (or there's nothing to check); exit 1
-if any of them FAILs. Hard gate, no soft-flag mode - a static-analysis FAIL (undefined name, arity
-mismatch) is never a matter of reviewer taste.
+if any of them FAILs. Hard gate, no soft-flag mode.
 
 Usage: python scripts\\check_scripts_gate.py --base-sha <sha> --head-sha <sha>
 Run from anywhere; always resolves paths against this toolkit\\ repo, not the caller's cwd.

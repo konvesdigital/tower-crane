@@ -2,58 +2,29 @@
 """
 check_shared_resource_catalog.py - internal-consistency checks for shared_resources\\CATALOG.md
 and shared_resources\\resource_relationships.yaml.
-These two hand-maintained files only work if they agree with each other; nothing previously
-checked that they do. The edge-validity check closes a known gap; the File-column and
-Tier-name checks were found alongside it while scoping this script - all three are the same
-"hand-edited data trusted without a check" shape found elsewhere in this project.
 
-Four checks, all notify-only (never blocks anything - nothing currently runs this automatically):
+Four checks, all notify-only:
 
 1. File column - every CATALOG.md row's `File` cell must resolve to a real file in
-   shared_resources\\, active or archived (an archived entry is still fully readable by design -
-   "never deleted", templates\\shared_resources.md - so archived status is not exempted from this
-   check, only from the two below where relevant).
+   shared_resources\\, active or archived.
 2. Tier-name consistency - a row's `Tier` cell (when set and not `Primary`) must match a tier
-   `name:` actually defined under its `Category` in resource_relationships.yaml's `tiers:` block.
-   Tier names are expected to get renamed/split over time (tier names/definitions stay revisable
-   going forward), and nothing enforces the two files staying in sync when that happens.
+   `name:` defined under its `Category` in resource_relationships.yaml's `tiers:` block.
 3. identity_eligible declared - every (non-archived) Category on any CATALOG.md row must have a
-   corresponding entry in resource_relationships.yaml's `identity_eligible:` block (added
-   2026-09-09 alongside the "Adopted Shared Resources" tiered-directive mechanism -
-   templates\\shared_resources.md's Saving step 1 asks this the moment a new Category is
-   introduced; an undeclared Category means that question was skipped, not answered `false`).
+   corresponding entry in resource_relationships.yaml's `identity_eligible:` block.
 4. Edge validity - every edge's `from`/`to` or `a`/`b` in resource_relationships.yaml must resolve
-   to some CATALOG.md row, by filename stem (resource_relationships.yaml's own node-naming
-   convention). An edge to
-   an *archived* entry PASSes deliberately (decided 2026-09-02): the archived file still exists and
-   is still fully readable, and the retrieval procedure doesn't filter graph neighbors by Status -
-   only a stem matching no row at all (a typo, or a genuine deletion without edge cleanup) is a
-   real failure.
+   to some CATALOG.md row, by filename stem. An edge to an archived entry PASSes; only a stem
+   matching no row at all is a failure.
 
-Message format (decided 2026-09-02, deliberately different from this script family's usual
-technical-first phrasing): lead with the practical effect on what Claude will or won't do,
-because a shared_resources\\ entry is saved for a reason and these breakages are exactly what
-stops that reason from ever reaching a session - the technical cause is secondary, included only
-so it can be fixed.
+Message format leads with the practical effect on what Claude will or won't do; the technical
+cause is included secondarily.
 
-Reuses check_shared_resource_hosts.py's parse_catalog() (fixed 2026-09-02: it was unpacking
-`cells[:6]` against the current 8-column Name/Kind/File/Category/Tier/Description/Added/Status
-schema, silently mis-assigning every cell from Category onward and breaking the archived-row
-filter downstream - caught live while scoping this script).
+resource_relationships.yaml is hand-parsed (regex/line-based), not via a `yaml` import.
 
-resource_relationships.yaml is hand-parsed (regex/line-based, same style as registry_lib.py's own
-yaml handling) rather than via a `yaml` import - this hub has no external Python dependency today
-(matching this project's multi-machine stance), and the file's shape is simple and always
-machine-written by templates\\shared_resources.md's Saving procedure, so a small dedicated parser
-is more portable than a new hard dependency for one script.
+Wired into `resume` (not `quick resume`) via resume_check.py.
 
-Wired into `resume` (not `quick resume`) via resume_check.py - decided 2026-09-02.
-
-Usage: python scripts\\check_shared_resource_catalog.py (run from inside toolkit\\, or anywhere -
-computed from this file's own location, not the caller's cwd). Quiet when clean (matching
-check_multi_machine.py/check_stale_paths.py's "(nothing to report)" convention, not this script
-family's usual per-row [OK] line) - prints one `[!] <message>` line per actual problem found, then
-a one-line summary either way. Always exits 0 (notify-only - nothing here blocks resume).
+Usage: python scripts\\check_shared_resource_catalog.py (run from inside toolkit\\, or anywhere).
+Quiet when clean - prints one `[!] <message>` line per problem found, then a one-line summary.
+Always exits 0.
 """
 
 import re
@@ -78,9 +49,8 @@ EDGE_FIELD_RE = re.compile(r'^    (from|to|a|b):\s*(\S+)\s*$')
 def parse_relationships(text):
     """Hand-rolled parser for resource_relationships.yaml's three top-level keys. Returns
     (tiers_by_category: dict[str, list[str]], identity_eligible: dict[str, bool], edges:
-    list[dict]). Relies on the file's always-consistent machine-written indentation (2-space
-    top-level keys/list items, 4-space nested fields) - see module docstring for why this isn't a
-    real yaml parse."""
+    list[dict]). Relies on the file's always-consistent indentation (2-space top-level
+    keys/list items, 4-space nested fields)."""
     lines = text.splitlines()
     tiers_idx = next((i for i, l in enumerate(lines) if l.strip() == 'tiers:'), None)
     identity_idx = next((i for i, l in enumerate(lines) if l.strip() == 'identity_eligible:'), None)
@@ -168,10 +138,7 @@ def check_tier_consistency(rows, tiers_by_category):
 
 def check_identity_eligible_declared(rows, identity_eligible):
     """Every Category that appears on any active CATALOG.md row must have a corresponding
-    identity_eligible: entry in resource_relationships.yaml (templates\\shared_resources.md's
-    Saving step 1 asks this the moment a save introduces a new Category - an undeclared Category
-    means that question was skipped, not that the answer is "false"). Archived rows are excluded:
-    an archived entry's Category no longer needs a live identity-eligibility answer."""
+    identity_eligible: entry in resource_relationships.yaml. Archived rows are excluded."""
     results = []
     seen = set()
     for row in rows:
@@ -192,9 +159,8 @@ def check_identity_eligible_declared(rows, identity_eligible):
 
 def check_edges(edges, rows):
     """Every edge's from/to (directional) or a/b (undirected) resolves to some CATALOG.md row by
-    filename stem - active or archived both count (archived entries stay fully readable and
-    retrieval doesn't filter graph neighbors by Status), only a name matching no row at all is a
-    real failure."""
+    filename stem - active or archived both count; only a name matching no row at all is a
+    failure."""
     stem_to_name = {Path(row['file']).stem: row['name'] for row in rows}
     results = []
     for edge in edges:
@@ -239,9 +205,6 @@ def main():
         tiers_by_category, identity_eligible, edges = parse_relationships(
             RELATIONSHIPS_PATH.read_text(encoding='utf-8'))
 
-    # Quiet when clean, matching this hub's other resume-time checks (check_multi_machine.py/
-    # check_stale_paths.py print "(nothing to report)" rather than one OK line per item) - a
-    # CATALOG.md row count that only grows shouldn't mean a resume that only gets noisier.
     file_fails = [r for r in check_file_column(rows) if r[0] == 'FAIL']
     tier_mismatches = [r for r in check_tier_consistency(rows, tiers_by_category) if r[0] == 'MISMATCH']
     undeclared_identity = [r for r in check_identity_eligible_declared(rows, identity_eligible)

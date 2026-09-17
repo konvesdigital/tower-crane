@@ -1,198 +1,80 @@
 #!/usr/bin/env python3
 """
 check_file_surface.py - a "what kind of file is this, and does it belong here" gate, independent
-of what any individual file's content means. Built after a live discussion found that the other
-new gates (check_agents_pr_gate.py's AGENTS.md-content checks, consistency_check.py's Python
-static analysis) only defend against careless mistakes in the surface they already know to look
-at - a deliberate adversary doesn't need to write a mismatched variable name, they can write the
-payload in a language no checker here reads, or hide it in a file extension nobody scans. This
-script assumes an adversary, not just carelessness.
+of what any individual file's content means.
 
-Runs over a whole-repo diff between two refs (matches the Locked "diff scope for the review gate
-= the whole inner repo, no path filter" decision) - never scoped to one file, since the whole point
-is catching a script or directive file showing up somewhere unexpected.
+Runs over a whole-repo diff between two refs, never scoped to one file.
 
-Seven checks, five hard-fail, two soft-flag:
-  1. Known AI-directive filename        HARD  - a new/renamed file matching a real, converged
-                                                  AI-directive filename convention (CLAUDE.md,
-                                                  .cursorrules, a second AGENTS.md, etc.) anywhere
-                                                  other than the one canonical AGENTS.md.
-  2. Non-Python script language          HARD  - this project's Locked "Language policy" decision
-                                                  (project_progress.md Decisions) is Python-only for
-                                                  every runtime script, no exceptions remaining now
-                                                  that the legacy PowerShell tools are fully retired
-                                                  to _archive\\. A new script in any other language is
-                                                  either going to be a compatibility problem or an
-                                                  attempt to dodge the Python-only checkers - both
-                                                  are reasons to stop and ask, not silently allow.
-                                                  Detected two ways: file extension, AND (to catch
-                                                  the "rename it to .txt" evasion) a non-Python
-                                                  shebang line, regardless of extension.
+Nine checks, seven hard-fail, two soft-flag:
+  1. Known AI-directive filename        HARD  - a new/renamed file matching a known AI-directive
+                                                  filename convention (CLAUDE.md, .cursorrules, a
+                                                  second AGENTS.md, etc.) anywhere other than the one
+                                                  canonical AGENTS.md.
+  2. Non-Python script language          HARD  - a new script in any language other than Python.
+                                                  Detected two ways: file extension, and a non-Python
+                                                  shebang line regardless of extension.
   3. Python file outside its home        HARD  - a .py file added anywhere other than hooks\\,
                                                   scripts\\, agents\\, or a tests\\<tool>\\ fixture.
-  4. Binary file                         HARD  - this is a text-based tooling repo; it should never
-                                                  need to ship a binary blob. The single clearest
-                                                  "something is very wrong" signal for an obfuscated
-                                                  payload.
+  4. Binary file                         HARD  - a binary file added or modified.
   5. Disguised-code heuristic            SOFT  - content (eval/exec/base64/curl-pipe-shell/etc.) in
-                                                  a file not already classified as code. Heuristic,
-                                                  so it can't safely hard-block (a design doc
-                                                  legitimately quotes shell commands in prose) - see
-                                                  capability-vs-content in check_agents_pr_gate.py
-                                                  for the same reasoning.
-  6. Invisible/formatting Unicode       HARD  - added 2026-07-27 (security stress-test pass), the
-                                                  single most
-                                                  directly-relevant gap this project has: zero-width
-                                                  chars, bidi embedding/override/isolate controls,
-                                                  variation selectors, and Unicode tag characters can
-                                                  render as blank (or reordered) in a normal editor,
-                                                  diff view, or chat code block, while an LLM parsing
-                                                  the raw text still reads them - the exact mechanism
-                                                  behind the academic "Trojan Source" attack (Boucher
-                                                  & Anderson 2021, CVE-2021-42574) and its 2025
-                                                  application against AI-assistant rules files
-                                                  (Pillar Security's "Rules File Backdoor"). This repo
-                                                  IS an AGENTS.md-governed AI-directive system and the
-                                                  entire trust gate rests on "a human reads the diff
-                                                  verbatim" - an invisible character would defeat that
-                                                  specific guarantee silently. No legitimate reason
-                                                  for these codepoints anywhere in a text tooling repo.
-  7. Python capability creep            SOFT  - added 2026-07-27, same stress-test pass: new/changed
-                                                  .py code introducing a network call, dynamic-exec,
-                                                  or deserialization primitive not obviously covered
-                                                  by AGENTS.md's declared capability manifest ("never
-                                                  an arbitrary network request outside git/gh, never
-                                                  reading or emitting credentials"). consistency_check.py
-                                                  only checks correctness, never intent, and check 5
-                                                  above deliberately skips already-recognized code as
-                                                  "not disguised" - so a legitimate-looking new script
-                                                  doing something it has no business doing currently
-                                                  got zero scrutiny anywhere in this pipeline. Heuristic
-                                                  and deliberately narrow: subprocess/os.system are NOT
-                                                  flagged, since invoking git/gh via subprocess is this
-                                                  project's own normal, sanctioned pattern everywhere.
-  8. Outgoing private-content leak     MIXED  - added 2026-07-30, the OUTGOING direction every
-                                                  check above is
-                                                  blind to - this repo's other gates all defend
-                                                  against a malicious/careless *incoming* change; this
-                                                  is the one that would have caught the near-miss that
-                                                  started that whole design doc (private client
-                                                  content nearly landing in this public repo, caught
-                                                  by the user before commit, not by anything here).
-                                                  Two parts sharing one signal source (the outer hub's
-                                                  private consumers\\*.md registry - the exact same
-                                                  detector templates\\shared_resources.md's own
-                                                  save-trigger heuristic uses, Locked as "one
-                                                  implementation, not two"):
+                                                  a file not already classified as code.
+  6. Invisible/formatting Unicode       HARD  - zero-width chars, bidi embedding/override/isolate
+                                                  controls, variation selectors, and Unicode tag
+                                                  characters added anywhere in the diff. Scans every
+                                                  file, not just code.
+  7. Python capability creep            SOFT  - new/changed .py code introducing a network call,
+                                                  dynamic-exec, or deserialization primitive not
+                                                  obviously covered by AGENTS.md's declared
+                                                  capability manifest. subprocess/os.system are NOT
+                                                  flagged.
+  8. Outgoing private-content leak     MIXED  - matched against the outer hub's private
+                                                  consumers\\*.md registry:
                                                     8a HARD - added content literally matching a live
                                                        consumer's registered name or identifying path
-                                                       segment. Deterministic and low-false-positive,
-                                                       since it's matched against real registry data,
-                                                       not a shape guess.
+                                                       segment.
                                                     8b SOFT - added content matching a generic
                                                        absolute-user-home-path shape (`C:\\Users\\...`,
                                                        `/home/...`, `/Users/...`) that isn't an obvious
-                                                       placeholder (you/your/<user>/username). Kept
-                                                       soft because this repo's own docs legitimately
-                                                       use placeholder paths like `C:\\Users\\you\\...`
-                                                       as examples.
+                                                       placeholder (you/your/<user>/username).
                                                     8c HARD - added content literally matching a live
                                                        host_id (machine name) - either a registered
                                                        consumer's `host:` field, or this machine's own
-                                                       config.local.json `host_id`. Added
-                                                       2026-08-10: the same class of leak as 8a
-                                                       (an identifier that names a specific person's
-                                                       setup, not generic tooling), so it gets the
-                                                       same hard-fail treatment and the same signal
-                                                       source, just a different registry field.
-                                                    8d SOFT - added after a live incident: an exact
-                                                       full-name match (8a) missed a real consumer
-                                                       name that landed split across two lines by an
-                                                       ordinary markdown line-wrap, even though the
-                                                       check was live and correctly wired at the time.
-                                                       The same exact-match design would equally miss
-                                                       a stylistic variant - an abbreviation, or a
-                                                       glued domain-name-shaped run (e.g. a project
-                                                       called "Quokka Labs" showing up as
-                                                       "quokkalabs.com") - that never appears as one
-                                                       literal contiguous string at all. Matches on
-                                                       individual WORD FRAGMENTS of a registered
-                                                       name/path segment instead, filtered against a
-                                                       curated common-word list rather than a length
-                                                       cutoff (commonness and length don't track each
-                                                       other - a short invented or unusual word can be
-                                                       far more distinctive than a longer common one).
-                                                       Plain substring match, not word-boundary, so
-                                                       the glued form still triggers (e.g. "quokka" is
-                                                       still found inside "quokkalabs"). Deliberately
-                                                       SOFT: a single word fragment is never proof by
-                                                       itself (it may carry an unrelated, legitimate
-                                                       meaning, or coincidentally appear inside a
-                                                       longer unrelated word), only a nudge.
+                                                       config.local.json `host_id`.
+                                                    8d SOFT - matches on individual WORD FRAGMENTS of
+                                                       a registered name/path segment, filtered
+                                                       against a curated common-word list rather than
+                                                       a length cutoff. Plain substring match, not
+                                                       word-boundary, so a glued form still triggers
+                                                       (e.g. "quokka" is found inside "quokkalabs").
                                                   All four gracefully report PASS/N-A (not a false
                                                   FAIL) when consumers\\ / config.local.json isn't
-                                                  reachable from this checkout - expected for a
-                                                  standalone toolkit\\ clone or this repo's own CI
-                                                  runner, which never checks out the outer private
-                                                  repo and won't have a filled-in per-machine config.
-  9. Outer-repo-only artifact citation  HARD  - added after a whole-toolkit audit found this repo's
-                                                  own docs/scripts routinely cite specific files that
-                                                  live only in the PRIVATE outer repo (one level up
-                                                  from toolkit\\, never published) - mostly `design\\
-                                                  <doc>.md` rationale pointers written by/for the
-                                                  operator's own hub session, which a fresh clone (or
-                                                  any other user's hub) simply doesn't have. Two
-                                                  sub-checks, both matched against a fixed pattern,
-                                                  not a live registry (so both work the same in CI as
-                                                  anywhere else, unlike check 8 above):
+                                                  reachable from this checkout.
+  9. Outer-repo-only artifact citation  HARD  - two sub-checks, both matched against a fixed
+                                                  pattern, not a live registry:
                                                     9a - a `design\\<name>.md` (or `design/<name>.md`)
-                                                       citation. `design\\` itself IS part of every
-                                                       fresh hub's default scaffold (setup_machine.md
-                                                       creates it empty) - the violation is asserting
-                                                       a SPECIFIC file inside it exists, since nothing
-                                                       toolkit\\ ever ships predetermines what any
-                                                       user's own design\\ folder contains. A bare
-                                                       placeholder form (`design\\X.md`, `design\\
-                                                       <name>.md`) is deliberately excluded by
-                                                       requiring a real (lowercase, 3+ char) filename
-                                                       stem, so genuine "here's the pattern" prose
-                                                       still passes.
+                                                       citation with a real (lowercase, 3+ char)
+                                                       filename stem. A bare placeholder form
+                                                       (`design\\X.md`, `design\\<name>.md`) doesn't
+                                                       match.
                                                     9b - a dated `change_requests\\YYYY-MM-DD_...md`
-                                                       ticket-filename citation - same reasoning:
-                                                       change_requests\\ is scaffolded empty, but a
-                                                       specific dated ticket inside it is one
-                                                       operator's own private history. The documented
-                                                       naming-convention example
-                                                       (`YYYY-MM-DD_<tool>_<slug>.md`, literal
-                                                       placeholder text) does not match this pattern,
-                                                       which requires actual digits.
-                                                  Deliberately NOT covered here (would cause false
-                                                  positives against correct documentation): bare
-                                                  mentions of `decisions_detail.md`, `CATALOG.md`,
-                                                  `resource_relationships.yaml`, `trigger_index.yaml`,
-                                                  `project_progress_archive.md`, or `toolkit_private\\`
-                                                  - the toolkit-wide audit confirmed these are
-                                                  legitimate, toolkit-documented MECHANISM names every
-                                                  user's hub eventually has (via the standard
-                                                  `checkpoint`/`archive`/`shared_resources.md`/"new
-                                                  private tool" procedures), not private one-off
-                                                  content - only citing a SPECIFIC file's real content
-                                                  under those mechanisms would be a leak, which is a
-                                                  judgment call left to human/agent review, not a
-                                                  pattern a deterministic check can safely hard-fail.
+                                                       ticket-filename citation, requiring actual
+                                                       digits. The documented naming-convention
+                                                       placeholder (`YYYY-MM-DD_<tool>_<slug>.md`)
+                                                       doesn't match.
+                                                  Not covered: bare mentions of `decisions_detail.md`,
+                                                  `CATALOG.md`, `resource_relationships.yaml`,
+                                                  `trigger_index.yaml`, `project_progress_archive.md`,
+                                                  or `toolkit_private\\` - these are toolkit-documented
+                                                  mechanism names every hub eventually has.
 
 Usage: python scripts\\check_file_surface.py --base-sha <sha> --head-sha <sha>
        python scripts\\check_file_surface.py --base-sha origin/main --head-sha worktree
 Run from anywhere; always resolves paths against this toolkit\\ repo, not the caller's cwd.
 
---head-sha worktree (added for checkpoint_git.py's leak-scan-first gate, its "Leak-scan
-ordering"): compares base_sha directly against the
-on-disk working tree - both staged and unstaged changes - instead of two committed refs, so this
-gate can run BEFORE anything has been committed this round, not after. Same convention as
-check_standing_constraints.py's own `--head worktree`. Note `git diff <base>` (the single-ref form
-this mode uses) only ever shows a path that has an index entry - a brand-new file git doesn't know
-about yet is invisible to it until `git add`ed, staged or not; the caller must stage any untracked
-file it wants covered before invoking this mode.
+--head-sha worktree compares base_sha directly against the on-disk working tree (staged +
+unstaged) instead of two committed refs. Note `git diff <base>` (the single-ref form this mode
+uses) only shows a path with an index entry - a brand-new file must be `git add`ed (staged or
+not) before this mode covers it.
 """
 
 import argparse
@@ -214,9 +96,8 @@ def _resolve_shared_root():
 
 COUNTS = {'PASS': 0, 'WARN': 0, 'FAIL': 0}
 
-# Other real, converged AI-directive filename conventions. AGENTS.md itself is deliberately NOT in
-# this set - a second copy of it elsewhere is checked separately below, against the canonical
-# constant directly, so there's only one spelling of that particular filename in this file.
+# Known AI-directive filename conventions. AGENTS.md itself is checked separately below, against
+# the canonical constant directly.
 KNOWN_DIRECTIVE_BASENAMES = {
     'claude.md', '.cursorrules', '.windsurfrules', '.clinerules', 'gemini.md',
     'copilot-instructions.md', 'system_prompt.md', 'system_prompt.txt',
@@ -239,11 +120,9 @@ DISGUISED_CODE_TOKENS = [
     'os.system(', 'subprocess.', 'curl ', 'wget ',
 ]
 
-# Invisible/formatting Unicode codepoints - the "Trojan Source" set (Boucher & Anderson 2021,
-# CVE-2021-42574/CVE-2021-42694) plus the additional invisible/steganography ranges used by the
-# 2025 "Rules File Backdoor" attacks against AI-assistant instruction files. Each range renders as
-# blank, zero-width, or silently reorders surrounding text in a normal editor/diff/chat view, while
-# still being fully legible to an LLM tokenizing the raw bytes. No legitimate use in this repo.
+# Invisible/formatting Unicode codepoints. Each range renders as blank, zero-width, or silently
+# reorders surrounding text in a normal editor/diff/chat view, while remaining fully legible to an
+# LLM tokenizing the raw bytes.
 INVISIBLE_UNICODE_RANGES = [
     (0x200B, 0x200F),   # zero-width space/non-joiner/joiner, LTR mark, RTL mark
     (0x202A, 0x202E),   # bidi embedding/override controls (LRE/RLE/PDF/LRO/RLO)
@@ -255,29 +134,20 @@ INVISIBLE_UNICODE_RANGES = [
     (0xE0000, 0xE007F), # Unicode tag characters (used for text steganography/smuggling)
 ]
 
-# Deliberately narrow: subprocess/os.system are NOT here (this project's scripts invoke git/gh via
-# subprocess constantly - that's the sanctioned pattern, not a capability creep). This targets
-# capabilities AGENTS.md's own manifest explicitly disclaims: network access and credential
-# handling, plus dynamic-exec/deserialization primitives a static correctness checker can't catch.
+# subprocess/os.system are NOT included. Targets network access, credential handling, and
+# dynamic-exec/deserialization primitives.
 CAPABILITY_CREEP_TOKENS = [
     'requests.', 'urllib.request', 'urllib3', 'http.client', 'socket.', 'ftplib', 'smtplib',
     'paramiko', 'telnetlib', 'eval(', 'exec(', '__import__(', 'marshal.loads(', 'pickle.loads(',
     'base64.b64decode(',
 ]
 
-# Check 8: outgoing private-content leak. ABS_PATH_RE matches an absolute user-home path and
-# captures the first path segment after it (the part that would actually identify a real user/
-# project, as opposed to the generic C:\Users\/home\ prefix every machine has).
+# ABS_PATH_RE matches an absolute user-home path and captures the first path segment after it.
 ABS_PATH_RE = re.compile(r'(?:[A-Za-z]:[\\/]Users[\\/]|/home/|/Users/)([^\s\\/<>]+)')
 PLACEHOLDER_SEGMENTS = {'you', 'your', 'username', 'user', '<user>', '<you>'}
 
-# Check 8d: word-fragment filter. Classic English closed-class/function words, plus this toolkit's
-# own generic vocabulary (words that legitimately appear constantly in ordinary toolkit prose and
-# would drown the fragment check in noise if not excluded). Deliberately NOT a frequency-ranked
-# "top N English words" list - no such list ships with this project, and building an accurate one
-# is its own research effort. This is a practical, hand-curated stoplist; it will occasionally
-# under- or over-filter, which is exactly why check 8d is SOFT, never a source of hard-fail
-# confidence.
+# Word-fragment filter for check 8d: closed-class/function words plus this toolkit's own generic
+# vocabulary. Hand-curated stoplist, not a frequency-ranked word list.
 MIN_FRAGMENT_LEN = 3
 COMMON_ENGLISH_WORDS = frozenset((
     "a an the and or but if then else when while for to of in on at by with from into onto over "
@@ -320,8 +190,8 @@ def git(shared_root, args):
 
 def _diff_target(base_sha, head_sha):
     """The ref-range argument `git diff` takes: 'base..head' normally, or a single-ref form
-    comparing base_sha directly against the on-disk working tree (see the module docstring's
-    "--head-sha worktree" section) when head_sha is the literal string 'worktree'."""
+    comparing base_sha directly against the on-disk working tree when head_sha is the literal
+    string 'worktree'."""
     if head_sha == 'worktree':
         return [base_sha]
     return [f'{base_sha}..{head_sha}']
@@ -472,10 +342,8 @@ def _is_invisible_char(ch):
 
 
 def check_invisible_unicode(shared_root, files, base_sha, head_sha):
-    """Hard-fail on any invisible/formatting Unicode codepoint added anywhere in the diff - see
-    check 6 in the module docstring for the full rationale. Scans every file, not just code: the
-    attack this defends against specifically targets prose/instruction files (AGENTS.md itself,
-    templates\\, README.md), not scripts."""
+    """Hard-fail on any invisible/formatting Unicode codepoint added anywhere in the diff. Scans
+    every file, not just code."""
     hits = []
     for status, path in files:
         norm = path.replace('\\', '/')
@@ -503,9 +371,8 @@ def check_invisible_unicode(shared_root, files, base_sha, head_sha):
 
 
 def check_python_capability_creep(shared_root, files, base_sha, head_sha):
-    """Soft nudge - see check 7 in the module docstring for the full rationale. Only scans .py
-    files already recognized as code under the allowed dirs; unrecognized-location .py files are
-    already a hard-fail via check_language_and_location above."""
+    """Only scans .py files already recognized as code under the allowed dirs; unrecognized-
+    location .py files are already a hard-fail via check_language_and_location above."""
     hits = []
     for status, path in files:
         norm = path.replace('\\', '/')
@@ -534,11 +401,8 @@ def check_python_capability_creep(shared_root, files, base_sha, head_sha):
 
 def _load_consumer_signals(shared_root):
     """Live consumer names + identifying path segments, read fresh from the outer hub's private
-    consumers\\*.md registry (one level above this toolkit\\ repo - the outer/inner repo split).
-    This is the same signal source templates\\shared_resources.md's own
-    save-trigger heuristic uses (Locked as "one detector, not two"). Returns ([], []) when
-    consumers\\ isn't reachable - expected and correct for a standalone toolkit\\ checkout (e.g.
-    this repo's own CI runner, which only checks out toolkit\\ and never the outer private repo)."""
+    consumers\\*.md registry (one level above this toolkit\\ repo). Returns ([], []) when
+    consumers\\ isn't reachable."""
     consumers_dir = shared_root.parent / 'consumers'
     if not consumers_dir.is_dir():
         return [], []
@@ -552,10 +416,8 @@ def _load_consumer_signals(shared_root):
         name_m = re.search(r'^name:\s*(.+?)\s*$', block, re.MULTILINE)
         if name_m and name_m.group(1).strip():
             names.append(name_m.group(1).strip())
-        # path: now lives per-host under `hosts:` (a 2026-08-10 schema migration)
-        # instead of a single top-level line - collect every host's path (`    path:`,
-        # 4-space indent), not just this machine's, since a leak from ANY host's path is still a
-        # leak. Old flat `path:` also matched here for an unmigrated entry.
+        # path: lives per-host under `hosts:` - collect every host's path (`    path:`, 4-space
+        # indent), not just this machine's. Old flat `path:` also matched for an unmigrated entry.
         for path_m in re.finditer(r'^(?:path|    path):\s*(.+?)\s*$', block, re.MULTILINE):
             raw_path = path_m.group(1).strip()
             if not raw_path:
@@ -567,14 +429,10 @@ def _load_consumer_signals(shared_root):
 
 
 def _load_host_signals(shared_root):
-    """Live host_id (machine name) values - every registered consumer's `hosts:` map keys (the
-    per-machine schema, migrated 2026-08-10 from the old
-    flat `host:` field - both forms are scanned so an unmigrated entry still contributes), plus
-    this machine's own config.local.json `host_id` if a filled-in config is reachable. Same signal
-    shape as _load_consumer_signals above: a host_id is exactly as identifying as a consumer/
-    project name and deserves the same outgoing-leak protection. Returns [] when nothing is
-    reachable - expected for a standalone toolkit\\ checkout (no outer consumers\\, no filled-in
-    config.local.json), never a false FAIL."""
+    """Live host_id (machine name) values - every registered consumer's `hosts:` map keys (both
+    the current per-machine schema and the old flat `host:` field are scanned), plus this
+    machine's own config.local.json `host_id` if a filled-in config is reachable. Returns []
+    when nothing is reachable."""
     hosts = []
     consumers_dir = shared_root.parent / 'consumers'
     if consumers_dir.is_dir():
@@ -587,11 +445,8 @@ def _load_host_signals(shared_root):
             host_m = re.search(r'^host:\s*(.+?)\s*$', block_m.group(1), re.MULTILINE)
             if host_m and host_m.group(1).strip():
                 hosts.append(host_m.group(1).strip())
-            # current hosts: map shape - each 2-space-indented key under `hosts:` is a host_id.
-            # Line-walked rather than a single regex: the block also contains 4-space-indented
-            # path:/registered: sub-lines, which a naive "every indented line" capture would stop
-            # at (they don't match the 2-space host-key shape), silently missing any host after
-            # the first.
+            # Each 2-space-indented key under `hosts:` is a host_id; 4-space-indented
+            # path:/registered: sub-lines are skipped.
             block_lines = re.split(r'\r?\n', block_m.group(1))
             in_hosts = False
             for line in block_lines:
@@ -612,17 +467,15 @@ def _load_host_signals(shared_root):
         if host_id and not str(host_id).startswith('<'):
             hosts.append(str(host_id))
     except RuntimeError:
-        pass  # no filled-in config.local.json reachable - nothing to add, not an error here
+        pass  # no filled-in config.local.json reachable
     return hosts
 
 
 def check_outgoing_host_id(shared_root, files, base_sha, head_sha):
-    """Check 8c, HARD - see check 8 in the module docstring for the full rationale. Added content
-    literally matching a live host_id value."""
+    """Check 8c, HARD. Added content literally matching a live host_id value."""
     hosts = sorted(set(_load_host_signals(shared_root)), key=len, reverse=True)
     if not hosts:
-        report('PASS', "no live host_id reachable from this checkout - nothing to match against "
-                       "(expected for a standalone toolkit\\ checkout, e.g. CI).")
+        report('PASS', "no live host_id reachable from this checkout - nothing to match against.")
         return
     hits = []
     for status, path in files:
@@ -648,13 +501,13 @@ def check_outgoing_host_id(shared_root, files, base_sha, head_sha):
 
 
 def check_outgoing_private_content(shared_root, files, base_sha, head_sha):
-    """Check 8a, HARD - see check 8 in the module docstring for the full rationale. Added content
-    literally matching a live consumer's registered name or leaf path segment."""
+    """Check 8a, HARD. Added content literally matching a live consumer's registered name or
+    leaf path segment."""
     names, path_segments = _load_consumer_signals(shared_root)
     signals = sorted(set(names) | set(path_segments), key=len, reverse=True)
     if not signals:
         report('PASS', "no live consumer registry reachable from this checkout - nothing to "
-                       "match against (expected for a standalone toolkit\\ checkout, e.g. CI).")
+                       "match against.")
         return
     hits = []
     for status, path in files:
@@ -679,11 +532,8 @@ def check_outgoing_private_content(shared_root, files, base_sha, head_sha):
 
 
 def _name_fragments(strings):
-    """Split each string into word tokens and keep only the ones uncommon enough to be a real
-    signal - drops anything under MIN_FRAGMENT_LEN chars or in COMMON_ENGLISH_WORDS. Length alone
-    doesn't track commonness (a short invented or unusual word can be far rarer, and so more
-    distinctive, than a longer everyday one), so this filters against a curated word list, not a
-    length cutoff; MIN_FRAGMENT_LEN just keeps 1-2 char noise out."""
+    """Split each string into word tokens and keep only the ones at least MIN_FRAGMENT_LEN chars
+    long and not in COMMON_ENGLISH_WORDS."""
     frags = set()
     for s in strings:
         for word in re.split(r'[^A-Za-z0-9]+', s):
@@ -694,19 +544,10 @@ def _name_fragments(strings):
 
 
 def check_outgoing_name_fragments(shared_root, files, base_sha, head_sha):
-    """Check 8d, SOFT - see check 8 in the module docstring for the full rationale. Complements 8a
-    (exact full-name match, HARD): a live consumer name rarely appears in one literal, contiguous
-    form. It gets styled as an abbreviation, a glued domain-name-shaped run (e.g. a project called
-    "Quokka Labs" showing up as "quokkalabs.com"), or split across an ordinary markdown line-wrap -
-    a real incident found exactly that last case, which defeated 8a's per-line exact-substring
-    match even though the check was live and correctly wired at the time. This check instead
-    matches on individual WORD FRAGMENTS of a registered name/path segment, filtered against a
-    common-word list - plain substring match, not word-boundary, so a glued form still triggers
-    (e.g. "quokka" is still found inside "quokkalabs"). Deliberately SOFT, never HARD: a single
-    common-ish word from a project's name (e.g. a generic word that also happens to appear inside
-    plenty of unrelated compounds) is nowhere near certain enough to block on, and even a genuinely
-    uncommon word can still carry a legitimate, unrelated meaning in ordinary prose - this is a
-    nudge for reviewer attention, exactly like check 8b, never proof on its own."""
+    """Check 8d, SOFT. Complements 8a (exact full-name match, HARD): matches on individual WORD
+    FRAGMENTS of a registered name/path segment, filtered against a common-word list. Plain
+    substring match, not word-boundary, so a glued form still triggers (e.g. "quokka" is found
+    inside "quokkalabs")."""
     names, path_segments = _load_consumer_signals(shared_root)
     fragments = sorted(_name_fragments(list(names) + list(path_segments)), key=len, reverse=True)
     if not fragments:
@@ -737,9 +578,8 @@ def check_outgoing_name_fragments(shared_root, files, base_sha, head_sha):
 
 
 def check_generic_absolute_paths(shared_root, files, base_sha, head_sha):
-    """Check 8b, SOFT - see check 8 in the module docstring for the full rationale. Kept soft
-    (not hard-fail) because this repo's own docs legitimately use placeholder absolute paths like
-    `C:\\Users\\you\\...` as examples - a shape-only match can't tell those from a real leak."""
+    """Check 8b, SOFT. Added content matching a generic absolute-user-home-path shape that isn't
+    an obvious placeholder."""
     hits = []
     for status, path in files:
         norm = path.replace('\\', '/')
@@ -764,9 +604,7 @@ def check_generic_absolute_paths(shared_root, files, base_sha, head_sha):
 
 
 def check_outer_repo_references(shared_root, files, base_sha, head_sha):
-    """Check 9, HARD - see check 9 in the module docstring for the full rationale. Pure pattern
-    match against added lines, no live signal source needed (unlike check 8), so this behaves
-    identically in CI and in a real checkout."""
+    """Check 9, HARD. Pure pattern match against added lines, no live signal source needed."""
     hits = []
     for status, path in files:
         norm = path.replace('\\', '/')

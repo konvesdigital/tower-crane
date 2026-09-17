@@ -2,40 +2,30 @@
 """
 new_consumer.py - scaffold a new tower_crane consumer project, deterministic, non-interactive.
 
-Creates ALL files a new consumer needs so it works like existing consumers from its first
-session (consumer_platform design, decision 10):
+Creates ALL files a new consumer needs:
   <target>/.claude/settings.json   - opt-in hook snippet(s) for the chosen tools (merged)
   <target>/CLAUDE.md               - from templates/consumer_CLAUDE.md.tmpl, with @import lines
   <target>/README.md               - from templates/consumer_README.md.tmpl, once, if absent
                                      (project narrative - CLAUDE.md stays directives-only)
   <target>/.claude/skills/<name>/  - Track-1 skill stub(s) for toolkit-governed pieces in
-                                     SKILL_PIECES - `filing`,
-                                     `checkpoint`, `archive`, `shared_resources` so far - plus every
-                                     STANDALONE_SKILLS entry - `update`, `commands` so far
+                                     SKILL_PIECES plus every STANDALONE_SKILLS entry
   <target>/project_progress.md      - continuity skeleton (only when continuity is on)
   <target>/FIRST_RUN.md             - one-time checklist the new project runs then deletes
   consumers/<slug>.md               - registry entry (this repo)
 
 consumers/<slug>.md is the ONLY place a project name is recorded - it lives in the outer, private
-hub repo (the outer/inner repo split), never in toolkit\\ itself, which
-tracks the public konvesdigital/tower-crane repo. MENU.md's "In use by" column was removed
-2026-07-28 after it was found writing real consumer/client names into that public-repo-tracked
-file - see project_progress.md.
+hub repo, never in toolkit\\ itself, which tracks the public konvesdigital/tower-crane repo.
 
 Recognized existing-CLAUDE.md shapes, each handled non-destructively (see the "CLAUDE.md from
 template" section below): a registered consumer connecting another host (host-merge, patches
 @import lines only), a disconnected project reconnecting (strips the DISCONNECTED_HEADING marker,
 re-appends the live sections), and an unregistered hand-copied project with no Tower Crane content
-at all (adoption - appends the live sections to whatever's already there). This third shape used to
-require copying templates\\register.md into the target project and filing a ticket back here from
-a separate session; that courier is retired (2026-08-12) now that this script can just be run
-directly from a hub session, the same as every other shape.
+at all (adoption - appends the live sections to whatever's already there).
 
 This script does NOT run git - git init + first commit is a FIRST_RUN.md step in the new project.
 
-Cross-platform port of an earlier new_consumer.ps1. Logic is a direct translation. Generated files (settings.json,
-CLAUDE.md, README.md, project_progress.md, FIRST_RUN.md, registry entry) now use LF line endings universally
-(the locked line-endings decision, bundled into this port).
+Generated files (settings.json, CLAUDE.md, README.md, project_progress.md, FIRST_RUN.md, registry
+entry) use LF line endings universally.
 """
 
 import argparse
@@ -80,38 +70,27 @@ TOOL_BLURBS = {
                           'string-key spelling (PostToolUse hook).',
 }
 
-# Scaffolding always precedes adoption. The "Adopted Shared Resources" subsection's own general
-# paragraph is fixed template text (true regardless of what's adopted, so it ships with every
-# scaffold, never written conditionally later) - this fallback is only the "what's been adopted"
-# LISTING underneath it, which shared_resources.md's Apply/Forget procedures own from the first
-# real adoption onward. The scaffolder itself only ever writes this fallback, never real content.
+# The "Adopted Shared Resources" subsection's general paragraph is fixed template text, shipped
+# with every scaffold. This fallback is only the "what's been adopted" LISTING underneath it,
+# which shared_resources.md's Apply/Forget procedures own from the first real adoption onward.
 ADOPTED_SHARED_RESOURCES_NONE = '**Shared resources adopted for this project:** _None yet._'
 
-# Toolkit-governed Track-1 skill pieces: a piece name in here is
-# scaffolded as one or more project-local skill stubs (each sourced from
-# templates/skills/<skill>/SKILL.md) plus a still-@imported Track-2 "resume check" companion,
-# instead of a flat @import <name>.md. `filing` -> one skill of the same name (2026-07-30 pilot);
-# `continuity` -> two skills, `checkpoint` and `archive` (2026-07-31 - `resume` itself stays
-# Track 2, see continuity_resume_check.md). compliance stays flat - never piloted this way.
+# Toolkit-governed Track-1 skill pieces: a piece name in here is scaffolded as one or more
+# project-local skill stubs (each sourced from templates/skills/<skill>/SKILL.md) plus a
+# still-@imported Track-2 "resume check" companion, instead of a flat @import <name>.md.
+# compliance stays flat.
 SKILL_PIECES = {
     'filing': {'companion': 'filing_resume_check', 'skills': ['filing']},
     'continuity': {'companion': 'continuity_resume_check', 'skills': ['checkpoint', 'archive']},
     'shared_resources': {'companion': 'shared_resources_resume_check', 'skills': ['shared_resources']},
 }
 
-# Standalone Track-1 skills with no @import companion at all: scaffolded
-# for every new consumer unconditionally, alongside (not through) the SKILL_PIECES protocol pieces
-# above. `update` is purely on-demand - nothing resume-time ever checks for it. `commands`
-# is the consumer-side discoverability menu, same on-demand shape.
-# `capability_relationships` answers a specific
-# mechanism/concept question by reading capability_catalog.yaml - also fires from a hub session,
-# via self_hooks.py's separate "skills" opt-in mechanism (templates\\optins\\capability_relationships.json).
+# Standalone Track-1 skills with no @import companion: scaffolded for every new consumer
+# unconditionally, alongside the SKILL_PIECES protocol pieces above.
 STANDALONE_SKILLS = ['update', 'commands', 'capability_relationships']
 
 
 def write_utf8(path, content):
-    # Python's utf-8 encoding never writes a BOM (unlike PS 5.1's -Encoding utf8); newline='\n'
-    # keeps embedded '\n' as LF instead of Windows-translating it to CRLF on write.
     path.write_text(content, encoding='utf-8', newline='\n')
 
 
@@ -124,8 +103,7 @@ def get_slug(name):
 
 def try_capture_remote(target_path):
     """Best-effort `git remote get-url origin` from target_path's own clone, or None if there's
-    no .git\\ yet, no `origin` remote, or git isn't available - the registry's
-    `remote:` field is seed-once/best-effort, never required."""
+    no .git\\ yet, no `origin` remote, or git isn't available."""
     if not (target_path / '.git').exists():
         return None
     try:
@@ -139,10 +117,8 @@ def try_capture_remote(target_path):
 
 
 def detect_git_state(target_path):
-    """(has_git, remote) at target_path - the "Reconnect-after-disconnect gap":
-    a reconnecting project (or a never-connected one someone already set up by hand) may already
-    have git, or a remote, or both - never assume a consumer starts from nothing. Drives
-    build_first_run_checklist() so the checklist only ever lists what's actually still missing."""
+    """(has_git, remote) at target_path. Drives build_first_run_checklist() so the checklist only
+    ever lists what's actually still missing."""
     has_git = (Path(target_path) / '.git').exists()
     return has_git, (try_capture_remote(target_path) if has_git else None)
 
@@ -164,10 +140,8 @@ def strip_disconnected_section(text):
 
 def find_oldest_registry_commit_date(slug):
     """Best-effort: date of the OLDEST commit touching consumers/<slug>.md in the hub's own git
-    history - fallback when the notes file doesn't carry the field. Local to new_consumer.py, not
-    reused from check_tower_crane.py's --diagnose (importing that tool would pull its whole import
-    graph into every plain scaffold invocation). Returns None on any failure (no git, empty history, never registered,
-    shallow clone) - never raises."""
+    history - fallback when the notes file doesn't carry the field. Returns None on any failure
+    (no git, empty history, never registered, shallow clone) - never raises."""
     try:
         proc = subprocess.run(
             ['git', '-C', str(PROJECT_ROOT), 'log', '--format=%ci', '--', f'consumers/{slug}.md'],
@@ -180,9 +154,7 @@ def find_oldest_registry_commit_date(slug):
 
 
 def build_first_run_checklist(has_git, remote, needs_overview):
-    """Only lists what's actually still needed, based on detected state - a reconnecting project
-    (real history, usually real git/remote already) and a never-connected one someone already set
-    up by hand both deserve an accurate checklist, not a blanket "start from scratch" one."""
+    """Only lists what's actually still needed, based on detected state."""
     items = []
     if not has_git:
         items.append("- [ ] `git init` and make an initial commit. (The scaffolder does NOT run "
@@ -215,12 +187,9 @@ _COMMIT_RESULT_LABELS = {
 def print_close_out_summary(project_name, target_path, existing_consumer, already_connected_here,
                              is_reconnect, is_adoption, consumer_commit_result,
                              progress_commit_result, registry_commit_result, remaining_checklist):
-    """One explicit block, printed once at the very end of the run, from the same classification/
-    commit-result variables main() already computed along the way (design\\
-    script_action_reporting.md) - never re-derived a second time by whatever reads this output.
-    "Left uncommitted" is the one line NOT sourced from an already-known variable: it re-checks git
-    directly (evidence over intent), since "what's still dirty" is exactly the fact a script's own
-    belief about what it just committed can be wrong about."""
+    """One block, printed once at the end of the run, from the classification/commit-result
+    variables main() already computed. "Left uncommitted" re-checks git directly rather than
+    being sourced from an already-known variable."""
     print()
     print(f"=== {project_name}: connect project summary ===")
 
@@ -308,9 +277,7 @@ def main():
     private_tools = args.private_tools
     scaffold_date = args.date or date.today().isoformat()
 
-    # Close-out summary state: the classification/commit-result
-    # variables the script already computes below, threaded out here so the final summary block
-    # (step 8) can report them directly instead of a caller re-deriving the same facts secondhand.
+    # Close-out summary state, threaded out here so step 8 can report it directly.
     remaining_checklist = None
     consumer_commit_result = None
     progress_commit_result = None
@@ -345,10 +312,8 @@ def main():
                                 f"{PRIVATE_OPTINS_DIR / (t + '.json')} and no skill stub at "
                                 f"{PRIVATE_SKILLS_DIR / t / 'SKILL.md'}")
 
-    # Slug-collision routing (locked 2026-08-10): an already-
-    # registered consumer is never an error and never a --force blind overwrite target - it
-    # always routes into an additive host-merge below (step 6a), so a second machine connecting
-    # the same project can never destroy the first machine's hosts: entry.
+    # An already-registered consumer is never an error and never a --force overwrite target - it
+    # always routes into an additive host-merge below (step 6a).
     registry_path = CONSUMERS_DIR / f"{slug}.md"
     existing_consumer = None
     already_connected_here = False
@@ -363,23 +328,15 @@ def main():
             )
         already_connected_here = config['host_id'] in existing_consumer['hosts']
 
-    # A "new connection" is any brand-new consumer,
-    # reconnect, adoption, or a genuinely NEW host joining an already-registered consumer
-    # (existing_consumer is not None and NOT already_connected_here) - every one of those gets the
-    # new hub_pointer.md/_hub_dispatch.py indirection. Re-scaffolding a host that's ALREADY
-    # connected is deliberately excluded (no forced migration of an existing, working connection -
-    # "migrate all existing consumers now vs. opportunistically" was decided in favor of
-    # opportunistic migration) - that one case keeps today's direct-path behavior untouched.
+    # A "new connection" is any brand-new consumer, reconnect, adoption, or a genuinely NEW host
+    # joining an already-registered consumer - every one of those gets the new
+    # hub_pointer.md/_hub_dispatch.py indirection. A host that's ALREADY connected is excluded, so
+    # it keeps its existing direct-path behavior untouched.
     is_new_connection = existing_consumer is None or not already_connected_here
 
-    # Blank-folder bootstrap: connecting an already-registered
-    # consumer whose target folder is genuinely empty and whose registry carries a remote: -
-    # clone before any scaffolding touches the folder. Ordering matters: cloning AFTER scaffolding
-    # would hit `refusing to merge unrelated histories`, or a same-path merge conflict in
-    # CLAUDE.md/settings.json/project_progress.md. Once cloned, the folder "already has files" and
-    # falls straight through to the same file-existence-keyed patch logic below as a physical copy
-    # would - no separate code path. Recovery (a corrupted/deleted local clone) reduces to this
-    # same path once the broken folder has been emptied first.
+    # Blank-folder bootstrap: connecting an already-registered consumer whose target folder is
+    # empty and whose registry carries a remote: clone before any scaffolding touches the folder.
+    # Once cloned, the folder falls through to the same file-existence-keyed patch logic below.
     if existing_consumer is not None and not already_connected_here and not args.no_clone:
         remote = existing_consumer.get('remote')
         folder_empty = not target_path.exists() or (target_path.is_dir() and not any(target_path.iterdir()))
@@ -396,11 +353,8 @@ def main():
                 )
             print("  cloned OK")
 
-    # Pull target_path's own repo current BEFORE any of the read-and-patch-in-place steps below
-    # (host-merge, reconnect, adoption, already-connected re-scaffold all read whatever CLAUDE.md/
-    # settings.json is on disk right now) - config_lib.py's sync_consumer_repo(), see that
-    # function's own docstring for the real 2026-08-22 push conflict this closes. No-op for a
-    # brand-new scaffold (no .git yet) or a folder just cloned above (already at its origin tip).
+    # Pull target_path's own repo current before any of the read-and-patch-in-place steps below.
+    # No-op for a brand-new scaffold (no .git yet) or a folder just cloned above.
     if target_path.exists():
         sync_consumer_repo(target_path, log=print)
 
@@ -429,8 +383,8 @@ def main():
         if not stub_src.exists():
             raise RuntimeError(f"Canonical skill stub missing for standalone skill '{skill_name}': {stub_src}")
 
-    # the piece names actually @imported into CLAUDE.md - a SKILL_PIECES entry substitutes its
-    # companion (e.g. 'filing' -> 'filing_resume_check'); everything else imports itself directly.
+    # The piece names actually @imported into CLAUDE.md - a SKILL_PIECES entry substitutes its
+    # companion; everything else imports itself directly.
     import_pieces = [SKILL_PIECES[p]['companion'] if p in SKILL_PIECES else p for p in pieces]
 
     if existing_consumer is not None:
@@ -453,12 +407,8 @@ def main():
     claude_dir.mkdir(parents=True, exist_ok=True)
 
     # --- 1a. hub_pointer.md / _hub_dispatch.py / .gitignore (new connections only) -----------
-    # Written BEFORE settings.json below, since that
-    # step's own tool-merge loop needs is_new_connection to already be decidable (it is - computed
-    # above) to choose get_dispatch_optin() over get_expanded_optin(). Reuses
-    # write_new_connection_files() (config_lib.py), which
-    # factored this out so migrate_consumer_indirection.py's one-time already-connected-host
-    # migration can call the identical write instead of a hand-copied duplicate.
+    # Written before settings.json below, since that step's tool-merge loop needs
+    # is_new_connection decidable to choose get_dispatch_optin() over get_expanded_optin().
     if is_new_connection:
         write_new_connection_files(target_path, config, import_pieces, SHARED_ROOT, log=print)
 
@@ -474,25 +424,20 @@ def main():
     settings.setdefault('hooks', {})
 
     def _get_optin(optins_dir, tool_name):
-        # A new connection gets the fixed dispatch-
-        # wrapper command form; an already-connected host's re-scaffold keeps today's direct-path
-        # form untouched (no forced migration).
+        # A new connection gets the dispatch-wrapper command form; an already-connected host's
+        # re-scaffold keeps its direct-path form untouched.
         if is_new_connection:
             return get_dispatch_optin(Path(optins_dir) / f"{tool_name}.json", tool_name, config)
         return get_expanded_optin(Path(optins_dir) / f"{tool_name}.json", config)
 
     if settings_existed and existing_consumer is not None:
-        # host-merge branch: repoint any ALREADY-PRESENT hook
-        # command (from a physically-copied settings.json) for tools the registry already lists
-        # as opted-in, reusing relocate.py's own regeneration. Fixes the double-hook-firing risk:
-        # a stale other-machine-path entry and a freshly-appended current-path entry below would
-        # never match as duplicates under the exact-JSON dedup the append loop uses.
+        # host-merge branch: repoint any already-present hook command for tools the registry
+        # already lists as opted-in, reusing relocate.py's own regeneration.
         existing_tool_names = [o['name'] for o in existing_consumer['opted_in']]
         existing_private_names = [o['name'] for o in existing_consumer['private_opted_in']]
         if is_new_connection:
-            # A genuinely new host joining an
-            # already-registered consumer gets the dispatch-wrapper command form here too, same as
-            # the fresh-tool-merge loop below - one command shape per settings.json, never mixed.
+            # A genuinely new host joining an already-registered consumer gets the
+            # dispatch-wrapper command form here too - one command shape per settings.json.
             stale_cmd = build_dispatch_cmd_map(existing_tool_names, existing_private_names, config, OPTINS_DIR, PRIVATE_OPTINS_DIR)
         else:
             stale_cmd = build_new_cmd_map(existing_tool_names, existing_private_names, config, OPTINS_DIR, PRIVATE_OPTINS_DIR)
@@ -501,17 +446,12 @@ def main():
             print(f"  patched stale hook command(s) in {settings_path}")
 
     # Every consumer reads canonical Track-1 skill/resume-check content straight out of
-    # toolkit\templates (e.g. "Read {{IMPORT_BASE}}/filing.md in full") - that's outside the
-    # project root, so without an allow rule every such read prompts. templates\ is read-only
-    # content by convention (templates\filing.md: "never edit any existing file inside toolkit\"),
-    # so blanket-allowing Read there carries no write risk.
+    # toolkit\templates, which is outside the project root - without an allow rule every such
+    # read prompts.
     allow_list = settings.setdefault('permissions', {}).setdefault('allow', [])
     read_rule = f"Read({import_base}/**)"
     if read_rule not in allow_list:
         allow_list.append(read_rule)
-    # The fixed, host-invariant set of Bash/PowerShell
-    # commands consumer-side resume/checkpoint already documents (git pull, consumer_resume_check.py,
-    # checkpoint_consumer.py) - so they never hit the ambient auto-mode permission classifier.
     merge_bash_allowlist(settings, 'consumer')
 
     for t in tools:
@@ -521,9 +461,7 @@ def main():
         if 'hooks' in optin:
             for evt, groups in optin['hooks'].items():
                 existing = settings['hooks'].setdefault(evt, [])
-                # dedupe so re-running the scaffolder (--force) doesn't append the same hook twice;
-                # existing_json is computed once (not updated per append) to mirror the original
-                # PowerShell's static comparison snapshot.
+                # dedupe so re-running the scaffolder (--force) doesn't append the same hook twice
                 existing_json = [json.dumps(e, separators=(',', ':')) for e in existing]
                 for entry in groups:
                     entry_json = json.dumps(entry, separators=(',', ':'))
@@ -533,7 +471,6 @@ def main():
     for t, kind in private_tool_kinds.items():
         if kind != 'hook':
             continue
-        # {{PRIVATE_ROOT}} expands the same way {{SHARED_ROOT}} does above.
         optin = _get_optin(PRIVATE_OPTINS_DIR, t)
         if 'hooks' in optin:
             for evt, groups in optin['hooks'].items():
@@ -548,42 +485,29 @@ def main():
 
     # --- 3. CLAUDE.md from template ----------------------------------------------------------
     claude_md_path = target_path / 'CLAUDE.md'
-    # A new connection gets the single, host-invariant
-    # indirection line; only reachable when existing_consumer is None (reconnect/adoption/brand
-    # new), which is always is_new_connection - the direct-lines join stays here only as a
-    # defensive fallback, never actually exercised.
+    # A new connection gets the single, host-invariant indirection line.
     protocol_imports = HUB_POINTER_IMPORT_LINE if is_new_connection else '\n'.join(
         f"@{import_base}/{p}.md" for p in import_pieces)
 
-    # Per-file principle reframe: claude_md_existed is captured
-    # ONCE, before any write, and is the one signal other files below should consult about
-    # CLAUDE.md's prior state - never is_reconnect/is_adoption themselves, which are CLAUDE.md's
-    # own content-driven classification and can legitimately be True even when CLAUDE.md itself
-    # doesn't exist (a hand-removed DISCONNECTED_HEADING with the notes file still present).
+    # claude_md_existed is captured once, before any write, and is the signal other steps below
+    # consult about CLAUDE.md's prior state - never is_reconnect/is_adoption themselves, which can
+    # be True even when CLAUDE.md itself doesn't exist.
     claude_md_existed = claude_md_path.exists()
     notes_path = target_path / DISCONNECT_NOTES_FILENAME
     notes_existed = notes_path.exists()
 
-    # Reconnect detection ("Reconnect-after-disconnect gap"): a previously
-    # disconnected project has no registry entry (existing_consumer is None, same as brand new)
-    # but either still carries the DISCONNECTED_HEADING pointer in CLAUDE.md, or - if that marker
-    # was hand-removed - the surviving TOWER_CRANE_DISCONNECT_NOTES.md is itself durable evidence
-    # of a prior connection (fixes the orphan bug: without this OR, a hand-stripped marker with the
-    # notes file intact misrouted into the adoption branch and the notes file was never cleaned
-    # up). Either way this is a recognized, safe-to-automate shape - not the ambiguous collision
-    # the --force gate below exists to protect against.
+    # Reconnect detection: a previously disconnected project has no registry entry (same as brand
+    # new) but either still carries the DISCONNECTED_HEADING pointer in CLAUDE.md, or - if that
+    # marker was hand-removed - the surviving TOWER_CRANE_DISCONNECT_NOTES.md is itself evidence
+    # of a prior connection.
     is_reconnect = False
     if existing_consumer is None:
         has_marker = claude_md_existed and DISCONNECTED_HEADING in claude_md_path.read_text(encoding='utf-8')
         is_reconnect = has_marker or notes_existed
 
-    # Adoption detection (register.md's subsumption, 2026-08-12): an existing hand-copied project
-    # that was never put through new_consumer.py/register.md at all has a CLAUDE.md with no
-    # TC_IN_USE_HEADING and no protocol-piece @import line - troubleshoot_project_connection.md's
-    # "no Tower Crane content at all" shape, register.md's actual original target case. Recognized
-    # and safe to automate the same way reconnect is: append, never overwrite - never routed
-    # through register.md, which is retired (its no-hub-access scenario was already retired, and
-    # every other recognized shape here already runs straight from a hub session with no ticket).
+    # Adoption detection: an existing hand-copied project that was never put through
+    # new_consumer.py has a CLAUDE.md with no TC_IN_USE_HEADING and no protocol-piece @import
+    # line.
     is_adoption = False
     if claude_md_path.exists() and existing_consumer is None and not is_reconnect:
         existing_text = claude_md_path.read_text(encoding='utf-8')
@@ -594,23 +518,17 @@ def main():
 
     if claude_md_path.exists() and existing_consumer is not None and not is_new_connection:
         # already-connected-here re-scaffold: patch only the @import lines in place via
-        # relocate.py's fix_imports(), instead of the old error-or-`--force` gate - `--force` used
-        # to be the only way past this check, and it also unconditionally reset project_progress.md
-        # to the blank skeleton. The project overview and everything else in CLAUDE.md is left
-        # untouched. No forced migration to the pointer-indirection form here -
-        # this host's connection already works.
+        # relocate.py's fix_imports(). The project overview and everything else in CLAUDE.md is
+        # left untouched.
         if fix_imports(target_path, import_pieces, import_base, dry_run=False, log=print):
             print(f"  patched {claude_md_path} (@import lines only)")
         else:
             print(f"  skip   {claude_md_path} already current (@import lines match)")
     elif claude_md_path.exists() and existing_consumer is not None and is_new_connection:
-        # host-merge branch, genuinely new host: collapse whatever direct-form @import lines
-        # are already present (however many hosts wrote them before this one) into the single
-        # host-invariant pointer line - this host's own hub_pointer.md (written above) is what
-        # actually resolves it. A piece with no existing line just isn't found; not an error, since
-        # the single pointer line covers every piece once hub_pointer.md exists. Reuses
-        # collapse_imports_to_pointer() (config_lib.py), which
-        # factored this out for migrate_consumer_indirection.py's identical reuse.
+        # host-merge branch, genuinely new host: collapse whatever direct-form @import lines are
+        # already present into the single host-invariant pointer line - this host's own
+        # hub_pointer.md (written above) resolves it. A piece with no existing line just isn't
+        # found.
         result = collapse_imports_to_pointer(claude_md_path, import_pieces, log=print)
         if result == 'already':
             print(f"  skip   {claude_md_path} already current (pointer import line present)")
@@ -621,8 +539,7 @@ def main():
         # Reconnect: strip the disconnected-pointer section first, preserving everything else.
         # Adoption: no marker to strip, just append to the existing content as-is. Either way,
         # reuses the same template the brand-new branch below renders from, sliced to just the two
-        # live sections (TC_IN_USE_HEADING onward) so the project-name/overview-placeholder lines
-        # at the top of the template are never applied over real content.
+        # live sections (TC_IN_USE_HEADING onward).
         if is_reconnect:
             text, _ = strip_disconnected_section(claude_md_path.read_text(encoding='utf-8'))
         else:

@@ -6,25 +6,6 @@
 # Runs Python AST-based static analysis on the target file.
 # Output: terminal stdout + timestamped log file + logs\latest_check.txt; on FAIL, also stderr.
 #
-# History: originally a PowerShell wrapper (consistency_check.ps1) around this exact Python
-# analysis, which it wrote to a temp file and ran via `& python`. Converted to pure Python
-# 2026-07-20 (part of this project's portability work): removes the PowerShell runtime from
-# the consumer side and the temp-file dance - Python was already a hard dependency. The AST
-# analysis below is UNCHANGED from the wrapper; the golden suite (tests\consistency_check\) is the
-# net that proves it.
-#
-# HARD-GUARDRAIL CONTRACT (fixed 2026-07-23 - see project_progress.md Work Log): a FAIL exits 2 and
-# echoes the report to stderr, not just stdout. This is deliberate, not incidental - Claude Code
-# only auto-feeds a PostToolUse hook's output back into the calling agent's context on exit code 2;
-# any other non-zero code is a "non-blocking" error the agent is never shown. Before this fix the
-# hook exited 1 and printed only to stdout, so a FAIL silently logged to disk without ever reaching
-# the agent that needed to see it - discovered via this repo's own self-use dogfooding. Every
-# consumer floats on this one file (no per-project copies), so this fix applies everywhere the hook
-# is wired the moment it lands - self-use here, every opted-in consumer, and the next public
-# release cut from this HEAD. Any future PreToolUse/PostToolUse/Stop hook added to this repo must
-# follow the same contract: a failure state MUST exit 2 and write its report to stderr, or it is
-# merely logging, not guarding.
-#
 # To use in a project: add a PostToolUse hook in that project's .claude\settings.json pointing at
 # this file (see MENU.md / templates\optins\consistency_check.json for the canonical snippet), then
 # list it in that project's CLAUDE.md under "Tower Crane In Use".
@@ -33,8 +14,9 @@
 #   <python_launcher> consistency_check.py            # hook mode: reads PostToolUse JSON on stdin
 #   <python_launcher> consistency_check.py <file.py>  # direct/test mode: target passed as argv[1]
 #
-# Exit codes: 0 = PASS (or skipped - no target, not a .py file, CLAUDE_PROJECT_DIR unset). 2 = FAIL
-# (certain failure(s) found - see HARD-GUARDRAIL CONTRACT above). Never 1.
+# Exit codes: 0 = PASS (skipped if no target, not a .py file, or CLAUDE_PROJECT_DIR unset).
+# 2 = FAIL (certain failure(s) found), with the report also written to stderr - Claude Code only
+# surfaces PostToolUse hook output to the calling agent on exit code 2, never on 1. Never exits 1.
 
 import ast
 import sys
@@ -50,9 +32,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="repla
 
 
 def emit(line, log_fh, latest_fh, also_stderr=False):
-    """Print to terminal and write to both log files with real newlines. also_stderr additionally
-    echoes to stderr - the one stream Claude Code auto-feeds back to the calling agent on a
-    PostToolUse hook's exit code 2 (see HARD-GUARDRAIL CONTRACT at the top of this file)."""
+    """Print to terminal and write to both log files. also_stderr additionally prints to stderr."""
     print(line)
     log_fh.write(line + "\n")
     latest_fh.write(line + "\n")
@@ -237,22 +217,13 @@ def check_file(path):
                         })
 
     # -- Check: string key consistency (column names / dict keys) --------------
-    # Stripping separators to normalise 'user_id' / 'user-id' / 'userid' as the same key is the
-    # point of this check, but the same blind stripping also collapses '--zip' -> 'zip' and
-    # '__main__' -> 'main', flagging a CLI flag or a dunder sentinel against an unrelated bare
-    # word as if they were the same key spelled two ways. Skip both shapes before they ever enter
-    # the fuzzy-match set. Found + deferred 2026-07-23 during this repo's own self-use dogfooding
-    # (see project_progress.md); fixed once the exit-2 hook contract (see file header) meant this
-    # false positive would start hard-blocking real work instead of silently logging.
+    # Normalises separators to flag 'user_id' / 'user-id' / 'userid' as the same key. Excludes
+    # CLI-flag literals ('--zip') and dunder sentinels ('__main__') before the fuzzy-match set,
+    # since blind normalisation would otherwise collide either against an unrelated bare word.
     #
-    # Second, related shape found while verifying that fix: an f-string's own literal text
-    # fragments (e.g. the "Release " in f"Release {tag}") are prose/template text, never a
-    # dict/column key - but ast.walk() visits them as plain ast.Constant nodes same as a real key
-    # literal, so e.g. 'release' (a CLI subcommand token in `['gh', 'release', 'view']`) collided
-    # with 'Release' (that f-string fragment). Excluded by identity: only a Constant that is a
-    # *literal segment of a JoinedStr* is skipped - a Constant used as a subscript key *inside* an
-    # f-string's `{...}` expression (e.g. f"{d['user_id']}") is a different AST node and still
-    # checked normally.
+    # A Constant that is a literal segment of an f-string (ast.JoinedStr) is also excluded - it's
+    # prose/template text, not a key - while a Constant used as a subscript key inside an
+    # f-string's `{...}` expression is a different AST node and is still checked normally.
     fstring_fragment_ids = {
         id(v) for node in ast.walk(tree) if isinstance(node, ast.JoinedStr)
         for v in node.values if isinstance(v, ast.Constant)
@@ -315,10 +286,8 @@ def main():
     if not target:
         sys.exit(0)
 
-    # GENERALIZATION NOTE (carried from the wrapper): an earlier, single-project version of this
-    # script fell back to a hardcoded project path if CLAUDE_PROJECT_DIR was unset. That's unsafe
-    # once shared across projects (it would write one project's logs into another's folder). Now it
-    # skips the run and says why.
+    # Skip rather than guess a project path - CLAUDE_PROJECT_DIR unset means the target project's
+    # logs\ folder can't be determined safely.
     project_root = os.environ.get("CLAUDE_PROJECT_DIR")
     if not project_root:
         print("[WARN] consistency_check.py: CLAUDE_PROJECT_DIR not set - skipping "

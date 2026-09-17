@@ -1,48 +1,30 @@
 #!/usr/bin/env python3
 """
-check_shared_resource_refs.py - a project's own
-"is what I adopted from shared_resources\\ still there" check, run at that project's `resume`
-(see templates\\shared_resources.md's "Checking adopted references at resume").
+check_shared_resource_refs.py - checks that a project's adopted shared_resources\\ references
+still exist, run at that project's `resume`.
 
-Why a script and not a written resume-time instruction: the same "prefer a deterministic check
-over LLM judgment" reasoning already governing consistency_check.py and check_tower_crane.py's
-golden suite - an existence check has one right answer, so let something outside the model give
-it, for free, instead of spending agent reasoning/tokens re-deriving it every resume.
-
-What it checks, in two forms - both per templates\\shared_resources.md's "Apply" step:
+What it checks, in two forms:
 1. Every `@import`-syntax line in the given project's CLAUDE.md whose target path contains a
-   `shared_resources/` segment (the pre-directive_economy flat-import form).
+   `shared_resources/` segment.
 2. Every backtick-quoted `~/...`-form path containing a `shared_resources/` segment inside any
-   project-local `.claude\\skills\\<name>\\SKILL.md` file (the Track-1 skill-stub form "Apply" now
-   produces).
-Both forms expand a leading `~` to the current user's home directory (the only such path form
-proven to resolve), then check the target file actually
-exists. Flags anything that doesn't resolve, so a folder-maintenance operation
-(split/consolidate/rename/delete) that broke a stub never fails silently.
+   project-local `.claude\\skills\\<name>\\SKILL.md` file.
+Both forms expand a leading `~` to the current user's home directory, then check the target file
+actually exists.
 
-Deliberately out of scope: free-text "pointer note" adoptions (a `tool`-kind entry invoked
-on-demand, or any adoption written as prose mentioning a spaced path rather than a literal
-`@import` line or a backtick-quoted `~/...` path in a skill stub). Those aren't machine-parseable
-by construction - there's no fixed shape to check deterministically. Also out of scope: a skill
-stub's trigger description going stale relative to its source entry's current topic footprint -
-a different, notify-only concern ("Drift mechanics", handled by check_shared_resource_drift.py),
-not an existence check.
+Out of scope: free-text "pointer note" adoptions (not machine-parseable), and a skill stub's
+trigger description going stale relative to its source entry's current content (handled by
+check_shared_resource_drift.py).
 
-Also checks a third, separate thing ("Per-host availability for pointer entries"): whether an
-adopted `tool`/pointer-`reference` entry's own `Hosts:` block
-(only present on an entry whose real target lives outside `shared_resources\\`, genuinely
-machine-local) lists THIS host. This is deliberately notify-only, never blocking - a missing host
-isn't a broken reference (the entry file itself resolves fine), it's a "the thing this points at
-was never provisioned here" gap that only a human can resolve. `[HOST-GAP]` never affects the exit
-code. See `templates\\shared_resources.md`'s "Per-host availability for pointer entries" for the
-three-option remedy (ignore / connect now / proceed and re-ask) the acting agent should offer on a
-`[HOST-GAP]` hit.
+Also checks a third thing ("Per-host availability for pointer entries"): whether an adopted
+`tool`/pointer-`reference` entry's own `Hosts:` block (present only on an entry whose real target
+lives outside `shared_resources\\`) lists THIS host. Notify-only, never blocking - `[HOST-GAP]`
+never affects the exit code. See `templates\\shared_resources.md`'s "Per-host availability for
+pointer entries" for the ignore / connect now / proceed-and-re-ask remedy.
 
 Usage: python scripts\\check_shared_resource_refs.py [--project-root <path>]
-Defaults --project-root to the current working directory (the normal case: run from inside the
-consuming project during its own `resume`). Prints [OK]/[FAIL]/[N/A]/[HOST-GAP] lines; exit 0 if
-nothing is broken (including "nothing adopted"), exit 1 if any adopted reference no longer
-resolves. A `[HOST-GAP]` alone never causes exit 1.
+Defaults --project-root to the current working directory. Prints [OK]/[FAIL]/[N/A]/[HOST-GAP]
+lines; exit 0 if nothing is broken (including "nothing adopted"), exit 1 if any adopted
+reference no longer resolves. A `[HOST-GAP]` alone never causes exit 1.
 """
 
 import argparse

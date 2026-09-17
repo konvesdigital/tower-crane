@@ -1,43 +1,28 @@
 #!/usr/bin/env python3
 """
-check_shared_resource_drift.py - the second half of the "Drift
-mechanics" mechanism: a notify-only, resume-time check for whether a Track-1 shared_resources\\ skill
-stub's trigger description has gone stale relative to its source entry's current content.
+check_shared_resource_drift.py - notify-only, resume-time check for whether a Track-1
+shared_resources\\ skill stub's trigger description has gone stale relative to its source entry's
+current content.
 
-This is deliberately NOT check_shared_resource_refs.py (B2). That script answers "does the
-adopted reference still exist" (a hard, blocking existence check - [FAIL], exit 1). This script
-answers a softer question: "has the source content changed since this stub's trigger was drafted,
-such that the trigger might no longer cover everything the source now talks about." A source file
-going missing is a narrow, local, self-healing failure (the model
-just gets a not-found on that one file and proceeds without it). A source file changing content
-without going missing is the real drift risk - the trigger is a static snapshot written once at
-adopt time, never re-read the way the index itself is, so it can silently under-match a new topic
-forever. Hence: separate script, separate (non-blocking) exit-code contract, separate [DRIFT]
-verdict distinct from [FAIL].
+Distinct from check_shared_resource_refs.py: that script checks whether the adopted reference
+still exists ([FAIL], exit 1, blocking). This script checks whether the source content has
+changed since the stub's trigger was drafted, which is non-blocking ([DRIFT], exit 0).
 
-Mechanism: "Apply" (templates\\shared_resources.md's reference/tool step) now stamps the stub's
-existing adoption-marker comment with a sha256 of the source entry file's content at adoption
-time: `<!-- shared_resources: <entry> adopted YYYY-MM-DD index-sha256:<hash> -->`. This script
-recomputes that hash from the live source file and compares. A full-file hash is a deliberately
-coarse proxy for "topic footprint changed" - it can flag a purely cosmetic edit as drift too, but
-that costs one "still fine" during resume, not a silent miss; it never under-fires, which is the
-property "notify only, confirm before applying" actually needs. Extracting a narrower "topic
-lines only" footprint was considered and rejected as needless complexity for a check whose false
-positives are this cheap.
+Mechanism: "Apply" (templates\\shared_resources.md's reference/tool step) stamps the stub's
+adoption-marker comment with a sha256 of the source entry file's content at adoption time:
+`<!-- shared_resources: <entry> adopted YYYY-MM-DD index-sha256:<hash> -->`. This script
+recomputes that hash from the live source file and compares. A full-file hash can flag a purely
+cosmetic edit as drift too; it never under-fires.
 
-A stub with no index-sha256 in its marker (an insight-kind adoption, a pre-existing stub written
-before this feature existed, or a `tool` entry adopted as free-text prose with no fixed shape) is
-out of scope, not a failure - see check_shared_resource_refs.py's own docstring for the same
-carve-outs, which this script mirrors.
+A stub with no index-sha256 in its marker (an insight-kind adoption, a pre-existing stub, or a
+`tool` entry adopted as free-text prose) is out of scope, not a failure.
 
 Usage: python scripts\\check_shared_resource_drift.py [--project-root <path>]
 Defaults --project-root to the current working directory. Prints [OK]/[DRIFT]/[N/A] lines.
-Always exits 0 - this check never blocks resume, only surfaces something worth a human decision.
-On [DRIFT], the acting agent should re-read the source entry, compare its current topic footprint
-against the stub's existing trigger description, and - only if it's actually grown a topic the
-trigger doesn't cover - redraft the trigger and confirm with the user before overwriting the stub
-(same confirm-before-write pattern as every other write in templates\\shared_resources.md), then
-re-run this script so the marker's hash is refreshed to the new current value.
+Always exits 0. On [DRIFT], the acting agent should re-read the source entry, compare its current
+topic footprint against the stub's existing trigger description, and - only if it's actually
+grown a topic the trigger doesn't cover - redraft the trigger and confirm with the user before
+overwriting the stub, then re-run this script so the marker's hash is refreshed.
 """
 
 import argparse
@@ -49,9 +34,7 @@ from pathlib import Path
 MARKER_RE = re.compile(
     r'<!--\s*shared_resources:\s*(?P<entry>.+?)\s+adopted\s+\d{4}-\d{2}-\d{2}'
     r'(?:\s+index-sha256:(?P<hash>[0-9a-f]{64}))?'
-    # The "Adopted-stub path portability" and
-    # resource_sharing_model.md's "Per-host availability for pointer entries" both add optional
-    # trailing marker fields (hub-rel:/hosts-ignored:) this script doesn't use but must tolerate.
+    # Optional trailing marker fields this script doesn't use but must tolerate.
     r'(?:\s+hub-rel:\S+)?'
     r'(?:\s+hosts-ignored:\S+)?'
     r'\s*-->'
@@ -60,8 +43,7 @@ SKILL_STUB_PATH_RE = re.compile(r'`(~/[^`]+)`')
 
 
 def resolve_path(raw):
-    """Same home-relative '~/...' resolution as check_shared_resource_refs.py - the only form
-    a real shared_resources\\ reference ever uses. Returns None if not in that form."""
+    """Resolves a home-relative '~/...' path. Returns None if not in that form."""
     normalized = raw.replace('\\', '/')
     if not normalized.startswith('~/'):
         return None

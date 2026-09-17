@@ -1,29 +1,20 @@
 #!/usr/bin/env python3
 """
 broadcast_guidance.py - push one hand-authored guidance file to every registered consumer (or a
-single one via --consumer), and report delivery status. The reusable maintainer-side primitive
-(locked 2026-07-23): fills the gap between silent
-minor-change propagation (import-by-reference content - no delivery step needed) and Replicate
-publish (public downloaders, outside the registry entirely) - content that's deliberately NOT
-imported (a one-off directive, a heads-up) but still needs to reach every registered project.
+single one via --consumer), and report delivery status.
 
 Shares COMPLIANCE_GUIDANCE.md with check_tower_crane.py's checker writer via guidance_lib.py's
 namespaced sections ('## Broadcast' here, '## Checker deviations' there) - each writer replaces
-only its own section and preserves the other's, so a routine checker run never wipes a pending
-broadcast, and a broadcast never wipes pending checker deviations (the "Collision fix").
+only its own section and preserves the other's.
 
 Usage:
   python broadcast_guidance.py --broadcast <file.md> [--consumer <slug>]
   python broadcast_guidance.py --status [--consumer <slug>]
 
-Status model: live re-scan, no persisted ack.
---status recomputes from the registry every run - a consumer's '## Broadcast' section still
-present means pending/declined; gone means applied (the consumer's own agent resolved it and
-removed that section per templates\\compliance.md).
+Status model: live re-scan, no persisted ack. --status recomputes from the registry every run - a
+consumer's '## Broadcast' section still present means pending/declined; gone means applied.
 
-Targeting: whole registry by default, optional
---consumer filter. No owner:/host: subset filtering - not needed at current single-user,
-single-machine scale.
+Targeting: whole registry by default, optional --consumer filter.
 """
 
 import argparse
@@ -38,19 +29,14 @@ from config_lib import get_shared_config
 from guidance_lib import read_sections, write_section, SECTION_BROADCAST, SECTION_CHECKER
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
-# consumers\ is private hub state, not shipped toolkit content - it lives at the outer root
-# (the outer/inner repo split), one level above SHARED_ROOT (toolkit\).
+# consumers\ lives one level above SHARED_ROOT, at the outer repo root.
 PROJECT_ROOT = SHARED_ROOT.parent
 CONSUMERS_DIR = PROJECT_ROOT / 'consumers'
 
 
 def parse_registry_minimal(path):
-    """Minimal registry read - name + hosts: map only, enough to target a broadcast. Deliberately
-    duplicated rather than imported from check_tower_crane.py: each maintainer script reads the
-    registry independently (same pattern relocate.py/new_consumer.py already use) - only the
-    guidance-file section logic is shared. Schema (2026-08-10 migration): hosts: is a map of
-    host_id -> {path, registered}, replacing the old flat path:/host: pair.
-    """
+    """Reads name + hosts: map from a consumer registry file. hosts: maps
+    host_id -> {path, registered}."""
     raw = path.read_text(encoding='utf-8')
     m = re.search(r'```yaml\s*\r?\n(.*?)\r?\n```', raw, re.DOTALL)
     if not m:
@@ -118,9 +104,8 @@ def get_head_sha():
 
 
 def reachable(c, this_host):
-    """Federate (#1) parity with check_tower_crane.py: skip silently when a consumer has no
-    hosts.<this_host> entry - its path can't be validated/written from here. Returns this host's
-    path on success, None otherwise."""
+    """Returns this host's path if the consumer has a hosts.<this_host> entry that exists on
+    disk; None otherwise (prints a skip/warn message)."""
     this_path = c['hosts'].get(this_host, {}).get('path')
     if not this_path:
         print(f"[skip] {c['name']} : not connected on this machine ('{this_host}').")

@@ -2,53 +2,40 @@
 # shared_resources_trigger_match.py
 # SHARED TOOL - lives in tower_crane\hooks\, referenced by any project that opts in.
 #
-# A deterministic, script-only recognition
-# layer under shared_resources\'s existing skill-gate mechanism. Today, a Category-level fallback /
-# Tier-scoped skill (templates\shared_resources.md's Saving step 7) only fires when the agent's own
-# judgment classifies the live task as matching that skill's trigger description - a real, repeated
-# failure mode when the task's phrasing doesn't happen to match. This hook adds a second,
-# judgment-free recognition path: cheap case-insensitive substring matching against hand-authored
-# concept slots in shared_resources\trigger_index.yaml. A hit does not bypass the existing Retrieval
-# procedure - it only surfaces a candidate for the agent to read live, the same way any other
-# retrieval candidate would be.
+# Deterministic, script-only recognition layer under shared_resources\'s skill-gate mechanism:
+# cheap case-insensitive substring matching against hand-authored concept slots in
+# shared_resources\trigger_index.yaml. A hit does not bypass the existing Retrieval procedure - it
+# only surfaces a candidate for the agent to read live.
 #
-# Matching model (Part 3, superseding Part 2's flat one-phrase-per-entry list):
+# Matching model:
 #   - Each resource has one or more scenario GROUPS (OR across groups - a resource with two groups
 #     fires if either is satisfied).
 #   - Each group holds 2-3 concept SLOTS, each slot a short list of 1-2 word alternate phrasings for
 #     one concept (AND across slots within a group, OR within a slot).
 #   - A Category's own slot-set (trigger_index.yaml's top-level `categories:` block) is applied as
 #     an implicit extra slot appended to EVERY group of every resource tagged with that Category in
-#     CATALOG.md - evaluated in this same deterministic string-match pass, never gated behind
-#     whether the Skill tool fired.
+#     CATALOG.md.
 #   - EDGE-ASSIST: a `process-material` edge in resource_relationships.yaml, from this resource to
 #     another one, relaxes or waives this resource's own bar when the edge's `to` node is "in play"
 #     this session (tracked by the companion `shared_resources_read_tracker.py` PostToolUse hook,
 #     read from its per-session state file). Default strength relaxes a group's AND-across-slots to
 #     any-one-slot; `strength: required` waives the check entirely - the resource surfaces
-#     unconditionally, since a `required` edge means the target's own content literally cites this
-#     resource's filename (a checkable fact, not an inferred association).
-#   - PROCEDURE ENTRIES (design doc Part 5) - trigger_index.yaml's `procedures:` block matches this
-#     same group/slot model against a *procedure* (currently just `retrieval_audit`) instead of a
-#     CATALOG.md resource: no row lookup, no Category slot, no edge-assist, always full AND-strictness.
-#     A hit renders as a distinct "[Retrieval Audit]" candidate, never as a "read this file" line.
+#     unconditionally.
+#   - PROCEDURE ENTRIES - trigger_index.yaml's `procedures:` block matches this same group/slot
+#     model against a *procedure* (currently just `retrieval_audit`) instead of a CATALOG.md
+#     resource: no row lookup, no Category slot, no edge-assist, always full AND-strictness. A hit
+#     renders as a distinct "[Retrieval Audit]" candidate, never as a "read this file" line.
 #
 # Triggered by Claude Code's UserPromptSubmit hook, once per submitted message. Reads the prompt
 # from stdin JSON's "user_input" field, matches it, and on a hit, emits
 # hookSpecificOutput.additionalContext naming the candidate(s) - never blocks or alters the prompt.
 #
-# Non-goals (design doc's own): no embedding model, no LLM call, no network round-trip - this stays
-# a local, sub-second string match so it can run on every single message without perceptible
-# latency (design doc's "Speed vs. precision" - a governing principle, not just this file's own
-# constraint). A missed match degrades to today's behavior; a false positive costs the agent a
-# moment's consideration of an irrelevant candidate.
+# No embedding model, no LLM call, no network round-trip - a local, sub-second string match.
 #
-# HARD CONTRACT, deliberately different from consistency_check.py's guardrail contract: this hook
-# must NEVER exit 2. Exit 2 on UserPromptSubmit blocks and erases the user's own message - the wrong
-# failure mode for a retrieval nicety. Any error (missing file, malformed data, bad stdin JSON,
-# missing/unreadable session-state file) fails open: print nothing, exit 0, with edge-assist simply
-# unavailable rather than the whole match failing. A match prints hookSpecificOutput JSON and exits
-# 0; no match exits 0 with no output.
+# This hook must NEVER exit 2 (exit 2 on UserPromptSubmit blocks and erases the user's own
+# message). Any error (missing file, malformed data, bad stdin JSON, missing/unreadable
+# session-state file) fails open: print nothing, exit 0, with edge-assist simply unavailable. A
+# match prints hookSpecificOutput JSON and exits 0; no match exits 0 with no output.
 #
 # To use in a project: add a UserPromptSubmit hook in that project's .claude\settings.json pointing
 # at this file (see MENU.md / templates\optins\shared_resources_trigger_match.json for the canonical
@@ -74,9 +61,7 @@ from pathlib import Path
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
-# shared_resources\ is private hub state, not shipped toolkit content - it lives at the outer root
-# (the outer/inner repo split), one level above SHARED_ROOT (toolkit\), same
-# convention check_shared_resource_catalog.py / check_shared_resource_hosts.py already use.
+# shared_resources\ lives at the outer root, one level above SHARED_ROOT (toolkit\).
 HUB_ROOT = SHARED_ROOT.parent
 TRIGGER_INDEX_PATH = HUB_ROOT / 'shared_resources' / 'trigger_index.yaml'
 CATALOG_PATH = HUB_ROOT / 'shared_resources' / 'CATALOG.md'
@@ -94,10 +79,8 @@ EDGE_FIELD_RE = re.compile(r'^    (from|to|strength):\s*(\S+)\s*$')
 
 
 def _parse_slot_literal(text):
-    """Parse a `["a", "b"]`-shaped line as a Python list literal (ast.literal_eval - no external
-    YAML dependency, matching this project's multi-machine stance). Returns [] on anything
-    malformed rather than raising - one bad hand-edited line should degrade that one slot, not take
-    the whole matcher down."""
+    """Parse a `["a", "b"]`-shaped line as a Python list literal (ast.literal_eval, no external
+    YAML dependency). Returns [] on anything malformed rather than raising."""
     try:
         val = ast.literal_eval(text)
         if isinstance(val, list) and all(isinstance(v, str) for v in val):
@@ -108,22 +91,17 @@ def _parse_slot_literal(text):
 
 
 def parse_trigger_index(text):
-    """Hand-rolled parser for trigger_index.yaml's three top-level keys (`categories:` and `entries:`
-    from Part 3; `procedures:` added by Part 5), same style as check_shared_resource_catalog.py's
-    parse_relationships() - no external YAML dependency, relies on the file's always-consistent
-    machine-written indentation. Tolerant of anything it doesn't recognize - an unfamiliar line is
-    just skipped, never a crash.
+    """Hand-rolled parser for trigger_index.yaml's three top-level keys: `categories:`, `entries:`,
+    `procedures:` - no external YAML dependency, relies on the file's fixed indentation. An
+    unfamiliar line is skipped, never a crash.
 
     Returns (categories: {name: [slot, ...]}, entries: {resource_stem: [group, ...]}, procedures:
     {procedure_name: [group, ...]}) where each group is a list of slots and each slot is a list of
-    alternate term strings. `procedures` (added in a later revision) is structurally identical to
-    `entries`, just keyed under `- procedure:` instead of `- resource:` and never resolved against
-    CATALOG.md.
+    alternate term strings. `procedures` is structurally identical to `entries`, just keyed under
+    `- procedure:` instead of `- resource:` and never resolved against CATALOG.md.
 
-    An entry's optional `evidence:` block (dated real-quote drafting material) is intentionally
-    never recognized here - it's drafting
-    material only, not consumed at match time. It falls through this loop's "anything unfamiliar is
-    skipped" contract same as any other unrecognized line, by design, not by omission."""
+    An entry's optional `evidence:` block (dated real-quote drafting material) is not recognized
+    here - it falls through as an unrecognized line, same as any other."""
     categories = {}
     entries = {}
     procedures = {}
@@ -192,8 +170,7 @@ def parse_trigger_index(text):
 
 def parse_process_material_edges(text):
     """Extract only `process-material` edges (from/to/strength) - the only edge type this matcher
-    consumes (design doc's edge-assist section: prerequisite/lifecycle-sibling/related stay
-    Retrieval-procedure-only, not read here at all)."""
+    consumes; other edge types are not read here."""
     edges = []
     current = None
     in_edges = False
@@ -261,7 +238,7 @@ def slot_satisfied(slot_terms, haystack):
 
 def group_satisfied(slots, haystack, relax_to_one):
     """AND-across-slots normally; relaxed to OR-across-slots (any one slot present) when a
-    default-strength edge-assist applies this turn (design doc's 'relax to one slot')."""
+    default-strength edge-assist applies this turn."""
     if not slots:
         return False, []
     hit_flags = [slot_satisfied(slot, haystack) for slot in slots]
@@ -279,8 +256,8 @@ def find_matches(prompt_text, categories, entries, edges, catalog_text, in_play,
     against the prompt. Returns a list of (resource_stem, detail_dict) for every resource that
     fires, where detail_dict carries enough to render a useful message (matched terms, or the
     required/default edge-assist reason when that's what fired it). Also evaluates any `procedures`
-    (design doc Part 5) - plain groups/slots only, no CATALOG.md row, no Category slot, no
-    edge-assist - appending a `{'procedure': name, ...}`-shaped hit distinguishable in format_context."""
+    entries - plain groups/slots only, no CATALOG.md row, no Category slot, no edge-assist -
+    appending a `{'procedure': name, ...}`-shaped hit distinguishable in format_context."""
     haystack = prompt_text.lower()
     hits = []
 
@@ -418,7 +395,7 @@ def main():
         }))
         sys.exit(0)
     except Exception:
-        # Fail open, always - a retrieval nicety must never block or degrade the user's own prompt.
+        # Fail open, always.
         sys.exit(0)
 
 

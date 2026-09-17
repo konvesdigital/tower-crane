@@ -1,17 +1,10 @@
 #!/usr/bin/env python3
-# _hub_dispatch.py - fixed, host-invariant wrapper a consumer's own .claude\settings.json hook
-# command invokes. Copied
-# verbatim into every consumer that connects from this build forward, at .claude\hooks\
-# _hub_dispatch.py - its content never changes, ever, regardless of host, so it is never
-# regenerated once scaffolded (unlike everything else this design touches). Canonical source lives
-# here in hooks\ (same category as consistency_check.py) rather than templates\, since templates\
-# is reserved for non-code content - check_file_surface.py's file-surface convention.
+# _hub_dispatch.py - host-invariant wrapper invoked from a consumer's .claude\settings.json hook
+# commands. Copied verbatim into every consumer at .claude\hooks\_hub_dispatch.py.
 #
-# At run time: reads THIS project's own .claude\hub_pointer.md (gitignored, regenerated per host
-# by "connect project" / scripts\relocate.py) for shared_root, builds the real target hub tool's
-# path, and execs it with the same stdin/argv passthrough - the one indirection hop that lets the
-# command string in settings.json stay identical on every host even though the hub itself lives at
-# a different absolute path on each one.
+# Reads this project's .claude\hub_pointer.md (gitignored, regenerated per host by "connect
+# project" / scripts\relocate.py) for shared_root, then execs {shared_root}/hooks/<tool>.py with
+# the same stdin/argv passthrough.
 #
 # Usage (from settings.json): python "$CLAUDE_PROJECT_DIR/.claude/hooks/_hub_dispatch.py" <tool> [args...]
 # <tool> selects the target script: {shared_root}/hooks/<tool>.py

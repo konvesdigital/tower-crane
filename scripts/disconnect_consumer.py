@@ -1,40 +1,29 @@
 #!/usr/bin/env python3
 """
-disconnect_consumer.py - reverse of new_consumer.py's host-connect: removes a host's connection to
-a registered consumer.
+disconnect_consumer.py - removes a host's connection to a registered consumer.
 
-Three modes (--mode):
+Modes (--mode):
   this-only     - remove only the current machine's connection to this consumer.
   all-but-this  - remove every OTHER host's connection, leaving only this machine.
-  all           - remove every host's connection (full disconnect).
+  all           - remove every host's connection.
 
 For each host being removed:
-  - If it's THIS machine (config['host_id']), the consumer's own local files at its registered
-    path are cleaned up too: this hub's @import lines are stripped from CLAUDE.md, its
-    'Tower Crane In Use'/'Shared Workflow Protocol' sections are replaced with a short honest
-    pointer (never just left behind reading as if the connection were still live), this hub's
-    hook entries and the Read(import_base/**) permission rule are stripped from
-    .claude\\settings.json, and every .claude\\skills\\<name>\\ directory this hub scaffolded is
-    removed. A generated TOWER_CRANE_DISCONNECT_NOTES.md is written as the single complete
-    breadcrumb index (what was removed, what was deliberately left behind, where the rest of the
-    history lives), and everything touched is committed (and pushed, if a remote exists) in the
-    consumer's OWN repo so nothing sits uncommitted/unexplained. project_progress.md and
-    FIRST_RUN.md are never touched - they're the consumer's own content, not Tower Crane's.
-  - If it's a DIFFERENT host, only the registry side can be touched from here - this machine has
-    no filesystem access to another machine's files. Printed plainly, not silently skipped.
+  - If it's THIS machine (config['host_id']): strips this hub's @import lines from CLAUDE.md,
+    replaces its 'Tower Crane In Use'/'Shared Workflow Protocol' sections with a pointer, strips
+    this hub's hook entries and the Read(import_base/**) permission rule from
+    .claude\\settings.json, and removes every .claude\\skills\\<name>\\ directory this hub
+    scaffolded. Writes TOWER_CRANE_DISCONNECT_NOTES.md listing what was removed and what was left
+    behind, and commits (and pushes, if a remote exists) in the consumer's own repo. Never touches
+    project_progress.md or FIRST_RUN.md.
+  - If it's a DIFFERENT host, only the registry side is touched here.
 
 Registry side: each removed host's hosts.<host_id> entry is deleted. If 0 hosts remain, the whole
-consumers\\<slug>.md file is hard-deleted (git history is the record - no archive/marker, matching
-the project's existing "no version tags/changelog" precedent, Reverts decision). If exactly 1 host
-remains, scope auto-reverts to `local` (registry_lib.remove_host_from_text's floor-in-reverse).
+consumers\\<slug>.md file is hard-deleted. If exactly 1 host remains, scope auto-reverts to
+`local`.
 
-Deliberately NOT touched by this first build (flagged in the notes file, not silently dropped):
-any adopted shared_resources\\ stub (its hub-rel: marker just goes stale) and
-COMPLIANCE_GUIDANCE.md's broadcast section - a real scope decision left for a later pass if it
-turns out to matter in practice.
+Not touched: any adopted shared_resources\\ stub, or COMPLIANCE_GUIDANCE.md's broadcast section.
 
-Reused by remove_hub.py (this-only, looped across every consumer connected on this machine) - see
-that script for the "reverse setup_machine.md entirely" case.
+Reused by remove_hub.py (this-only, looped across every consumer connected on this machine).
 """
 
 import argparse
@@ -65,9 +54,8 @@ CONSUMERS_DIR = PROJECT_ROOT / 'consumers'
 def local_skill_names(consumer):
     """Every .claude\\skills\\<name>\\ this hub would have scaffolded for this consumer: the
     SKILL_PIECES piece->skills expansion for each imported companion, every STANDALONE_SKILLS
-    entry (always scaffolded), and every private_opted_in name (private tools aren't tagged
-    hook-vs-skill in the registry, so removal is attempted unconditionally - a no-op for a name
-    that was actually a private hook, since there's no matching directory to remove)."""
+    entry, and every private_opted_in name (removal is attempted unconditionally; a no-op if no
+    matching directory exists)."""
     names = set()
     for imp in consumer['imported']:
         for piece_info in SKILL_PIECES.values():
@@ -80,13 +68,9 @@ def local_skill_names(consumer):
 
 def replace_prose_sections(text, date, mode):
     """Replace the '## Tower Crane In Use' / '## Shared Workflow Protocol' sections (each
-    heading through the end of its content) with a short, honest pointer to NOTES_FILENAME -
-    fixes the gap found live 2026-08-12: leaving that prose in place made
-    a disconnected project's CLAUDE.md still read as if the connection were live, which is what
-    sent a fresh session in that project looking for an explanation. Returns (new_text, replaced)
-    - replaced is False if the standard heading isn't found (e.g. hand-edited CLAUDE.md), in
-    which case text is returned unchanged and the caller flags it for manual cleanup instead of
-    guessing at unfamiliar structure."""
+    heading through the end of its content) with a short pointer to NOTES_FILENAME. Returns
+    (new_text, replaced) - replaced is False if the standard heading isn't found (e.g.
+    hand-edited CLAUDE.md), in which case text is returned unchanged."""
     idx_start = text.find(TC_IN_USE_HEADING)
     if idx_start == -1:
         return text, False
@@ -109,11 +93,9 @@ def replace_prose_sections(text, date, mode):
 
 def _detect_shared_content(target_path, consumer, config):
     """Read-only detection of every trace of SHARED, git-tracked Tower Crane content in this
-    consumer's local files - the same signals strip_local_references()'s apply path removes on the
-    last host, computed here without mutating anything. Used only when another host is still
-    connected, to render an exhaustive, code-derived checklist for a manual full purge -
-    never a hand-written enumeration that could drift from what a real last-host removal would
-    actually do."""
+    consumer's local files - the same signals strip_local_references()'s apply path removes on
+    the last host. Used when another host is still connected, to build the manual-purge
+    checklist."""
     import_base = str(config['import_base'])
     claude_md_path = target_path / 'CLAUDE.md'
     n_imports = 0
@@ -156,10 +138,9 @@ def write_disconnect_notes(target_path, date, mode, host_id, n_imports, removed_
                             had_read_rule, removed_skills, sections_replaced, log,
                             original_registered=None, is_last_host=True,
                             hub_pointer_removed=False, dispatch_removed=False, detected=None):
-    """Write TOWER_CRANE_DISCONNECT_NOTES.md - designed so reading THIS FILE ALONE gives a 100%
-    complete list of every trace Tower Crane leaves behind in a consumer project after a
-    this-machine disconnect, including a cross-reference back to CLAUDE.md's own short pointer
-    (which itself points back here) so neither file alone is a dead end."""
+    """Write TOWER_CRANE_DISCONNECT_NOTES.md listing every trace Tower Crane leaves behind in a
+    consumer project after a this-machine disconnect, cross-referenced with CLAUDE.md's own
+    pointer."""
     removed_lines = []
     if n_imports:
         removed_lines.append(f"- {n_imports} `@import` line(s) removed from `CLAUDE.md`")
@@ -338,26 +319,16 @@ def write_disconnect_notes(target_path, date, mode, host_id, n_imports, removed_
 
 
 def strip_local_references(target_path, consumer, config, mode, log, is_last_host=True):
-    """Undo what new_consumer.py wrote at target_path for THIS hub connection. Host-count-aware
-    split (fixing a confirmed pre-existing bug the per-host/shared distinction made newly
-    obvious): ALWAYS strips this host's own
-    per-host state (hub_pointer.md, this host's own Read(...) permission entry) regardless of how
-    many other hosts remain connected; only strips SHARED, git-tracked content (@import/pointer
-    line, hook entries, _hub_dispatch.py, skill-stub dirs) when is_last_host - doing so with
-    another host still connected would break that host's live connection, since those are the same
-    tracked file synced to every host. Replaces the now-inaccurate 'Tower Crane In Use'/'Shared
-    Workflow Protocol' prose with a short honest pointer (last-host only, for the same reason),
-    writes TOWER_CRANE_DISCONNECT_NOTES.md as the single complete breadcrumb index, then commits
-    everything in the consumer's own repo (commit_consumer_changes()) so nothing is left
-    uncommitted/unexplained - the gap a live 2026-08-12 test found.
-    Never touches project_progress.md or FIRST_RUN.md - those are the consumer's own content.
+    """Undo what new_consumer.py wrote at target_path for THIS hub connection. Always strips this
+    host's own per-host state (hub_pointer.md, this host's own Read(...) permission entry)
+    regardless of how many other hosts remain connected; only strips SHARED, git-tracked content
+    (@import/pointer line, hook entries, _hub_dispatch.py, skill-stub dirs) when is_last_host.
+    Replaces the 'Tower Crane In Use'/'Shared Workflow Protocol' prose with a pointer (last-host
+    only), writes TOWER_CRANE_DISCONNECT_NOTES.md, then commits everything in the consumer's own
+    repo (commit_consumer_changes()). Never touches project_progress.md or FIRST_RUN.md.
 
-    Returns a result dict - the same classification variables
-    this function already computes to drive its own behavior and write_disconnect_notes(), threaded
-    back out instead of discarded, so a caller's own close-out summary can relay them directly
-    rather than re-deriving them from this function's printed log. Every key is always present with
-    a safe default, even on the early target-missing return, so a caller never needs a presence
-    check before reading one."""
+    Returns a result dict mirroring the values passed to write_disconnect_notes(). Every key is
+    always present with a safe default, even on the early target-missing return."""
     target_path = Path(target_path)
     result = {
         'target_path': str(target_path), 'target_missing': False,
@@ -371,25 +342,21 @@ def strip_local_references(target_path, consumer, config, mode, log, is_last_hos
         result['target_missing'] = True
         return result
 
-    # Pull this consumer's own repo current BEFORE reading/editing CLAUDE.md/settings.json below,
-    # so the disconnect commit is never built on a stale snapshot (config_lib.py's
-    # sync_consumer_repo() - a real 2026-08-22 push conflict this closes (see that function's own
-    # docstring, and project_progress.md's Work Log, for the full incident).
+    # Pull this consumer's own repo current before reading/editing CLAUDE.md/settings.json below.
     sync_consumer_repo(target_path, log=log)
 
     date = datetime.date.today().isoformat()
     import_base = str(config['import_base'])
 
-    # .claude\hub_pointer.md: ALWAYS safe to delete - gitignored, genuinely per-host, zero effect
-    # on any other host's own (separately-regenerated) copy.
+    # .claude\hub_pointer.md: gitignored, per-host - always safe to delete.
     pointer_path = target_path / HUB_POINTER_RELPATH
     hub_pointer_removed = pointer_path.exists()
     if hub_pointer_removed:
         pointer_path.unlink()
         log(f"  removed {pointer_path}")
 
-    # CLAUDE.md: strip @import lines / the pointer line, then replace the prose sections - SHARED,
-    # tracked content, so only on the last host disconnecting.
+    # CLAUDE.md: strip @import/pointer lines, then replace prose sections. Shared tracked
+    # content - last host only.
     claude_md_path = target_path / 'CLAUDE.md'
     n_imports = 0
     sections_replaced = False
@@ -408,9 +375,8 @@ def strip_local_references(target_path, consumer, config, mode, log, is_last_hos
             log(f"  note   {claude_md_path} doesn't contain the standard '{TC_IN_USE_HEADING}' "
                 f"section (hand-edited?) - prose left untouched, clean up manually if desired.")
 
-    # settings.json: hook entries are SHARED tracked content (last host only); this host's own
-    # Read(...) permission entry is per-host-distinct (each host appends its own import_base-keyed
-    # entry) so it's always removed.
+    # settings.json: hook entries are shared tracked content (last host only); the Read(...)
+    # permission entry is per-host and always removed.
     settings_path = target_path / '.claude' / 'settings.json'
     removed_hooks = 0
     had_read_rule = False
@@ -467,9 +433,7 @@ def strip_local_references(target_path, consumer, config, mode, log, is_last_hos
                 removed_skills.append(name)
                 log(f"  removed {skill_dir}")
 
-    # Read-only detection of shared content, for the not-last-host manual-purge checklist only
-    # - nothing above this line was mutated by
-    # it, and it's never used to decide what the apply steps above actually did.
+    # Read-only detection of shared content, for the not-last-host manual-purge checklist only.
     detected = None if is_last_host else _detect_shared_content(target_path, consumer, config)
 
     write_disconnect_notes(target_path, date, mode, config['host_id'], n_imports, removed_hooks,
@@ -478,11 +442,9 @@ def strip_local_references(target_path, consumer, config, mode, log, is_last_hos
                             hub_pointer_removed=hub_pointer_removed, dispatch_removed=dispatch_removed,
                             detected=detected)
 
-    # claude_prose_status: derived, not separately tracked -
-    # 'left-shared' when another host still depends on the tracked prose (deliberately untouched,
-    # not an anomaly), 'missing' when there was no CLAUDE.md to touch at all, 'replaced' on the
-    # normal success path, 'unrecognized' when is_last_host and CLAUDE.md exists but the standard
-    # heading wasn't found (the hand-edited case the existing log note above already flags).
+    # claude_prose_status: 'left-shared' when another host still depends on the tracked prose,
+    # 'missing' when there was no CLAUDE.md, 'replaced' on success, 'unrecognized' when
+    # is_last_host and CLAUDE.md exists but the standard heading wasn't found.
     claude_prose_status = ('left-shared' if not is_last_host else
                             'missing' if not claude_md_path.exists() else
                             'replaced' if sections_replaced else 'unrecognized')
@@ -498,8 +460,6 @@ def strip_local_references(target_path, consumer, config, mode, log, is_last_hos
         'committed-no-remote': "  [git] committed in this consumer's own repo (no origin remote to push to).",
         'commit-failed': None,  # commit_consumer_changes() already logged the warn line itself
         'push-failed': None,
-        # A real divergence was auto-resolved by
-        # resetting and regenerating this host's own Tower-Crane-owned values.
         'reconciled-pushed': "  [git] push conflict auto-reconciled (reset + regenerated), committed and pushed.",
     }
     label = commit_labels.get(commit_result)
@@ -512,27 +472,20 @@ def strip_local_references(target_path, consumer, config, mode, log, is_last_hos
         'removed_hooks': removed_hooks, 'had_read_rule': had_read_rule,
         'dispatch_removed': dispatch_removed, 'removed_skills': removed_skills,
         'notes_path': str(target_path / NOTES_FILENAME), 'commit_result': commit_result,
-        # Evidence over intent: re-checked fresh via git rather
-        # than assumed clean from commit_result alone, since a 'noop'/'not-a-repo'/'commit-failed'
-        # result can each legitimately still leave real content dirty on disk.
+        # Re-checked fresh via git rather than assumed clean from commit_result alone.
         'left_uncommitted': scoped_status_paths(target_path, CONSUMER_OWNED_PATHS),
     })
     return result
 
 
 def disconnect_host(slug, host_id, config, mode, log, do_local_cleanup=True):
-    """Core primitive: remove ONE host from ONE consumer's registry entry, optionally cleaning up
-    that host's own local files (only possible/meaningful when host_id is THIS machine's own
-    config['host_id']). `mode` is recorded in the local-cleanup commit message / notes file, not
-    used for any registry logic.
+    """Remove ONE host from ONE consumer's registry entry, optionally cleaning up that host's own
+    local files (only possible when host_id is THIS machine's own config['host_id']). `mode` is
+    recorded in the local-cleanup commit message / notes file, not used for any registry logic.
 
-    Returns a result dict, not just True/False as before -
-    'removed' carries the old boolean meaning (present and actually removed from the registry) for
-    any caller still checking only that key; 'local' carries strip_local_references()'s own result
-    dict when do_local_cleanup ran, else None; 'skip_reason' names why nothing happened when
-    'removed' is False. A caller that only inspects `result['removed']` (or ignores the return value
-    entirely, as remove_hub.py's loop does today) keeps working unchanged - this is purely additive
-    over the boolean the old return value carried."""
+    Returns a result dict: 'removed' (bool, present and actually removed from the registry);
+    'local' (strip_local_references()'s own result dict when do_local_cleanup ran, else None);
+    'skip_reason' (why nothing happened when 'removed' is False)."""
     base = {'slug': slug, 'host_id': host_id, 'removed': False, 'local': None,
             'do_local_cleanup': do_local_cleanup, 'skip_reason': None, 'hosts_left': None}
     registry_path = CONSUMERS_DIR / f"{slug}.md"
@@ -550,10 +503,8 @@ def disconnect_host(slug, host_id, config, mode, log, do_local_cleanup=True):
         base['skip_reason'] = 'not-connected'
         return base
 
-    # Host-count-aware split: computed BEFORE removal
-    # (host_id is confirmed present above) since strip_local_references() needs to know, for a
-    # multi_machine consumer, whether any OTHER host will still depend on the shared tracked
-    # content it's deciding whether to strip.
+    # Computed before removal (host_id confirmed present above): whether any OTHER host will
+    # still depend on the shared tracked content strip_local_references() is deciding whether to strip.
     is_last_host = len(consumer['hosts']) == 1
 
     if do_local_cleanup:
@@ -593,9 +544,8 @@ _COMMIT_RESULT_LABELS = {
 
 
 def _print_host_summary(host_result):
-    """One host's block within the close-out summary -
-    entirely sourced from disconnect_host()'s/strip_local_references()'s own already-computed
-    result dicts, nothing re-derived."""
+    """One host's block within the close-out summary, built from disconnect_host()'s/
+    strip_local_references()'s result dicts."""
     host_id = host_result['host_id']
     if not host_result['removed']:
         reason = {
@@ -642,12 +592,8 @@ def _print_host_summary(host_result):
 
 
 def print_close_out_summary(slug, mode, host_results, registry_commit_result):
-    """Close-out block, printed once at the very end of the run (design\\
-    script_action_reporting.md) - entirely built from the result dicts disconnect_host()/
-    strip_local_references() already computed and returned, never a second re-derivation of what
-    happened. Extends the same shape new_consumer.py's own close-out summary uses, adapted for the
-    one real structural difference here: a single run can touch several hosts at once, each landing
-    in a genuinely different outcome, so this reports one block per host instead of one block total."""
+    """Close-out block, printed once at the end of the run, built from the result dicts
+    disconnect_host()/strip_local_references() returned. One block per host."""
     print()
     print(f"=== {slug}: disconnect project summary ===")
     print(f"Mode: {mode} (target host(s): {', '.join(r['host_id'] for r in host_results)})")
@@ -699,11 +645,9 @@ def main():
         print(f"Nothing to do for '{args.slug}' under mode '{args.mode}'.")
         return
 
-    # disconnect_host() computes its own
-    # is_last_host from the registry's LIVE state at call time (never from this loop's
-    # precomputed target set), so this-host's own removal must run LAST under mode 'all' -
-    # otherwise it would see other still-present hosts.<host> entries and wrongly conclude shared
-    # tracked content should be left in place, even though every host is being removed this run.
+    # disconnect_host() computes is_last_host from the registry's live state at call time, so
+    # this host's own removal must run LAST under mode 'all', or it would see other still-present
+    # entries and wrongly leave shared content in place.
     if args.mode == 'all' and this_host in targets:
         targets = [h for h in targets if h != this_host] + [this_host]
 
@@ -717,11 +661,8 @@ def main():
         if host_result['removed']:
             any_removed = True
 
-    # Commit the registry change into the outer hub
-    # repo itself, now, not left for a later optional `checkpoint` - the registry is
-    # functionality-critical state (every host's own resume / check_tower_crane.py reads it for a
-    # correct answer), not user work-in-progress. `git add` on a since-hard-deleted registry file
-    # (0 hosts left) stages the deletion correctly, so this covers that case too.
+    # Commits the registry change into the outer hub repo now. `git add` on a since-hard-deleted
+    # registry file stages the deletion correctly.
     registry_commit_result = None
     if any_removed:
         registry_commit_msg = (
