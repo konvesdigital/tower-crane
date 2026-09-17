@@ -37,17 +37,17 @@ actually invoked.
      (should govern a future action), put the actual rule in whichever procedure/companion file
      enforces that action and point there instead; anything left over (pure historical rationale
      with no other home) goes in `decisions_detail.md`, one short section per row, pointed to from
-     here. The Item + Status columns stay resident and readable at a glance; full detail is always
-     one click away, never inline — same shape as a skill stub vs. its template.
+     here. The Item + Status
+     columns stay resident and readable at a glance; full detail is always one click away, never
+     inline — same shape as a skill stub vs. its template.
    - Prepend one dated Work Log entry (what changed, what's next). Newest on top.
    - Do NOT prune or move older entries automatically — only "archive" does that.
-2. Git mechanics for both repos — mechanized (`design\command_procedure_audit.md`'s B2; mechanical
+2. Git mechanics for both repos — mechanized (mechanical
    steps live in the script, same split as `update_toolkit.py` keeps below):
    `python scripts\checkpoint_git.py --message "<summary>"` from inside `toolkit\`. Handles, for
    both the outer project repo and the inner `toolkit\` repo in one call: staging, the
    leak-scan-first gate, the Standing Constraints disclosure guardrail, commit, push, and (after a
-   successful `toolkit\` push) the `last_reviewed_sha` self-heal (the "B2 addendum" —
-   `design\command_procedure_audit.md`).
+   successful `toolkit\` push) the `last_reviewed_sha` self-heal.
    - **Untracked-file safety**: never a blind `git add -A`. Tracked-file modifications are staged
      automatically (`git add -u`, always safe). A genuinely untracked file in either repo — a real
      new design doc/script this session wrote, or a stray temp/report file dropped in a repo root —
@@ -100,9 +100,9 @@ actually invoked.
    chronological order (oldest first). Create the archive file if it doesn't exist yet.
 5. Remove those entries from `project_progress.md`. Confirm what was archived.
 
-**"update"** — pulls `toolkit\`'s `origin` remote under a diff-review trust gate
-(`design\update_trust_review.md`, `design\local_first_reframe.md`). User-initiated only; mechanical
-steps live in `scripts\update_toolkit.py`, diff review/assessment below is manual judgment.
+**"update"** — pulls `toolkit\`'s `origin` remote under a diff-review trust gate. User-initiated
+only; mechanical steps live in `scripts\update_toolkit.py`, diff review/assessment below is manual
+judgment.
 1. Run `python scripts\update_toolkit.py` (`--check`) from inside `toolkit\`.
 2. "Already up to date": nothing else to do.
 3. `[ABORT]` (remote-identity mismatch — `origin`'s URL no longer matches upstream): stop, report
@@ -123,13 +123,13 @@ steps live in `scripts\update_toolkit.py`, diff review/assessment below is manua
    indefinite steady state ("tools go stale but stay safe"), not a holdout to re-nag about.
 
 **"propose upstream"** — sends a hand-built local fix in `toolkit\` back to the public repo
-(`konvesdigital/tower-crane`) as a fork + PR (`design\local_first_reframe.md`). **For a clone
+(`konvesdigital/tower-crane`) as a fork + PR. **For a clone
 without direct write access to `origin`** (an external contributor's fork, or any downloaded copy
 of the public repo) — the operator's own hub clone has real write access (branch-protection admin
 bypass) and lands `AGENTS.md`/companion-file edits through the ordinary `"checkpoint"` procedure's
 guardrail-gated push instead, never needing this flow. User-initiated only, run from inside
-`toolkit\` — ordinary `git`/`gh` steps. **If the change touches `AGENTS.md`**, step 2a adds Fix 3's
-authoring-assistant behavior (`design\update_trust_review.md`, Phase 2).
+`toolkit\` — ordinary `git`/`gh` steps. **If the change touches `AGENTS.md`**, step 2a adds an
+authoring-assistant behavior described below.
 1. Check for a `fork` remote: `git remote get-url fork`. If it errors, this clone isn't pointed at
    one yet (don't assume no GitHub fork exists):
    a. `gh repo fork konvesdigital/tower-crane --remote=false` (idempotent; `--remote=false` keeps
@@ -161,10 +161,9 @@ authoring-assistant behavior (`design\update_trust_review.md`, Phase 2).
    the `change_requests\` ticket system — don't file a ticket.
 
 **"curate shared resources"** — occasional bulk distribution of `shared_resources\` entries to
-every (or one) registered consumer, via `scripts\broadcast_guidance.py --broadcast`
-(`design\resource_sharing_model.md`). Lands one pointer-only notice in a consumer's
-`COMPLIANCE_GUIDANCE.md` `## Broadcast` section — never the full entry content. User-initiated
-only, never triggered by `checkpoint`.
+every (or one) registered consumer, via `scripts\broadcast_guidance.py --broadcast`. Lands one
+pointer-only notice in a consumer's `COMPLIANCE_GUIDANCE.md` `## Broadcast` section — never the
+full entry content. User-initiated only, never triggered by `checkpoint`.
 1. **Curate** — list `shared_resources\CATALOG.md` (skip anything `Archived`). Ask the user which
    entries are worth pushing right now.
 2. **Author a pointer-only file** — one line per selected entry (e.g. `<Name> — <one-line hook>,
@@ -175,9 +174,8 @@ only, never triggered by `checkpoint`.
 
 **"register host"** — bulk-registers THIS machine into every `shared_resources\` entry it's missing
 from, instead of waiting for `check_shared_resource_refs.py`'s per-adoption `[HOST-GAP]` check to
-catch each one separately, one already-adopting consumer project at a time
-(`design\shared_resources_bulk_host_registration.md`). User-initiated, any time — also run
-automatically as `setup_machine.md` Step 8a on a newly connected machine.
+catch each one separately, one already-adopting consumer project at a time. User-initiated, any
+time — also run automatically as `setup_machine.md` Step 8a on a newly connected machine.
 1. Run `python scripts\check_shared_resource_hosts.py` from inside `toolkit\` — notify-only,
    catalog-wide, exit 0 always. Buckets every non-`Archived`, non-`insight` catalog row as `[OK]`
    (already registered here — skip silently), `[UNREGISTERED]` (has a `Hosts:` block, this host

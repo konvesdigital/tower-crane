@@ -5,21 +5,20 @@ off by default.
 
 Tower Crane is not a registered consumer of itself (no consumers\\<slug>.md entry) - self-use is
 kept deliberately separate from the consumer registry/scaffolder/checker machinery, which is built
-for tracking OTHER projects (design discussion: project_progress.md, 2026-07-22 "Self-use
-(dogfooding) mechanism" entry). Every available tool already has a single canonical opt-in snippet
+for tracking OTHER projects. Every available tool already has a single canonical opt-in snippet
 at templates\\optins\\<tool>.json - this script is the only piece that was actually missing: a
 personal, per-machine way to flip one on/off for THIS repo's own use.
 
 An opt-in snippet may carry a 'hooks' key (merged into .claude\\settings.local.json, as always) and/
 or a 'skills' key - a list of Track-1 skill names whose canonical templates\\skills\\<name>\\SKILL.md
-gets copied into this hub's own .claude\\skills\\<name>\\SKILL.md (design\\optimize_ux.md's
-hub_commands - the hub-operator side of the "commands" discoverability mechanism, distributed this
+gets copied into this hub's own .claude\\skills\\<name>\\SKILL.md (hub_commands - the
+hub-operator side of the "commands" discoverability mechanism, distributed this
 way since the hub isn't a registered consumer of new_consumer.py's scaffolder). Any {{IMPORT_BASE}}
 placeholder in the canonical stub is resolved the same way new_consumer.py resolves it for a real
 consumer - using this same hub's own computed import_base - before the copy is written; a stub with
 no such placeholder (e.g. hub_commands) is unaffected, since the substitution is a no-op on it. This
 lets a single canonical stub serve both a consumer scaffold and this hub's own self-install (see
-design\\capability_relationships.md's capability_relationships skill for the first case that needed
+the capability_relationships skill for the first case that needed
 this - a skill that fires the same way from either a consumer or a hub session).
 
   --list              (default) show every available tool and whether it's currently on here.

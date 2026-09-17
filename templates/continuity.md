@@ -1,5 +1,5 @@
 <!--
-Shared protocol piece: continuity.md (Track 1, on-demand — design\directive_economy.md).
+Shared protocol piece: continuity.md (Track 1, on-demand).
 Home: ~\Documents\Claude\tower_crane\toolkit\templates\continuity.md
 As of 2026-07-31 this file is no longer @imported directly (when continuity is adopted). A
 consumer instead carries two thin skill stubs — .claude\skills\checkpoint\SKILL.md and
@@ -52,7 +52,7 @@ this mechanism works and how it relates to other mechanisms.
    - Prepend **one** dated Work Log entry (what changed, what's next). Newest entry on top.
    - Do **not** prune or move older entries automatically — the Work Log stays complete until
      the user runs "archive".
-2. Git mechanics — mechanized (`design\command_procedure_audit.md`'s B2 consumer port):
+2. Git mechanics — mechanized:
    ```
    <python_launcher> "<hub root>\toolkit\scripts\checkpoint_consumer.py" --project-root "<this
    project's absolute root>" --message "<summary>"

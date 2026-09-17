@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-checkpoint_git.py - the `checkpoint` action's git mechanics (design\\command_procedure_audit.md's
-B2, the largest Shape-B gap that audit found): mechanizes the two-repo commit/guardrail/leak-scan/
-push sequence that used to be 100% re-decided from prose (toolkit\\agents_continuity.md's
+checkpoint_git.py - the `checkpoint` action's git mechanics: mechanizes the two-repo
+commit/guardrail/leak-scan/push sequence that used to be 100% re-decided from prose
+(toolkit\\agents_continuity.md's
 "checkpoint" step 2) every single invocation. The doc-editing half of checkpoint (step 1 -
 updating project_progress.md's Current Status / Next Up / Decisions / Work Log) stays a Claude
 Code judgment call, same split as update_toolkit.py keeps the diff-review-and-assessment step out
 of its own mechanical --check/--approve.
 
-Two repos live in this folder (design\\local_first_reframe.md's outer/inner split) and this script
+Two repos live in this folder (the outer/inner repo split) and this script
 handles both in one call:
   - the OUTER project repo (this folder's own root - project_progress.md, consumers\\,
     change_requests\\, config.local.json)
@@ -201,8 +201,7 @@ def toolkit_stage_and_leak_scan(cfg, to_stage):
     for path in to_stage:
         _git(TOOLKIT_ROOT, ['add', '--', path])
 
-    print("Running the leak-scan gate BEFORE any commit, in either repo (Locked ordering, "
-          "design\\command_procedure_audit.md)...")
+    print("Running the leak-scan gate BEFORE any commit, in either repo (locked ordering)...")
     leak_ok, leak_output = run_leak_scan(cfg)
     print(leak_output)
     if not leak_ok:
@@ -345,7 +344,7 @@ def main():
 
     cfg = get_shared_config(TOOLKIT_ROOT)
 
-    # Leak-scan-first (Locked ordering, design\command_procedure_audit.md): toolkit\'s staging and
+    # Leak-scan-first (locked ordering): toolkit\'s staging and
     # leak-scan gate run to completion here, BEFORE either repo's commit step - the outer repo's
     # own commit (do_outer, below) and toolkit\'s own commit (toolkit_commit_push, further below)
     # both happen only after this resolves.

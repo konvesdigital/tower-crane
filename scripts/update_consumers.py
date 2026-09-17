@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
 update_consumers.py - hub-operator "update consumers": the push-side counterpart to each
-registered consumer's own pull-side `update` skill (design\\consumer_update.md). Scope is
+registered consumer's own pull-side `update` skill. Scope is
 identical - hooks, toolkit Track-1 skills (STANDALONE_SKILLS), and mandatory/default-on protocol
 pieces (SKILL_PIECES) a consumer hasn't adopted yet. Never shared_resources content - that stays
 the "shared resources" command's own job, on either side.
 
 Reuses scan_consumer_update.py's per-project scan/apply functions directly (no duplicated logic)
-against every registered consumer's own path, one at a time. Federate model (design\\portability.md):
+against every registered consumer's own path, one at a time. Federate model:
 a consumer registered on another machine's clone is skipped silently, same as check_tower_crane.py
 and relocate.py already do.
 
@@ -57,7 +57,7 @@ def local_consumers(this_host, consumer_filter=None):
         if c is None:
             print(f"  [skip] {f.name}: no parseable yaml registry block.")
             continue
-        # 2-host write-back floor (design\multi_machine_hub.md) - applies to every consumer this
+        # 2-host write-back floor - applies to every consumer this
         # tool touches, regardless of whether it's reachable on THIS machine.
         if reconcile_scope_floor(f, c):
             print(f"  [fixed] {f.stem}: scope -> multi_machine (2+ hosts: entries present).")
@@ -186,7 +186,7 @@ def update_registry_entry(registry_path, entries, today):
             continue
         yaml_text = _yaml_add_list_item(yaml_text, 'imported', [f'  - piece: {piece_field}', f'    since: {today}'])
 
-    # design\private_tools.md decision 6: both hook- and skill-kind private items get a row here
+    # Both hook- and skill-kind private items get a row here
     # (unlike public STANDALONE_SKILLS, there's no separate discovery-filter list on the private
     # side - this row is what the extended check_tower_crane.py needs to know to check the name
     # against toolkit_private\).
@@ -236,7 +236,7 @@ def do_apply(cfg, scanned, global_index, spec, today):
             if apply_permissions(project_root, cfg, item):
                 per_consumer_writeback.setdefault(slug, []).append(('permission', item['name']))
 
-    # design\resource_sharing_model.md's "Saving now propagates itself" fix, one level down
+    # The "Saving now propagates itself" fix, one level down
     # (project_progress.md's 2026-08-11 Work Log): this pushes into a consumer's own repo with no
     # live session there to notice and checkpoint it, so it closes its own loop per consumer
     # instead of leaving uncommitted state behind for a human to remember later.
@@ -253,7 +253,7 @@ def do_apply(cfg, scanned, global_index, spec, today):
         elif result == 'committed-no-remote':
             print(f"  [git] {c['name']}: committed in its own repo (no origin remote to push to).")
         elif result == 'reconciled-pushed':
-            # design\grt_connectivity_audit.md item (ii): a real divergence was auto-resolved by
+            # A real divergence was auto-resolved by
             # resetting and regenerating this host's own Tower-Crane-owned values.
             print(f"  [git] {c['name']}: push conflict auto-reconciled (reset + regenerated), "
                   f"committed and pushed.")

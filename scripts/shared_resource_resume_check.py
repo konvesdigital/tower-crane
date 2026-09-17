@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
 shared_resource_resume_check.py - templates\\shared_resources_resume_check.md's "At resume"
-Shape-B fix (design\\command_procedure_audit.md's consumer-side sweep, finding B4, 2026-08-24):
-chains its two already-scripted, notify-only checks into one call instead of two separately
+Shape-B fix: chains its two already-scripted, notify-only checks into one call instead of two separately
 prose-sequenced Bash invocations every resume this project has adopted a shared_resources entry -
 a smaller-scale instance of the exact same disease B1 found and fixed for `resume` step 3.
 

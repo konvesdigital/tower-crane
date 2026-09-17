@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
 migrate_consumer_indirection.py - one-time migration of an ALREADY-CONNECTED host onto the
-consumer-reference-indirection pointer form (design\\grt_connectivity_audit.md item (iii)).
+consumer-reference-indirection pointer form.
 
-design\\consumer_reference_indirection.md's original 2026-08-14 decision applied the pointer-file
+The original 2026-08-14 decision applied the pointer-file
 model to NEW connections only - a brand-new consumer, or a genuinely new host joining an
 already-registered one - on the reasoning that new_consumer.py's host-merge branch already
 re-scaffolds a joining host's files, so it gets the new form for free. An ALREADY-connected host
@@ -60,7 +60,7 @@ COMMIT_LABELS = {
 def main():
     parser = argparse.ArgumentParser(
         description="One-time migration of THIS already-connected host onto reference-indirection "
-                    "form (design\\grt_connectivity_audit.md item (iii)).")
+                    "form.")
     parser.add_argument('--slug', required=True, help="Registry slug (consumers\\<slug>.md).")
     args = parser.parse_args()
 

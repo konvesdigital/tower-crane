@@ -1,13 +1,13 @@
 <!--
-Canonical hub-operator content: hub_commands.md (design\optimize_ux.md). Reached via a thin skill
+Canonical hub-operator content: hub_commands.md. Reached via a thin skill
 stub at .claude\skills\hub_commands\SKILL.md, installed only through self_hooks.py's per-tool
 opt-in mechanism (templates\optins\hub_commands.json's "skills" key) — off by default, per-machine,
 same as every other self-use tool. Float-on-HEAD: this file is the one canonical source the stub
 always re-reads live. This file describes THIS hub's own operator-facing capabilities — it never
 governs a consumer project's session (that's templates\commands.md instead).
 
-Fluent-tier track sourcing (design\capability_relationships.md, "partial conversion" decision,
-2026-08-02): only "Efficiency habits" below is catalog-derived - the only one of this file's three
+Fluent-tier track sourcing ("partial conversion" decision, 2026-08-02): only "Efficiency habits"
+below is catalog-derived - the only one of this file's three
 tracks with a real matching theme tag in the locked design (`efficiency-rationale`). "Toolkit
 evolution" and "Fleet operations" stay hand-authored - no matching theme tag exists for either yet,
 and inventing one just to force uniformity would violate the theme-tag test itself (two members
@@ -100,7 +100,7 @@ You can say "commands" any time to see everything else.
 
 ### Reciprocal pairs to volunteer
 
-Per the reciprocal-tracks rule (design\optimize_ux.md): when a query lands on one node, volunteer
+Per the reciprocal-tracks rule: when a query lands on one node, volunteer
 its nearest structural neighbor as the single next-best follow-up - don't wait to be asked. Not a
 fixed list below - read this hub's own `capability_catalog.yaml` fresh (`toolkit\capability_catalog.yaml`,
 same file the "Efficiency habits" track above and `capability_relationships` both resolve from).

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-check_agents_pr_gate.py - Fix 3 Checkpoint 2's mechanical half (design\\update_trust_review.md,
-"Phase 3 - Checkpoint 2: merge-time CODEOWNERS + branch protection + mechanical checks"). Runs as
+check_agents_pr_gate.py - the merge-time CODEOWNERS + branch protection + mechanical-checks gate's
+mechanical half. Runs as
 a GitHub Actions status check on any PR touching `AGENTS.md`, alongside CODEOWNERS-required human
 review - this script is the deterministic teeth that give Checkpoint 2 real substance beyond "a
 human eyeballed it," mirroring check_tower_crane.py's PASS/WARN/FAIL discipline aimed at code.
@@ -10,8 +10,8 @@ No-ops (prints "not applicable", exits 0) if the diff between --base-sha and --h
 touch AGENTS.md or one of its structural companion files at all - this gate only ever fires on the
 files it's scoped to.
 
-AGENTS.md's own 2026-08-11 split (design\\update_trust_review.md's "Fix 3 single-file vs.
-split-into-pieces" row) moved most of its procedure content into four companion files
+AGENTS.md's own 2026-08-11 split (the single-file vs. split-into-pieces decision) moved most of
+its procedure content into four companion files
 (COMPANION_FILES below) that AGENTS.md points to by plain filename, not @import - AGENTS.md itself
 stays the one file carrying frontmatter and the Standing Constraints section. Checks 1-3 are about
 that specific structure and stay scoped to AGENTS_FILE only; checks 4-6 are content-agnostic
@@ -20,8 +20,7 @@ ALL_GATED_FILES, so a PR touching only a companion still gets the same mechanica
 touching AGENTS.md itself always got.
 
 Six checks, split hard-fail (exit 1, blocks the status check) vs soft-flag (WARN, never fails the
-build - same convention as check_tower_crane.py) per the Decisions table in
-design\\update_trust_review.md:
+build - same convention as check_tower_crane.py):
   1. Filename invariant           HARD  - AGENTS.md must still exist, at that path, at head.
                                            AGENTS_FILE only.
   2. Frontmatter schema           HARD  - the 4 required keys, correct shape, all present.
@@ -110,8 +109,7 @@ def touched_gated_files(base_sha, head_sha):
 def check_filename_invariant(head_text):
     if head_text is None:
         report('FAIL', f"'{TARGET_FILE}' not found at head - renamed or deleted. The canonical "
-                        "AI-directive filename must not move without a design decision (see "
-                        "design\\update_trust_review.md's Fix 3 filename lock).")
+                        "AI-directive filename must not move without a deliberate design decision.")
         return False
     report('PASS', f"'{TARGET_FILE}' exists at head, at its canonical path.")
     return True

@@ -9,7 +9,7 @@ Provides:
   expand_optin_command / get_expanded_optin - substitute config values into an opt-in snippet's
     command templates, so scaffolder / checker / relocate all compute the SAME concrete command.
 
-Portability foundation (design\\portability.md): the canonical opt-in snippets
+Portability foundation: the canonical opt-in snippets
 (templates\\optins\\<tool>.json) carry PLACEHOLDER commands ({{PYTHON_LAUNCHER}}, {{SHARED_ROOT}});
 the real machine values are injected here. This is the "config -> regenerate" seam - no
 machine-specific path is committed anywhere.
@@ -22,9 +22,7 @@ is kept only as a last-known-location marker for detecting a move (see get_share
 self-corrects automatically. python_launcher / host_id / identity / publish.* are the only
 fields that genuinely differ per machine and need a human to fill them in.
 
-OS-reach Tier 2 port of config_lib.ps1 (design\\portability.md, "OS-reach Tier 2: full
-cross-platform design"). Logic is a direct translation, not a rewrite - see that doc's Build
-order for the parity-check approach used to verify this against the original.
+Cross-platform port of an earlier config_lib.ps1. Logic is a direct translation, not a rewrite.
 """
 
 import json
@@ -57,7 +55,7 @@ def get_shared_config(shared_root=None):
             "  1. Copy config.example.json to config.local.json\n"
             "  2. Fill in host_id / identity for THIS machine (shared_root / import_base fill\n"
             "     themselves in automatically the first time any script runs)\n"
-            "  3. Re-run. (See design\\portability.md / README.md.)"
+            "  3. Re-run. (See README.md.)"
         )
 
     try:
@@ -84,7 +82,7 @@ def get_shared_config(shared_root=None):
     # from the file. config.local.json's own 'shared_root' is kept only as a last-known-location
     # marker so a move/rename is detectable; it self-corrects below rather than ever going stale
     # in a way that matters. Normalize to forward-slash before comparing: the locked path
-    # convention is forward-slash always (design\portability.md, OS-reach Tier 2), but a resolved
+    # convention is forward-slash always, but a resolved
     # path is backslash form on Windows regardless of how the config stores it.
     live_root = str(shared_root.resolve()).rstrip('\\/').replace('\\', '/')
     raw_marker = cfg.get('shared_root')
@@ -120,7 +118,7 @@ def get_shared_config(shared_root=None):
         cfg['shared_root'] = live_root
 
     # import_base: Claude Code's @import only resolves home-relative '~/...' paths (the only form
-    # ever proven to work - design\portability.md decision 7), so compute it fresh from live_root
+    # ever proven to work), so compute it fresh from live_root
     # every call rather than storing it. Error clearly if this repo isn't under the home directory
     # at all, since there's no other resolvable form to fall back to.
     try:
@@ -164,7 +162,7 @@ def get_shared_config(shared_root=None):
               "mechanism can't")
         print("          route around.")
 
-    # private_root: design\private_tools.md - the private, automatic analog to shared_root, always
+    # private_root: the private, automatic analog to shared_root, always
     # recomputed live the same way (never trusted from the file) so a move/rename can't leave it
     # stale either. Points at toolkit_private\, a sibling of this toolkit\ folder in the outer repo
     # - it may not exist yet on a fresh clone or before the first private tool is added, which is
@@ -196,7 +194,7 @@ def expand_optin_command(command, config):
     """Substitute config placeholders in a single command string.
       {{PYTHON_LAUNCHER}} -> config.python_launcher
       {{SHARED_ROOT}}     -> config.shared_root
-      {{PRIVATE_ROOT}}    -> config.private_root (design\\private_tools.md)
+      {{PRIVATE_ROOT}}    -> config.private_root
     """
     return (command
             .replace('{{PYTHON_LAUNCHER}}', str(config.get('python_launcher', '')))
@@ -222,7 +220,7 @@ def get_expanded_optin(optin_path, config):
     return optin
 
 
-# design\consumer_reference_indirection.md: the fixed, host-invariant wrapper form of a hook
+# The fixed, host-invariant wrapper form of a hook
 # command, used for any NEW connection (a brand-new consumer, or a not-yet-connected host joining
 # an already-registered one) from this build forward. An already-connected host's existing
 # settings.json keeps the direct-path form from get_expanded_optin() above untouched - no forced
@@ -237,7 +235,7 @@ HUB_DISPATCH_TEMPLATE = 'hooks/_hub_dispatch.py'
 
 
 def merge_bash_allowlist(settings, scope, cfg=None):
-    """design\\bash_permission_allowlist.md: merges templates\\bash_allowlist.json's `scope`
+    """Merges templates\\bash_allowlist.json's `scope`
     ('hub' or 'consumer') pattern list into settings's own permissions.allow, as both Bash(...)
     and PowerShell(...) forms so the two tool-namespaces can never drift apart. Append-if-missing,
     same shape as new_consumer.py's existing Read(<import base>/**) rule merge. `cfg` is required
@@ -260,11 +258,10 @@ def get_dispatch_optin(optin_path, tool_name, config):
     templates\\optins\\<tool>.json - one file, no duplicated second canonical source), but every
     hook's command replaced with a fixed, fully host-invariant invocation that looks up
     python_launcher from THIS host's own .claude\\hub_pointer.md at firing time, instead of baking
-    a launcher value into the command text (design\\multi_machine_hub.md "Problem 3", Fix B - the
-    prior baked-launcher form was a treadmill the instant a consumer gained a second host, same
-    shape as Problem 1's fixed hub CLAUDE.md self-import). Requires a POSIX shell to run the
-    lookup - every hook entry this produces also carries "shell": "bash"
-    (design\\multi_machine_hub.md "Prerequisite locked: Git Bash on Windows").
+    a launcher value into the command text (the prior baked-launcher form was a treadmill the
+    instant a consumer gained a second host, same shape as the fixed hub CLAUDE.md self-import).
+    Requires a POSIX shell to run the lookup - every hook entry this produces also carries
+    "shell": "bash" (Git Bash on Windows is a locked prerequisite).
 
     `config` is accepted but no longer read for the launcher (kept for signature stability across
     every existing caller - build_dispatch_cmd_map, new_consumer.py, check_tower_crane.py, etc. -
@@ -290,9 +287,8 @@ def get_dispatch_optin(optin_path, tool_name, config):
 
 def build_dispatch_cmd_map(tools, private_tools, config, optins_dir, private_optins_dir):
     """Dispatch-wrapper analog of build_new_cmd_map() above: tool name -> its dispatch-wrapper
-    command (get_dispatch_optin() instead of get_expanded_optin()). Used for a NEW connection only
-    (design\\consumer_reference_indirection.md) - new_consumer.py's host-merge branch, when the
-    joining host is genuinely new."""
+    command (get_dispatch_optin() instead of get_expanded_optin()). Used for a NEW connection only -
+    new_consumer.py's host-merge branch, when the joining host is genuinely new."""
     new_cmd = {}
     for t in tools:
         optin_path = Path(optins_dir) / f"{t}.json"
@@ -318,15 +314,15 @@ def build_dispatch_cmd_map(tools, private_tools, config, optins_dir, private_opt
 
 
 def build_hub_pointer_content(config, import_pieces):
-    """Renders .claude\\hub_pointer.md's full content for THIS host, right now
-    (design\\consumer_reference_indirection.md): a fenced yaml block carrying the raw
+    """Renders .claude\\hub_pointer.md's full content for THIS host, right now: a fenced yaml
+    block carrying the raw
     shared_root:/import_base:/python_launcher: values config_lib.get_shared_config() just computed,
     followed by the literal @import lines for every mandatory/imported protocol piece this consumer
     has - the exact lines that used to live directly in CLAUDE.md. Gitignored, one per consumer,
     one value per host - regenerated fresh by new_consumer.py (scaffold/host-merge) and
     relocate.py, never hand-edited.
 
-    python_launcher (design\\multi_machine_hub.md "Problem 3", Fix B) lives here rather than baked
+    python_launcher lives here rather than baked
     into a tracked hook command for the same reason shared_root/import_base already do: it's a
     per-host value read live by get_dispatch_optin()'s command at hook-firing time, never written
     into anything a second host's `origin` pull could inherit and re-break.
@@ -334,7 +330,7 @@ def build_hub_pointer_content(config, import_pieces):
     import_base = config['import_base']
     lines = [
         '<!-- Tower Crane hub pointer - auto-regenerated per host, never hand-edit or commit',
-        '     (this file is gitignored). See design\\consumer_reference_indirection.md. -->',
+        '     (this file is gitignored). Regenerated by new_consumer.py / relocate.py. -->',
         '',
         '```yaml',
         f"shared_root: {config['shared_root']}",
@@ -349,9 +345,8 @@ def build_hub_pointer_content(config, import_pieces):
 
 def fix_hub_pointer(consumer_path, config, import_pieces, dry_run=False, log=None):
     """Regenerates .claude\\hub_pointer.md for THIS host, but ONLY for a consumer whose CLAUDE.md
-    already carries the HUB_POINTER_IMPORT_LINE indirection (design\\
-    consumer_reference_indirection.md) - an old-style, not-yet-migrated consumer is left
-    completely untouched (no unrequested file appears in its working tree). Called by relocate.py
+    already carries the HUB_POINTER_IMPORT_LINE indirection - an old-style, not-yet-migrated
+    consumer is left completely untouched (no unrequested file appears in its working tree). Called by relocate.py
     on every regeneration pass, same as fix_imports()/fix_skill_stubs() above. Returns True if
     written (or would be, under dry_run)."""
     consumer_path = Path(consumer_path)
@@ -375,8 +370,7 @@ def fix_hub_pointer(consumer_path, config, import_pieces, dry_run=False, log=Non
 def fix_hub_dispatch_wrapper(consumer_path, shared_root, dry_run=False, log=None):
     """Refreshes .claude\\hooks\\_hub_dispatch.py against the canonical toolkit\\hooks\\
     _hub_dispatch.py source, but ONLY for a consumer that already has this file (i.e. already
-    migrated - design\\consumer_reference_indirection.md) - never introduces it to a not-yet-
-    migrated consumer. Content is host-invariant (no substitution), same drift shape as
+    migrated) - never introduces it to a not-yet-migrated consumer. Content is host-invariant (no substitution), same drift shape as
     fix_skill_stubs() above. Returns True if written (or would be, under dry_run)."""
     dst = Path(consumer_path) / HUB_DISPATCH_RELPATH
     if not dst.exists():
@@ -397,11 +391,11 @@ def fix_hub_dispatch_wrapper(consumer_path, shared_root, dry_run=False, log=None
 
 def write_new_connection_files(target_path, config, import_pieces, shared_root, log=None):
     """Writes the three files a genuinely NEW connection needs to use the pointer-indirection
-    form (design\\consumer_reference_indirection.md): this host's own gitignored
-    .claude\\hub_pointer.md, the tracked .claude\\hooks\\_hub_dispatch.py wrapper, and the
-    .gitignore entry for the pointer file. Factored out of new_consumer.py's original inline "1a"
-    block (design\\grt_connectivity_audit.md item (iii)) so migrate_consumer_indirection.py's
-    one-time already-connected-host migration reuses the identical write instead of a hand-copied
+    form: this host's own gitignored .claude\\hub_pointer.md, the tracked
+    .claude\\hooks\\_hub_dispatch.py wrapper, and the .gitignore entry for the pointer file.
+    Factored out of new_consumer.py's original inline "1a" block so
+    migrate_consumer_indirection.py's one-time already-connected-host migration reuses the
+    identical write instead of a hand-copied
     duplicate that could drift. Idempotent - a repeat call only rewrites _hub_dispatch.py if its
     content actually differs, and only adds the .gitignore line if absent."""
     target_path = Path(target_path)
@@ -435,10 +429,9 @@ def write_new_connection_files(target_path, config, import_pieces, shared_root, 
 
 def collapse_imports_to_pointer(claude_md_path, import_pieces, log=None):
     """Collapses whatever direct-form @import lines are present in a consumer's CLAUDE.md into
-    the single host-invariant HUB_POINTER_IMPORT_LINE (design\\consumer_reference_indirection.md).
-    Factored out of new_consumer.py's host-merge branch (design\\grt_connectivity_audit.md item
-    (iii)) so migrate_consumer_indirection.py's one-time already-connected-host migration reuses
-    the identical collapse logic. Returns 'already' (pointer line already present - nothing to
+    the single host-invariant HUB_POINTER_IMPORT_LINE.
+    Factored out of new_consumer.py's host-merge branch so migrate_consumer_indirection.py's
+    one-time already-connected-host migration reuses the identical collapse logic. Returns 'already' (pointer line already present - nothing to
     do), 'collapsed' (rewrote the file), or 'no-match' (no recognized @import line found to
     collapse - caller should leave CLAUDE.md untouched and tell a human to add the pointer line
     by hand)."""
@@ -473,7 +466,7 @@ def collapse_imports_to_pointer(claude_md_path, import_pieces, log=None):
 # config.local.json's import_base, same "already-baked, needs a relocate pass" situation as a hook
 # command - config_lib.py always recomputes import_base live, so this brings a consumer's @import
 # lines back in sync the same way apply_hook_command_fixes() does for hooks. Moved here 2026-08-19
-# from relocate.py (design\\grt_connectivity_audit.md item (ii)) - the one Tower-Crane-owned-file
+# from relocate.py - the one Tower-Crane-owned-file
 # regenerator not yet centralized alongside fix_skill_stubs/fix_hub_pointer/
 # fix_hub_dispatch_wrapper/fix_adopted_stub_paths above, needed here so
 # commit_consumer_changes()'s own push-failure reconciliation (below) can call it in-process.
@@ -536,7 +529,7 @@ _READ_INSTRUCTION_RE = re.compile(r'\{\{READ_INSTRUCTION:([\w.]+)\}\}')
 
 
 def _render_read_instruction(target, import_base, use_pointer):
-    """The one sentence fragment design\\consumer_reference_indirection.md's skill-stub fix
+    """The one sentence fragment the skill-stub pointer fix
     actually changes: for a new-connection consumer (use_pointer=True), points the agent at this
     project's own .claude\\hub_pointer.md instead of a baked import_base path - for a
     not-yet-migrated consumer (use_pointer=False, the default - no forced migration), the
@@ -553,10 +546,9 @@ def materialize_skill_stub(canon_path, import_base=None, use_pointer=False):
     should actually be installed (scaffolded to a consumer, self-hooked into the hub, or applied
     by update_consumers.py): the leading maintainer HTML-comment header stripped, {{IMPORT_BASE}}
     substituted if import_base is given (omit for a private, copy-only stub), and any
-    {{READ_INSTRUCTION:<target>}} placeholder rendered per use_pointer (design\\
-    consumer_reference_indirection.md - defaults False, i.e. the pre-existing direct-substitution
-    wording, so every existing caller that doesn't pass this explicitly keeps its current
-    behavior unchanged).
+    {{READ_INSTRUCTION:<target>}} placeholder rendered per use_pointer (defaults False, i.e. the
+    pre-existing direct-substitution wording, so every existing caller that doesn't pass this
+    explicitly keeps its current behavior unchanged).
 
     The header strip matters, not just tidiness: every canonical stub carries that comment BEFORE
     the YAML frontmatter, which breaks the harness's name/description parsing on the installed
@@ -577,7 +569,7 @@ def build_new_cmd_map(tools, private_tools, config, optins_dir, private_optins_d
     """tool name -> its current concrete hook command, read from the canonical opt-in snippets.
     Single source of truth for 'what should this tool's hook command be right now' - relocate.py's
     regeneration pass and new_consumer.py's host-merge reuse of it both call this instead of each
-    hand-rolling the same walk (design\\consumer_reconnect.md).
+    hand-rolling the same walk.
 
     `warn`, if given, is called with a message for a tool with no canonical opt-in file (public
     tools only - a private "tool" may be a Track-1 skill instead of a hook, so a missing private
@@ -613,19 +605,19 @@ def apply_hook_command_fixes(settings, new_cmd, all_tools, dry_run=False, log=No
                               needs_shell=False):
     """Rewrite, in place, any hook command in `settings` (an already-loaded settings.json dict)
     that references an opted-in tool's hook file - either the direct form (hooks/<tool>.ps1 or
-    .py) or the dispatch-wrapper form (hooks/_hub_dispatch.py <tool>, design\\
-    consumer_reference_indirection.md) - to that tool's current command from `new_cmd` (see
-    build_new_cmd_map / build_dispatch_cmd_map). Also collapses any hook group that becomes (or
-    already was) a byte-exact duplicate of an earlier group under the same event: a stale entry
-    repaired to match an already-correct entry (e.g. two hosts with different python_launcher
-    values on an already-dispatch-form consumer) would otherwise leave both firing - a real
-    failure mode hit live 2026-08-23 connecting a second host to an already-migrated consumer (see
-    the private hub's own decisions_detail.md for the incident - not this repo).
+    .py) or the dispatch-wrapper form (hooks/_hub_dispatch.py <tool>, the reference-indirection
+    pattern) - to that tool's current command from `new_cmd` (see build_new_cmd_map /
+    build_dispatch_cmd_map). Also collapses any hook group that becomes (or already was) a
+    byte-exact duplicate of an earlier group under the same event: a stale entry repaired to match
+    an already-correct entry (e.g. two hosts with different python_launcher values on an
+    already-dispatch-form consumer) would otherwise leave both firing - a real failure mode hit
+    live connecting a second host to an already-migrated consumer; record any incident detail in
+    your own hub's private notes, not here.
 
-    `needs_shell` (design\\multi_machine_hub.md "Problem 3", Fix B): set True when `new_cmd` came
-    from build_dispatch_cmd_map - its command text now depends on a POSIX shell (the launcher
-    lookup against .claude\\hub_pointer.md), so any entry this function rewrites onto that form
-    also needs "shell": "bash" set, same as get_dispatch_optin() sets it on a fresh one.
+    `needs_shell` (multi-machine "Problem 3" fix): set True when `new_cmd` came from
+    build_dispatch_cmd_map - its command text now depends on a POSIX shell (the launcher lookup
+    against .claude\\hub_pointer.md), so any entry this function rewrites onto that form also
+    needs "shell": "bash" set, same as get_dispatch_optin() sets it on a fresh one.
     build_new_cmd_map's direct-path form needs no such key - leave False for that caller.
 
     Never adds, reorders, or touches an unrelated hook. Returns True if anything changed (or
@@ -675,12 +667,12 @@ def apply_hook_command_fixes(settings, new_cmd, all_tools, dry_run=False, log=No
 def fix_skill_stubs(consumer_path, templates_dir, import_base, dry_run=False, log=None, use_pointer=False):
     """Regenerate every installed .claude\\skills\\<name>\\SKILL.md stub whose content doesn't
     match what materialize_skill_stub() would produce right now from the canonical
-    templates\\skills\\<name>\\SKILL.md source (design\\consumer_reconnect.md - closes a
+    templates\\skills\\<name>\\SKILL.md source (closes a
     pre-existing gap: stubs are baked with {{IMPORT_BASE}} at scaffold time and were never
     revisited by anything, even on a single-machine rename). Skips a skill dir with no matching
-    canonical source (e.g. a private-tool-managed skill). `use_pointer` (design\\
-    consumer_reference_indirection.md) selects which of the two valid renderings to regenerate
-    TO - the caller decides per-consumer (a migrated consumer's CLAUDE.md already carries
+    canonical source (e.g. a private-tool-managed skill). `use_pointer` selects which of the two
+    valid renderings to regenerate TO - the caller decides per-consumer (a migrated consumer's
+    CLAUDE.md already carries
     HUB_POINTER_IMPORT_LINE; an un-migrated one doesn't, and stays on the direct-substitution
     form, the default). Returns True if anything changed (or would, under dry_run).
     """
@@ -707,7 +699,7 @@ def fix_skill_stubs(consumer_path, templates_dir, import_base, dry_run=False, lo
     return changed
 
 
-# design\directive_economy.md's "Adopted-stub path portability" - a shared_resources\-adopted
+# "Adopted-stub path portability" - a shared_resources\-adopted
 # reference/tool skill stub (private-only, no canonical toolkit\ source - see fix_skill_stubs()'s
 # docstring for that contrast) still needs its embedded path to survive a move across hosts. The
 # adoption-marker comment templates\shared_resources.md's Apply step already writes carries an
@@ -735,7 +727,7 @@ def hub_root_tilde(hub_root):
 def fix_adopted_stub_paths(consumer_path, hub_root, dry_run=False, log=None):
     """Regenerate a private, shared_resources\\-adopted skill stub's embedded path for THIS host,
     using the hub-relative fragment recorded in its own adoption marker at Apply time
-    (design\\directive_economy.md's "Adopted-stub path portability"). Unlike fix_skill_stubs(),
+    (the "Adopted-stub path portability" fix). Unlike fix_skill_stubs(),
     there's no canonical templates\\skills\\ source to diff a whole file against - an adopted
     stub's trigger/body is bespoke, private, written once. The marker's `hub-rel:` field is the
     only portable anchor: `~/<hub-relative fragment>` recomputed against THIS host's live
@@ -766,7 +758,7 @@ def fix_adopted_stub_paths(consumer_path, hub_root, dry_run=False, log=None):
 
 
 # Shared markers between disconnect_consumer.py (writer) and new_consumer.py (reader, for the
-# reconnect branch - design\\connect_disconnect.md "Reconnect-after-disconnect gap"): the two live sections
+# reconnect branch, "Reconnect-after-disconnect gap"): the two live sections
 # a disconnect replaces, the pointer heading it replaces them with, and the breadcrumb notes file
 # that heading points to. Centralized here (rather than defined in disconnect_consumer.py alone) so
 # the two scripts can't drift out of sync on what marker text means "disconnected".
@@ -783,8 +775,8 @@ FIRST_RUN_FILENAME = 'FIRST_RUN.md'
 # disconnect_consumer.py additionally writes DISCONNECT_NOTES_FILENAME (the generated breadcrumb
 # manifest a this-only local cleanup leaves behind), and new_consumer.py additionally writes
 # FIRST_RUN_FILENAME (the one-time setup checklist, freshly written every time it's written at all,
-# wholly hub-owned like everything else in this tuple - design\connect_project_commit_gate.md's
-# addendum) - harmless no-op for the other writers, which never touch either filename.
+# wholly hub-owned like everything else in this tuple) - harmless no-op for the other writers,
+# which never touch either filename.
 # README.md joins this tuple the same way FIRST_RUN.md does: new_consumer.py writes it wholesale,
 # once, only when absent (never appends to real pre-existing content), so it's safe to commit
 # alongside everything else here - unlike project_progress.md below, it never needs the narrower
@@ -792,7 +784,7 @@ FIRST_RUN_FILENAME = 'FIRST_RUN.md'
 # project_progress.md is deliberately NOT here despite new_consumer.py also writing it: unlike
 # every path above, it's not wholly hub-owned (the hub only ever prepends one dated note to an
 # otherwise user-owned continuity doc), so it needs its own narrower, pre-checked commit path -
-# commit_consumer_progress_note() below, never this tuple. HUB_DISPATCH_RELPATH (design\consumer_reference_indirection.md)
+# commit_consumer_progress_note() below, never this tuple. HUB_DISPATCH_RELPATH
 # is tracked, host-invariant content - a real committable path, unlike HUB_POINTER_RELPATH, which
 # is gitignored and must NEVER appear here (an explicit `git add` of a gitignored path stages it
 # anyway, bypassing .gitignore).
@@ -804,7 +796,7 @@ CONSUMER_OWNED_PATHS = ('CLAUDE.md', 'README.md', '.claude/settings.json', '.cla
 def scoped_status_paths(repo_path, candidate_paths):
     """Parsed (forward-slash, repo-relative) paths `git status --porcelain` reports as dirty,
     scoped to candidate_paths. Shared by _commit_scoped()'s own noop check and by a caller building
-    a post-commit "what's still left dirty" close-out report (design\\script_action_reporting.md) -
+    a post-commit "what's still left dirty" close-out report -
     evidence over intent: reports what git actually shows right now, not what a code path believes
     it just committed. [] if repo_path has no `.git\\` at all."""
     repo_path = Path(repo_path)
@@ -953,8 +945,8 @@ def sync_consumer_repo(consumer_path, log=None):
 
 def _reconcile_diverged_push(consumer_path, message, log, config, imports, shared_root):
     """Real reconciliation for a rejected consumer push, replacing the old dead end
-    (design\\grt_connectivity_audit.md item (ii)) - confirmed in code before this was built:
-    commit_consumer_changes() previously just logged 'push-failed' and stopped, with no fetch,
+    - confirmed in code before this was built: commit_consumer_changes() previously just logged
+    'push-failed' and stopped, with no fetch,
     retry, or reconciliation of any kind, even though CONSUMER_OWNED_PATHS content is entirely
     regenerable (not hand-authored), so a divergence confined to it never needs a real text merge.
 
@@ -989,8 +981,7 @@ def _reconcile_diverged_push(consumer_path, message, log, config, imports, share
 
     # Safety gate: nothing outside what commit_consumer_changes() just committed may be dirty -
     # git reset --hard below would otherwise destroy unrelated in-progress work sitting elsewhere
-    # in this same consumer repo (a risk the design doc's mechanism section named but didn't
-    # spell out a guard for).
+    # in this same consumer repo.
     if _git(['status', '--porcelain']).stdout.strip():
         if log:
             log(f"  [warn] not auto-reconciling {consumer_path}: unrelated uncommitted changes "
@@ -1044,12 +1035,11 @@ def commit_consumer_changes(consumer_path, message, log=None, config=None, impor
     session there to notice and checkpoint it - unlike a consumer's own session adopting something
     itself, which naturally checkpoints right after. Left alone, that write just sits uncommitted
     indefinitely, with no reminder mechanism short of a human remembering. Mirrors
-    `shared_resources\\`'s own "saving now propagates itself" fix
-    (design\\resource_sharing_model.md) one level down: don't ask, don't rely on a human/agent
-    remembering to push later - make the routine pass close its own loop, every time, as its own
-    last step for that consumer.
+    `shared_resources\\`'s own "saving now propagates itself" fix one level down: don't ask,
+    don't rely on a human/agent remembering to push later - make the routine pass close its own
+    loop, every time, as its own last step for that consumer.
 
-    `config`/`imports`/`shared_root` (design\\grt_connectivity_audit.md item (ii), optional and
+    `config`/`imports`/`shared_root` (optional and
     backward-compatible - a caller that omits them gets exactly today's behavior): when given, a
     rejected push is followed by one real reconciliation attempt via _reconcile_diverged_push()
     above, instead of a dead end. `imports` is the consumer's own list of imported piece names
@@ -1075,8 +1065,8 @@ def path_is_clean(repo_path, rel_path):
     dirty). False if repo_path has no `.git\\` (nothing this can verify, so a caller relying on
     'was it clean before I touched it' must treat unknown as not-safe-to-assume-clean).
 
-    Built for `design\\connect_project_commit_gate.md`'s addendum: callers that are about to make
-    a hub-owned edit to a NOT-wholly-hub-owned file (project_progress.md) call this immediately
+    Built for callers that are about to make
+    a hub-owned edit to a NOT-wholly-hub-owned file (project_progress.md), which call this immediately
     BEFORE making that edit, so the post-edit diff is guaranteed to be exactly their own addition
     if (and only if) this returned True."""
     repo_path = Path(repo_path)
@@ -1089,7 +1079,7 @@ def path_is_clean(repo_path, rel_path):
 
 def commit_consumer_progress_note(consumer_path, message, log=None):
     """Narrow, single-path companion to commit_consumer_changes() above, for project_progress.md
-    specifically (design\\connect_project_commit_gate.md addendum). Deliberately NOT folded into
+    specifically. Deliberately NOT folded into
     CONSUMER_OWNED_PATHS / commit_consumer_changes()'s all-paths-at-once commit, for two reasons:
 
     1. project_progress.md is not wholly hub-owned like everything in CONSUMER_OWNED_PATHS - the
@@ -1111,8 +1101,8 @@ def commit_consumer_progress_note(consumer_path, message, log=None):
 
 
 def commit_hub_changes(project_root, paths, message, log=None):
-    """Outer-repo analog of commit_consumer_changes() above (design\\grt_connectivity_audit.md
-    item (i)): commits (and pushes, if 'origin' is configured) a registry-mutating routine's own
+    """Outer-repo analog of commit_consumer_changes() above: commits (and pushes, if 'origin' is
+    configured) a registry-mutating routine's own
     write(s) into the outer hub repo itself, immediately at the point of mutation, instead of
     leaving it for a later, optional `checkpoint` to find - `checkpoint` exists to save the user's
     OWN in-progress work; skipping it should only ever cost the user their own unsaved work, never

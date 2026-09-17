@@ -5,9 +5,9 @@ Read this when `connect project` (`new_consumer.py`) or `disconnect project`
 abandoning the operation or forcing an overwrite that could destroy real project content. This is
 **not** a deterministic fix — connections can break for more reasons than any script can
 enumerate, and this file deliberately does not try to enumerate them as named cases
-(`design\connection_diagnostics.md`'s reframe: `hooks\consistency_check.py`'s own report-don't-fix
-split applied here — compute facts, let Claude reason about what they mean, rather than chasing an
-open-ended set of shapes with more and more named branches).
+(`hooks\consistency_check.py`'s own report-don't-fix split applied here — compute facts, let Claude
+reason about what they mean, rather than chasing an open-ended set of shapes with more and more
+named branches).
 
 **Before trying anything below:** never run `--force` (on `new_consumer.py`) as a first move. It
 fully overwrites `CLAUDE.md` from the blank template, destroying any real project overview or
@@ -18,7 +18,7 @@ after those are ruled out, and only with the user's explicit go-ahead, per the s
 ## Start here: read the fact table, don't guess
 
 Both scripts' fatal-error paths now auto-invoke `check_tower_crane.py --diagnose` inline and print
-its output ahead of the error (design\connection_diagnostics.md — wired 2026-08-13). If you're
+its output ahead of the error. If you're
 reading this file because you saw one of those errors, the fact table already printed above it in
 the same output — scroll up before running anything else. To run it by hand (standalone-reachable,
 not only failure-triggered): `python scripts\check_tower_crane.py --diagnose --path <project path>
@@ -68,7 +68,7 @@ table would have shown: Category A — heading present, no live import, no marke
 unrecognized combination); Category B — a `"Tower Crane: disconnected"` commit in the consumer's
 own repo. Reasoning from B: this project *was* disconnected via the real command, and the marker
 mechanism just didn't exist yet at the time that disconnect ran (it was built *from* this exact
-incident afterward — `design\connect_disconnect.md`'s post-disconnect legibility fix). Once you know that,
+incident afterward, via a post-disconnect legibility fix). Once you know that,
 the remedy is obvious and safe: treat it as a reconnect (strip the stale heading pair, let
 `new_consumer.py --force` — or, after the legibility fix landed, an ordinary reconnect run —
 re-append live sections), never a blind `--force` overwrite from scratch.
@@ -116,7 +116,7 @@ registry drift — see the worked incident above.
 ## Wired in
 
 `new_consumer.py`'s and `disconnect_consumer.py`'s fatal-error paths auto-invoke
-`check_tower_crane.py --diagnose` and print its fact table inline (2026-08-13,
-`design\connection_diagnostics.md`), ahead of naming this file. Not yet built: a
+`check_tower_crane.py --diagnose` and print its fact table inline, ahead of naming this file. Not
+yet built: a
 `"fix connection"` trigger that reads this file and runs `--diagnose` proactively before any error
 is even hit — a plausible future extension, not scoped yet.

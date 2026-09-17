@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-check_shared_resource_refs.py - Group B2 of design\\resource_sharing_model.md: a project's own
+check_shared_resource_refs.py - a project's own
 "is what I adopted from shared_resources\\ still there" check, run at that project's `resume`
 (see templates\\shared_resources.md's "Checking adopted references at resume").
 
@@ -14,23 +14,22 @@ What it checks, in two forms - both per templates\\shared_resources.md's "Apply"
    `shared_resources/` segment (the pre-directive_economy flat-import form).
 2. Every backtick-quoted `~/...`-form path containing a `shared_resources/` segment inside any
    project-local `.claude\\skills\\<name>\\SKILL.md` file (the Track-1 skill-stub form "Apply" now
-   produces - design\\directive_economy.md's "Apply procedure, resolved").
+   produces).
 Both forms expand a leading `~` to the current user's home directory (the only such path form
-proven to resolve - design\\portability.md decision 7), then check the target file actually
+proven to resolve), then check the target file actually
 exists. Flags anything that doesn't resolve, so a folder-maintenance operation
-(split/consolidate/rename/delete) that broke a stub never fails silently
-(design\\resource_sharing_model.md's "Shared resources folder maintenance" principle).
+(split/consolidate/rename/delete) that broke a stub never fails silently.
 
 Deliberately out of scope: free-text "pointer note" adoptions (a `tool`-kind entry invoked
 on-demand, or any adoption written as prose mentioning a spaced path rather than a literal
 `@import` line or a backtick-quoted `~/...` path in a skill stub). Those aren't machine-parseable
 by construction - there's no fixed shape to check deterministically. Also out of scope: a skill
 stub's trigger description going stale relative to its source entry's current topic footprint -
-a different, notify-only concern (design\\directive_economy.md's "Drift mechanics"), not an
-existence check.
+a different, notify-only concern ("Drift mechanics", handled by check_shared_resource_drift.py),
+not an existence check.
 
-Also checks a third, separate thing (design\\resource_sharing_model.md's "Per-host availability
-for pointer entries"): whether an adopted `tool`/pointer-`reference` entry's own `Hosts:` block
+Also checks a third, separate thing ("Per-host availability for pointer entries"): whether an
+adopted `tool`/pointer-`reference` entry's own `Hosts:` block
 (only present on an entry whose real target lives outside `shared_resources\\`, genuinely
 machine-local) lists THIS host. This is deliberately notify-only, never blocking - a missing host
 isn't a broken reference (the entry file itself resolves fine), it's a "the thing this points at
@@ -62,8 +61,8 @@ from config_lib import ADOPTED_MARKER_RE
 # whitespace-intolerant pattern.
 IMPORT_LINE_RE = re.compile(r'^@(.+?)\s*$', re.MULTILINE)
 SKILL_STUB_PATH_RE = re.compile(r'`(~/[^`]+)`')
-# A shared_resources\ entry's own "Hosts:" block (design\resource_sharing_model.md's worked
-# example) - present only on a tool/pointer-reference entry whose real target lives outside
+# A shared_resources\ entry's own "Hosts:" block - present only on a tool/pointer-reference entry
+# whose real target lives outside
 # shared_resources\ itself. Mirrors registry_lib.py's consumers\<slug>.md hosts: shape one layer
 # down, but hand-authored markdown rather than a fenced yaml block, so this is its own small
 # parser rather than a registry_lib.py reuse.

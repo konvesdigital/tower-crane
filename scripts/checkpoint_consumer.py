@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """
-checkpoint_consumer.py - the consumer-side "checkpoint" skill's git mechanics
-(design\\command_procedure_audit.md's B2 consumer port, scoped 2026-08-24): ports
+checkpoint_consumer.py - the consumer-side "checkpoint" skill's git mechanics: ports
 scripts\\checkpoint_git.py's untracked-file-safety mechanic from the hub's own two-repo checkpoint
 to a single connected project's own repo.
 
-Ported deliberately narrower than the hub original - see command_procedure_audit.md's "Hub/
-consumer command parity" section for why:
+Ported deliberately narrower than the hub original, following the same hub/consumer command-parity
+discipline applied elsewhere:
   - Untracked-file safety carries over unchanged: `git add -u` stages tracked modifications
     automatically (always safe, no prompt); a genuinely untracked file blocks with an
     `[UNTRACKED]` report until resolved via --include/--include-all/--skip-untracked, exactly

@@ -1,6 +1,6 @@
 <!--
 Shared protocol piece: commands.md (OPTIONAL / self-scaffolding for every consumer - Track 1,
-on-demand, no always-resident companion - design\optimize_ux.md).
+on-demand, no always-resident companion).
 Home: ~\Documents\Claude\tower_crane\toolkit\templates\commands.md
 Reached via a thin skill stub at .claude\skills\commands\SKILL.md (sourced from
 toolkit\templates\skills\commands\SKILL.md), same copy-and-substitute pattern as
@@ -8,13 +8,12 @@ filing/checkpoint/archive/update. Float-on-HEAD: this file is the one canonical 
 always re-reads live. Keep this file project-agnostic - it must read correctly from ANY consumer.
 Refer to "this project", never a specific consumer name.
 
-Fluent-tier track sourcing (design\capability_relationships.md, "partial conversion" decision,
-2026-08-02): "Efficiency habits" and "Sharing outward" below are catalog-derived (see their own
-render instructions) - the only two of this file's four tracks that had a real matching theme tag
-in the locked design. "Cross-project knowledge" and "Reaching the hub from here" stay hand-authored
-- no matching theme tag exists for either yet, and inventing one just to force uniformity would
-violate the theme-tag test itself (two members from different structural clusters, nameable in one
-clause - design\capability_relationships.md's theme layer section). No functional loss either way:
+Fluent-tier track sourcing ("partial conversion" decision, 2026-08-02): "Efficiency habits" and
+"Sharing outward" below are catalog-derived (see their own render instructions) - the only two of
+this file's four tracks that had a real matching theme tag in the locked design. "Cross-project
+knowledge" and "Reaching the hub from here" stay hand-authored - no matching theme tag exists for
+either yet, and inventing one just to force uniformity would violate the theme-tag test itself (two
+members from different structural clusters, nameable in one clause). No functional loss either way:
 the theme layer is additive to `capability_relationships`' own answers regardless of whether a track
 here reflects it. Revisit only if a real third theme naturally emerges - don't invent one for this.
 
@@ -124,7 +123,7 @@ You can say "commands" any time to see everything else.
 
 ### Reciprocal pairs to volunteer
 
-Per the reciprocal-tracks rule (design\optimize_ux.md): when a query lands on one node, volunteer
+Per the reciprocal-tracks rule: when a query lands on one node, volunteer
 its nearest structural neighbor as the single next-best follow-up - don't wait to be asked. Not a
 fixed list below - read this project's own `capability_catalog.yaml` fresh (same file the tracks
 above and `capability_relationships` both resolve from the `toolkit\` root). For the node the

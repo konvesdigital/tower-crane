@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-update_toolkit.py - the `update` action (design\\local_first_reframe.md's "`update` action
-mechanics", design\\update_trust_review.md's Fix 1): pulls this inner toolkit repo's own `origin`
+update_toolkit.py - the `update` action: pulls this inner toolkit repo's own `origin`
 remote (the public tower_crane repo, or whichever upstream this clone points at) under a
 diff-review trust gate, instead of a blind `git pull`.
 
@@ -45,13 +44,13 @@ check and the mechanical merge:
               Only on a clean pass does last_reviewed_sha actually advance.
                 Without --through: approves every pending commit shown by --check (all the way to
               origin/main). With --through <n-or-sha>: partial approval, added 2026-07-27 (security
-              stress-test pass, design\\security_stress_test.md) - fast-forwards only to the given
+              stress-test pass) - fast-forwards only to the given
               commit (a 1-based index into the pending-commit list --check printed, or one of those
               commits' own SHAs), leaving the remaining, newer pending commits queued. Lets a large
               batch of upstream commits be reviewed a few at a time across multiple `update` calls
               instead of forcing one all-or-nothing read of a potentially large diff in one sitting
-              (a real residual risk this project's own diff-size gate only partially covers - see
-              the design doc). The mechanical gates below still always run against the FULL pending
+              (a real residual risk this project's own diff-size gate only partially covers). The
+              mechanical gates below still always run against the FULL pending
               range regardless of --through, so nothing merges - partial or otherwise - until
               everything currently fetched has passed every gate; --through only controls how much
               of what already passed gets merged and trusted in this round.
@@ -59,8 +58,8 @@ check and the mechanical merge:
               ran against a worktree, not this clone), so rejecting is just "forget the pending
               review" - the old trusted baseline was never actually left.
 
-last_reviewed_sha lives at toolkit\\.last_reviewed_sha (gitignored - design\\update_trust_review.md's
-resolved storage-location decision: a property of this specific clone, not the toolkit content).
+last_reviewed_sha lives at toolkit\\.last_reviewed_sha (gitignored -
+a property of this specific clone, not the toolkit content).
 First run (file absent): trust-on-first-use - the clone's current local HEAD becomes the initial
 baseline (same bootstrap assumption as an SSH known_hosts first connection or a fresh lockfile
 install; nothing to review yet since nothing has been pulled through this gate before).
@@ -68,12 +67,12 @@ install; nothing to review yet since nothing has been pulled through this gate b
 Update is always the user's choice, never assumed or forced (Locked 2026-07-26) - this script never
 runs itself; nothing schedules --check automatically.
 
-  --notify    The "check for update" proactive notice (design\\local_first_reframe.md): plain
+  --notify    The "check for update" proactive notice: plain
               fetch + comparison against last_reviewed_sha, no golden suite, no pending-file
               write, never mutates state. Prints one line per direction. Safe on any cadence
               (resume, cron) - never triggers the full review gate; that stays --check,
-              user-initiated only. Also checks the outgoing direction
-              (design\\cross_machine_toolkit_sync.md): local HEAD ahead of origin/main means an
+              user-initiated only. Also checks the outgoing direction: local HEAD ahead of
+              origin/main means an
               earlier checkpoint's push was rejected or never completed - surfaced independently of
               the incoming last_reviewed_sha comparison, so a stranded local commit is never
               silently forgotten by a later session on any machine. Also checks for an uncommitted
@@ -81,8 +80,8 @@ runs itself; nothing schedules --check automatically.
               --notify/resume, only surfacing later when --check's own dirty-tree abort happened to
               run - now checked here too, on the same immediate-every-resume footing as the other
               two directions.
-  --consumer  Modifier, only meaningful with --notify (change_requests\\2026-08-25_update_toolkit_
-              notify-audience-mismatch.md): every --notify message above names a hub-only fix verb
+  --consumer  Modifier, only meaningful with --notify: every --notify message above names a
+              hub-only fix verb
               (`checkpoint`, `update`) describing the hub's own toolkit\\ clone state relative to
               its public upstream - correct and actionable when read in a hub session
               (resume_check.py), but misleading when the identical text surfaces verbatim in a
@@ -92,7 +91,7 @@ runs itself; nothing schedules --check automatically.
               every such message as informational-only, pointing at a session opened directly in
               the hub instead. Never changes the underlying check, only the audience of the text.
 
-Remote-identity check (added 2026-07-27, security stress-test pass, design\\security_stress_test.md):
+Remote-identity check (added 2026-07-27, security stress-test pass):
 every subcommand that talks to `origin` first confirms `git remote get-url origin` still matches
 the expected canonical URL recorded in config.local.json (`publish.public_repo_remote`). Nothing
 before this defended against `origin` silently being repointed (local tampering, a bad clone-URL
@@ -172,7 +171,7 @@ def _git(args, check=True):
 def _is_dirty():
     """TRACKED changes only (--untracked-files=no) - an untracked file may be one checkpoint_git.py's
     own --skip-untracked deliberately left alone, not a real "run checkpoint" situation (found live
-    2026-08-23 testing checkpoint_git.py's B2 build - design\\command_procedure_audit.md). Also more
+    2026-08-23 testing checkpoint_git.py's own commit mechanics). Also more
     correct for cmd_check/cmd_approve's pre-merge abort: an untracked file doesn't block a
     fast-forward merge unless it collides with an incoming path, which git already reports clearly
     on its own."""
@@ -353,15 +352,15 @@ def run_relocate(cfg):
     """Self-heal step (added 2026-08-18, found live via a real cross-machine rollback): runs the
     now-live, just-merged relocate.py against every locally-reachable consumer BEFORE the
     post-merge gate below. relocate.py/update_consumers.py/a consumer's own "update" skill are all
-    federated by design (design\\portability.md) - each only ever touches consumers reachable from
+    federated by design - each only ever touches consumers reachable from
     the machine running it, so a skill-stub/hub_pointer/dispatch-wrapper canonical-content change
     merged on machine A never reaches machine B's own locally-connected consumers until something
     runs a refresh THERE. Without this step, --approve's merge-then-gate-check was atomic with no
     window for that refresh to happen first, so ANY pending content that changes canonical
     skill-stub wording (not specific to any one feature) would deterministically fail the post-merge
     Pass B stub-drift check and roll back, every time, on every second-or-later machine to review
-    it - see design\\consumer_reference_indirection.md's Decisions row, which independently hit and
-    manually cleared this same drift via a normal relocate.py pass. Invoked as a subprocess (not
+    it - a prior real incident independently hit and manually cleared this same drift via a normal
+    relocate.py pass. Invoked as a subprocess (not
     imported) so it always runs whatever relocate.py actually does post-merge, including any repair
     logic this very update just added to it - update_toolkit.py never needs its own knowledge of
     what relocate.py fixes. relocate.py commits and pushes any changes it makes directly into each
@@ -466,7 +465,7 @@ def cmd_check(cfg):
     print()
     print("Present the pending-commit list above to the user FIRST, as a short line-item index. "
           "Ask how many of the leading (oldest) items they want to review right now - a large batch "
-          "doesn't have to be read in one sitting (design\\security_stress_test.md). For whichever "
+          "doesn't have to be read in one sitting. For whichever "
           "commits they choose to decide on this round, quote that commit's own diff section above "
           "VERBATIM in your own chat-visible response (fenced code block), together with your own "
           "plain-language assessment - never the diff alone, never a verdict alone, and never "
@@ -547,14 +546,14 @@ def cmd_approve(cfg, through=None):
 
 
 def cmd_notify(cfg, consumer=False):
-    """The 'check for update' proactive notice (design\\local_first_reframe.md): a plain fetch +
+    """The 'check for update' proactive notice: a plain fetch +
     comparison against last_reviewed_sha, no LLM, no golden suite, no pending-file write - never
     mutates anything, safe to run on any cadence (resume, cron). Surfaces a single line; never
     triggers the full review gate (that stays --check, user-initiated only). The remote-identity
     check here is a WARN, not an abort - --notify's whole point is a safe, side-effect-free
     heads-up, so it still reports a mismatched origin without blocking `resume`.
 
-    consumer=True (change_requests\\2026-08-25_update_toolkit_notify-audience-mismatch.md): every
+    consumer=True: every
     message below describes the hub's own toolkit\\ clone relative to its public upstream, and
     every hub-audience phrasing names a hub-only fix verb (`checkpoint`, `update`). Read verbatim
     from a connected consumer session, none of those verbs are reachable and the state described
@@ -591,7 +590,7 @@ def cmd_notify(cfg, consumer=False):
 
     target = origin_main_sha()
 
-    # Outgoing check (design\\cross_machine_toolkit_sync.md): local HEAD ahead of origin/main means
+    # Outgoing check: local HEAD ahead of origin/main means
     # an earlier checkpoint's push was rejected or never ran - independent of the incoming
     # last_reviewed_sha comparison below, and checked even before a baseline exists.
     head = _git(['rev-parse', 'HEAD']).stdout.strip()

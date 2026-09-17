@@ -1,8 +1,8 @@
 <!--
 Shared protocol piece: filing.md (MANDATORY for every consumer — Track 1, on-demand).
 Home: ~\Documents\Claude\tower_crane\toolkit\templates\filing.md
-As of 2026-07-30 (design\directive_economy.md's pilot) this file is no longer @imported
-directly. A consumer instead carries a thin skill stub at .claude\skills\filing\SKILL.md
+As of 2026-07-30 this file is no longer @imported directly. A consumer instead carries a thin
+skill stub at .claude\skills\filing\SKILL.md
 (sourced from toolkit\templates\skills\filing\SKILL.md) whose body says to read this file in
 full when the model recognizes a filing-shaped moment. Float-on-HEAD still holds — this file is
 the one canonical source the stub always re-reads live. Keep this file project-agnostic — it
@@ -26,15 +26,15 @@ each one can actually write, not because two different people are involved. Read
 with that in mind: "file a request, don't fix it here" is about *where* an edit happens, not a
 handoff to some other party awaiting instructions; a ticket already closed, or a fix already
 present, that this session didn't personally see land almost certainly means the operator did that
-directly in another session. Full rationale: `design\single_operator_identity.md`.
+directly in another session.
 
 This project uses shared Claude Code tools that live in a local **tower_crane** hub — the same
 hub this file's own `@import` line (in this project's `CLAUDE.md`) points at. That hub is two
 nested git repos in one folder: an outer, private repo, and an inner `toolkit\` repo that
 actually holds the shared tools/templates (including this file). This file's own `@import` path
 is home-relative and resolves inside `toolkit\`, wherever the hub actually sits on this machine;
-there is no fixed conventional location or folder name to assume (this repo's own self-locating
-install design — see `design\portability.md` if curious). Below, **"the hub root"** means the
+there is no fixed conventional location or folder name to assume — this repo is self-locating by
+design. Below, **"the hub root"** means the
 outer folder — one level up from `toolkit\`, and where `change_requests\` actually lives — and
 **"`toolkit\`"** means the inner folder your `@import` resolves into. Those files are owned by
 the tower_crane hub, not by this project.
@@ -82,8 +82,8 @@ more than one plausible fix, not a single narrow bug/improvement — a ticket's 
 most of what you'd want to say. If the operator asks for a full write-up instead (background,
 incident data, every option discussed, open questions named rather than resolved), write that as an
 ordinary file in this project rather than forcing it into the template below; the operator carries
-it into a hub session directly. See `design\single_operator_identity.md`'s "report-drop pattern" if
-you want the full reasoning. Use the ticket template below for the ordinary case.
+it into a hub session directly (the "report-drop pattern"). Use the ticket template below for the
+ordinary case.
 
 ### How to file
 
@@ -148,8 +148,8 @@ you want the full reasoning. Use the ticket template below for the ordinary case
    `reference`/`tool` entry, or an `insight` that's proven itself broadly enough it's now adopted
    the same way everywhere) can graduate into an actual shared default — but only through this same
    `Type: proposal` shape, never by editing `toolkit\` directly (`shared_resources\` writes stay
-   settings-space; only the shared repo's own session decides what becomes a default — see
-   `design\resource_sharing_model.md`'s "Settings vs. defaults"). If the proven setting still
+   settings-space; only the shared repo's own session decides what becomes a default). If the
+   proven setting still
    carries real project/client detail rather than having genuinely become generic, this isn't the
    right path at all — that's a `toolkit_private\` build instead (`AGENTS.md`'s "new private tool"),
    skipping the ticket entirely, same as any other private tool. File it exactly as above, with one
@@ -198,9 +198,8 @@ test on your side:
 - If it still fails: append `YYYY-MM-DD — <this project> re-verified, still fails: <what>`. The
   ticket stays OPEN, for a hub session to pick up again.
 - If the operator directly instructs you to close the ticket without a live verify (an "operator
-  override" — see the hub's `design\single_operator_identity.md` if you want the full reasoning:
-  the same person operates this project and the hub, so this instruction carries the same authority
-  it would in a hub session), you may flip `Status: DONE` yourself. Log it as
+  override" — the same person operates this project and the hub, so this instruction carries the
+  same authority it would in a hub session), you may flip `Status: DONE` yourself. Log it as
   `YYYY-MM-DD — operator override: Status → DONE (no live verify) — <one-line reason>` instead of
   the verify-PASS line above. This is the one case where you do flip `Status` yourself — the default
   above is about your own unprompted judgment when you lack cross-project context, not about

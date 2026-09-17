@@ -1,5 +1,5 @@
 <!--
-Canonical Track-1 skill stub source: hub_commands (toolkit-governed — design\optimize_ux.md).
+Canonical Track-1 skill stub source: hub_commands (toolkit-governed).
 Home: ~\Documents\Claude\tower_crane\toolkit\templates\skills\hub_commands\SKILL.md
 
 Unlike every other Track-1 skill (filing/checkpoint/archive/update/commands), this one is NOT

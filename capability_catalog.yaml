@@ -3,16 +3,15 @@
 # Public, toolkit-governed data file. Read by the `capability_relationships` skill
 # (templates\capability_relationships.md) and by `commands`/`hub_commands`
 # (templates\commands.md / templates\hub_commands.md, for their theme-derived tracks and
-# path-rendered beginner tier). Source of truth for this data is
-# design\capability_relationships.md (outer repo, private design reasoning) — this file is the
-# built, public artifact that design doc's "Catalog file format" section specifies. Update this
-# file, not a hand-authored duplicate, whenever a capability's relationships change.
+# path-rendered beginner tier). This file is the built, public artifact of this hub's own capability
+# design reasoning. Update this file, not a hand-authored duplicate, whenever a capability's
+# relationships change.
 #
 # Three sections:
 #   nodes — every capability: id, trigger phrase, context (hub | consumer | both), a one-line
 #           description, any theme tags (broad cross-cluster purpose links — see themes below), and
-#           an optional partial_reach note (design\capability_relationships.md's "Partial reach"
-#           section) for the smaller set of nodes where `context` alone undersells where meaningful
+#           an optional partial_reach note for the smaller set of nodes where `context` alone
+#           undersells where meaningful
 #           work toward the capability can actually start — e.g. a node declared context: hub whose
 #           own procedure genuinely permits an early phase from a consumer session, with only a later
 #           phase requiring the hub. Not populated on most nodes; add only where the underlying
@@ -367,8 +366,7 @@ edges:
 
 path:
   # 19 steps (some steps carry two ids run consecutively — new_tool/modify_tool at step 12,
-  # curate_shared_resources/broadcast_guidance at step 15 — see
-  # design\capability_relationships.md's "The Path" section for the full reordering rationale).
+  # curate_shared_resources/broadcast_guidance at step 15).
   - setup_machine     # 1
   - checkpoint         # 2
   - resume             # 3 (full mode first; quick-resume mode follows naturally right after)

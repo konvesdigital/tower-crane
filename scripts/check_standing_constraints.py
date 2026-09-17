@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-check_standing_constraints.py - the mechanical half of Fix 3 Checkpoint 1's authoring assistant
-(design\\update_trust_review.md's "propose upstream" Phase 2 build): a deterministic exact-match
-check for whether a proposed change touches AGENTS.md's "## Standing Constraints" section.
+check_standing_constraints.py - the mechanical half of the "propose upstream" authoring assistant's
+change-review gate: a deterministic exact-match check for whether a proposed change touches
+AGENTS.md's "## Standing Constraints" section.
 
 Why this needs to be a script rather than an agent judgment call: the whole point of the
 refuse-and-ask gate is to fire reliably on ANY edit to that section, including a subtle
@@ -18,8 +18,8 @@ update_toolkit.py's [PASS]/[BLOCKED]/=== BEGIN DIFF ===:
   [UNCHANGED]  Standing Constraints section is byte-identical to the base ref's version.
   [CHANGED]    it differs - printed alongside the literal before/after text.
 
-A second caller, `checkpoint`'s new soft disclosure guardrail (design\\update_trust_review.md's
-"Refinement 2026-07-27"), reuses this same exact-text detector before committing a `toolkit\\`
+A second caller, `checkpoint`'s soft disclosure guardrail, reuses this same exact-text detector
+before committing a `toolkit\\`
 change - but compared against the previous *pushed* state, not a merge-base with `main` (checkpoint
 commits straight to `main`, no PR branch). Pass `--head worktree` for this mode: `--base` is then
 read literally (no merge-base computation) and the "after" text comes from the file currently on

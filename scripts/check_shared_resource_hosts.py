@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-check_shared_resource_hosts.py - Part 1 of design\\shared_resources_bulk_host_registration.md: a
+check_shared_resource_hosts.py - a
 hub-session, catalog-wide scan of every shared_resources\\ entry's per-host registration status for
 THIS machine - the proactive counterpart to check_shared_resource_refs.py's existing [HOST-GAP]
 check, which only fires per already-adopted entry in an already-connected consumer project (so a
@@ -36,14 +36,14 @@ from check_shared_resource_refs import parse_hosts_block, read_this_host_id
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
 # shared_resources\ is private hub state, not shipped toolkit content - it lives at the outer
-# root (design\local_first_reframe.md's outer/inner split), one level above SHARED_ROOT (toolkit\).
+# root (the outer/inner repo split), one level above SHARED_ROOT (toolkit\).
 PROJECT_ROOT = SHARED_ROOT.parent
 CATALOG_PATH = PROJECT_ROOT / 'shared_resources' / 'CATALOG.md'
 
 
 def parse_catalog(catalog_text):
     """Parse shared_resources\\CATALOG.md's table (Name | Kind | File | Category | Tier |
-    Description | Added | Status - design\\shared_resources_relationship_graph.md's Category/Tier
+    Description | Added | Status - Category/Tier
     columns, inserted after File). Returns a list of dicts; skips the header and separator rows.
     Malformed rows (fewer than 8 cells) are silently skipped - out of scope for this scan, not a
     failure.

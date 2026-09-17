@@ -1,7 +1,6 @@
 # Golden fixture: MUST produce [PASS] (exit 0).
 # Exercises every locally-bound-name case the checker previously flagged as
-# undefined (see change_requests\2026-07-17_consistency-check_local-binding-
-# false-positives.md): function params (normal / *args / kw-only / **kwargs),
+# undefined: function params (normal / *args / kw-only / **kwargs),
 # lambda params, comprehension targets, and `except ... as`.
 
 

@@ -2,7 +2,7 @@
 # shared_resources_read_tracker.py
 # SHARED TOOL - lives in tower_crane\hooks\, referenced by any project that opts in.
 #
-# design\shared_resources_mechanical_trigger.md Part 3, "Session-state mechanism" - the companion
+# The companion
 # hook to shared_resources_trigger_match.py's edge-assist feature. Edge-assist needs to know which
 # shared_resources\ entries are already "in play" this session (a cross-turn fact) before it can
 # relax or waive another resource's own trigger bar - this hook is what actually tracks that.

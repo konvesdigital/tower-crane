@@ -41,8 +41,8 @@ The hub is two nested git repos in one folder: an outer, private repo (holds `pr
 `consumers\`, `change_requests\` — the user's own continuity data) and an inner `toolkit\` repo
 (holds `hooks\`, `scripts\`, `templates\`, `AGENTS.md`, `config.example.json` — this file included).
 
-Mechanized as `scripts\setup_machine_preflight.py` (`design\command_procedure_audit.md`'s C1-C6) —
-run it, don't reconstruct this sequence by hand or improvise around whatever error comes up first.
+Mechanized as `scripts\setup_machine_preflight.py` — run it, don't reconstruct this sequence by
+hand or improvise around whatever error comes up first.
 Step 2 below is what formally settles this machine's `python_launcher` — that hasn't happened yet
 here, so just try `python3` first and fall back to `python` (same order Step 2 uses) for every
 invocation of this script in Step 0; if neither responds at all, Step 2 will catch and resolve that
@@ -55,7 +55,7 @@ separate reconcile-with-remotes step afterward) and it structurally avoids stale
 per-machine state (`config.local.json`'s `host_id`, `.claude\settings.local.json`'s baked hook
 paths) riding along from the old machine — see README.md's "Second machine" section for the exact
 two-clone steps. A copy isn't fatal (this file still works from one), but it invites exactly the
-kind of stale-state bugs `design\second_machine_onboarding.md` documents a live session hitting.
+kind of stale-state bugs a real live session has hit before.
 
 **0a. Ask reconnect-vs-new first, before touching any file (C1).** Does the user already have an
 existing outer hub remote (a private GitHub repo from a previous machine, or one they just want to
@@ -74,8 +74,8 @@ go straight to asking. Whichever one resolves reports one of:
 - `[NESTED]` — already correctly structured (either cwd is the outer root with a `toolkit\`
   subfolder, or cwd is `toolkit\` itself with a populated outer folder one level up). The same output
   also reports each repo's `origin` status and any stale `TOWER_CRANE_UNINSTALLED.md`
-  (`design\hub_uninstall_end_state.md` — both only ever show up after a prior `"uninstall"` on this
-  exact clone). For an `[ORIGIN-MISSING]` line: ask the user for that repo's remote URL, then run
+  (both only ever show up after a prior `"uninstall"` on this exact clone). For an
+  `[ORIGIN-MISSING]` line: ask the user for that repo's remote URL, then run
   `--reattach-origin --git-remote-url <url>` from inside it. For an `[UNINSTALL-NOTE]` line: run
   `--clear-uninstall-note` from the outer root once any reattachment above is done. Otherwise,
   nothing further needed — skip straight to Step 1.
@@ -105,8 +105,8 @@ onward `--nest` has already moved it down (`toolkit\scripts\setup_machine_prefli
    ordinary checkpoint flow: `toolkit\scripts\checkpoint_git.py --message "Initial hub scaffold"
    --include-all`.
 4. **If the user wants a private GitHub repo backing a brand-new outer hub** (recommended, for
-   backup/continuity — see `design\local_first_reframe.md` if curious why this matters) and doesn't
-   have one yet: this is the one moment `gh` might be needed (C4 — check lazily, right here, never
+   backup/continuity) and doesn't have one yet: this is the one moment `gh` might be needed (C4 —
+   check lazily, right here, never
    earlier) — `gh --version`; if missing, tell the user plainly and point at `gh`'s install docs, or
    let them create the repo manually on GitHub's website instead. Then `gh repo create <name>
    --private`, and pass the resulting URL as `--git-remote-url` to `--new-outer` above (or `git
@@ -187,8 +187,8 @@ explicit go-ahead before writing it.
 
 ## Step 7a — Write this machine's Bash permission allowlist
 `python toolkit\scripts\setup_machine_preflight.py --write-bash-allowlist` — merges the fixed set
-of routine `resume`/`checkpoint`/`update` commands (`design\bash_permission_allowlist.md`) into
-this machine's own gitignored `.claude\settings.local.json`, so they never hit the ambient
+of routine `resume`/`checkpoint`/`update` commands into this machine's own gitignored
+`.claude\settings.local.json`, so they never hit the ambient
 auto-mode permission classifier. Safe to re-run any time; nothing to confirm with the user first
 (purely additive, no behavior change).
 
@@ -202,8 +202,7 @@ commands for this machine), then `scripts\check_tower_crane.py` to confirm a cle
 
 ## Step 8a — Register this host in shared_resources (if any exist)
 If `shared_resources\CATALOG.md` exists and has at least one non-`Archived`, non-`insight` row, run
-the `"register host"` procedure now (`agents_continuity.md`,
-`design\shared_resources_bulk_host_registration.md`) — a brand-new machine otherwise has zero
+the `"register host"` procedure now (`agents_continuity.md`) — a brand-new machine otherwise has zero
 visibility into which catalog entries it could register a local path for until something happens to
 adopt one and hit the lazy per-project `[HOST-GAP]` check. Skip silently if the catalog doesn't
 exist yet or every entry is already `Archived`/`insight`.

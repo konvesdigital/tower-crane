@@ -1,7 +1,7 @@
 <!--
 Home: templates\setup_automation.md  (part of the tower_crane pattern — floats on HEAD)
-This is the hub-operator-only runbook for turning on Piece 3 (design\sync_automation.md): the
-unattended ticket-processing agent. Read directly, never `@import`ed by any consumer project —
+This is the hub-operator-only runbook for turning on Piece 3, the unattended ticket-processing
+agent. Read directly, never `@import`ed by any consumer project —
 same category as templates\setup_machine.md.
 
 How it's used: open this hub in Claude Code and say "read templates\setup_automation.md and
@@ -21,13 +21,11 @@ this mechanism works and how it relates to other mechanisms.
 You (the agent running in THIS hub) are walking the user through enabling Piece 3 — an hourly,
 unattended pass that refreshes compliance guidance (`check_tower_crane.py --write-guidance`, zero
 AI cost) and applies at most one fix-worthy `change_requests\` ticket per tick, directly — no PR,
-no branch (local-only ticket processing, `design\local_first_reframe.md`; concrete repo targeting
-in `design\automation_repo_targeting.md`). The tool fix itself commits locally to `toolkit\`'s own
+no branch (local-only ticket processing). The tool fix itself commits locally to `toolkit\`'s own
 history, unpushed; the ticket's round-trip log line commits and pushes to the outer (private)
 repo. It never flips a ticket's `Status` directly, and it never pulls/merges `toolkit\`'s own
 `origin` (that stays the separate, always-user-initiated `update` action) — it only surfaces a
-one-line "update available" notice if one exists. Full design: `design\sync_automation.md`,
-`design\automation_repo_targeting.md`.
+one-line "update available" notice if one exists.
 
 This is entirely opt-in and off by default (`automation.enabled: false`). Nothing below runs on
 its own until both this setup finishes AND that flag is flipped to `true`.
@@ -46,7 +44,7 @@ values and get a go-ahead, same as `setup_machine.md` Step 7:
 - `enabled` — leave `false` until Step 2's scheduled task is actually wired up and tested; flip to
   `true` only at the very end.
 - `mode` — `"apply_direct"` is the only value that exists; nothing to ask.
-- `cadence_minutes` — `60` (hourly) is the locked default (design\sync_automation.md). Only change
+- `cadence_minutes` — `60` (hourly) is the locked default. Only change
   this if the user explicitly wants a different cadence AND has re-pointed the scheduled task in
   Step 2 to match.
 - `max_tickets_per_tick` — `1` is the default; ask if the user expects enough ticket volume to want
@@ -59,9 +57,9 @@ values and get a go-ahead, same as `setup_machine.md` Step 7:
 ## Step 2 — Schedule the hourly tick
 
 `toolkit\scripts\run_automation.py` is the script the scheduler invokes — note the `toolkit\`
-prefix; the outer hub root and the inner toolkit repo are two different folders post-split
-(`design\local_first_reframe.md`'s outer/inner split), and this script physically lives in the
-inner one. It no-ops harmlessly if `automation.enabled` is still `false`, so it's safe to wire up
+prefix; the outer hub root and the inner toolkit repo are two different folders post-split, and
+this script physically lives in the inner one. It no-ops harmlessly if `automation.enabled` is
+still `false`, so it's safe to wire up
 the schedule before Step 3.
 
 **Windows (Task Scheduler).** Confirm the hub's actual path and this machine's Python launcher
@@ -106,7 +104,5 @@ round-trip log line landed on the outer repo's `main` in the expected format.
 ## Step 5 — Finish
 
 Confirm to the user: automation is scheduled, `config.local.json` reflects it, and the first tick's
-behavior was verified. Point them at `design\sync_automation.md` /
-`design\automation_repo_targeting.md` for the full round-trip vocabulary and remind them the fix
-itself stays local to `toolkit\` (unpushed) until they separately run `"propose upstream"` if they
-want to share it.
+behavior was verified. Remind them the fix itself stays local to `toolkit\` (unpushed) until they
+separately run `"propose upstream"` if they want to share it.

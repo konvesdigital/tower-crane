@@ -1,6 +1,6 @@
 <!--
 Shared protocol piece: update.md (OPTIONAL / self-scaffolding for every consumer - Track 1,
-on-demand, no always-resident companion - design\consumer_update.md).
+on-demand, no always-resident companion).
 Home: ~\Documents\Claude\tower_crane\toolkit\templates\update.md
 Reached via a thin skill stub at .claude\skills\update\SKILL.md (sourced from
 toolkit\templates\skills\update\SKILL.md), same copy-and-substitute pattern as filing/checkpoint/
@@ -18,8 +18,7 @@ This project imports mandatory/default-on pieces from a local **tower_crane** hu
 registration time, but a hub feature that ships *after* that point (a new hook, a new toolkit
 Track-1 skill, a new mandatory/default-on protocol piece) never retroactively reaches an
 already-set-up project on its own. `update` is the on-demand, pull-only fix: run it whenever you
-want to check, never automatically, and never at `resume` (no staleness nagging by design - see
-`design\consumer_update.md`'s "Staleness nagging" decision).
+want to check, never automatically, and never at `resume` (no staleness nagging, by design).
 
 **Scope is functionality, not data.** `update` exists to bring this project to *functionality
 parity with a project scaffolded fresh today* - the same hooks, toolkit skills, and protocol
@@ -89,5 +88,4 @@ regenerating hook commands after a machine move, and the "who's opted in" check 
 behavior-changing shared-tool edit. File a short registration-update ticket the same way
 `templates\filing.md` describes (a lightweight ticket, not a bug report), naming what was added.
 **Not needed** for a flat `@import`-only protocol piece like `compliance` (a live reference,
-nothing copied to go stale) — see `design\consumer_update.md`'s "Does registry write-back actually
-matter?" for the full reasoning.
+nothing copied to go stale — registry write-back only matters for content that's actually copied).

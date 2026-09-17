@@ -25,8 +25,8 @@ The person operating this hub and the person operating every connected consumer 
 same individual across sessions — not two parties handing work to each other. Anything filed,
 overridden, or closed in another session (a ticket, a `shared_resources\` write) is that same
 operator acting somewhere this session has no visibility into, not a separate party to negotiate
-with or a violation to flag. Full rationale: `design\single_operator_identity.md`;
-`agents_change_requests.md`'s "What a ticket actually is" applies this to tickets specifically.
+with or a violation to flag. See `agents_change_requests.md`'s "What a ticket actually is" for how
+this applies to tickets specifically.
 
 ## Is this machine set up?
 `toolkit\config.local.json` exists → set up; read it for `host_id`, everything below applies.
@@ -62,8 +62,7 @@ Missing → not set up (or uninstalled): don't guess machine identity, don't run
   AI-directive file, a binary file, or an invisible/formatting Unicode character anywhere in the
   incoming diff); an `origin` remote-identity mismatch; or a post-merge Pass B (cross-consumer
   drift) failure, which additionally requires automatically rolling back the merge (fast-forward
-  makes this a clean revert) rather than leaving the broken state landed. Full rationale and
-  history: `design\security_stress_test.md`.
+  makes this a clean revert) rather than leaving the broken state landed.
 - An agent MUST NOT edit any file inside `hooks\`, `scripts\`, `templates\`, or `agents\` in
   response to a consumer project's request without that request first existing as a ticket in
   `change_requests\` (see `agents_change_requests.md`).
@@ -128,26 +127,27 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
 |---|---|---|
 | Root | `tower_crane\` | `tower_crane\toolkit\` |
 | Remote's field in `config.local.json` | `identity.git_remote` | `publish.public_repo_remote` |
-| Lives here | `CLAUDE.md`, `project_progress*.md`, `consumers\`, `change_requests\`, `design\`, `decisions_detail.md`, `shared_resources\`, `toolkit_private\` | `AGENTS.md`, `README.md`, `MENU.md`, `scripts\`, `hooks\`, `templates\`, `agents_*.md`, `config.local.json` (gitignored, per-machine, physically here) |
+| Lives here (scaffolded day 1) | `CLAUDE.md`, `project_progress*.md`, `consumers\`, `change_requests\`, `design\` | `AGENTS.md`, `README.md`, `MENU.md`, `scripts\`, `hooks\`, `templates\`, `agents_*.md`, `config.local.json` (gitignored, per-machine, physically here) |
+| Lives here (created later, once you use that mechanism) | `decisions_detail.md`, `shared_resources\`, `toolkit_private\` | — |
 
 **"resume"**
 1. Read `host_id` from `toolkit\config.local.json`. Never infer machine identity any other way
    (path, `hostname`, prior context).
 2. Outer project repo: `git pull`.
-3. If `toolkit\` exists: `python toolkit\scripts\resume_check.py` (`design\command_procedure_audit.md`
-   finding B1) — one call chaining the four notify-only checks below; never pulls/merges/pushes
+3. If `toolkit\` exists: `python toolkit\scripts\resume_check.py` — one call chaining the four
+   notify-only checks below; never pulls/merges/pushes
    (`update`/`checkpoint` are separate) and never mutates. `toolkit\` missing: skip silently.
    Interpret its consolidated output per sub-check, exactly as each already reports on its own:
-   - `update_toolkit.py --notify` (dirty / incoming-vs-`last_reviewed_sha` / outgoing-vs-`origin/main`,
-     `design\cross_machine_toolkit_sync.md`) — dirty → "toolkit\ has uncommitted changes — run
-     `checkpoint`"; incoming → "toolkit\ has N commit(s) available — run `update`"; outgoing →
+   - `update_toolkit.py --notify` (dirty / incoming-vs-`last_reviewed_sha` / outgoing-vs-`origin/main`)
+     — dirty → "toolkit\ has uncommitted changes — run `checkpoint`"; incoming → "toolkit\ has N
+     commit(s) available — run `update`"; outgoing →
      "toolkit\ has N local commit(s) not yet pushed — run `checkpoint`"; none → say nothing.
    - `check_hook_activation.py` (rung-2 activation) — note any `[UNWIRED]`/`[BROKEN]` line; say
      nothing if only `[WIRED]`/`[N/A]`.
-   - `check_multi_machine.py` (`design\multi_machine_hub.md` "Problem 2") — any `[NUDGE]` line names
+   - `check_multi_machine.py` — any `[NUDGE]` line names
      a `scope: multi_machine` consumer with no `hosts.<this host>` entry yet; mention it and offer
      "connect project". Silent → say nothing.
-   - `check_stale_paths.py` (`design\grt_connectivity_audit.md` item (iv)) — any `[STALE-PATH]` line
+   - `check_stale_paths.py` — any `[STALE-PATH]` line
      names a hand-written absolute path that doesn't resolve on this host; mention it, but don't
      assume it needs fixing — may be intentionally single-host-only. Silent → say nothing.
    - `check_shared_resource_catalog.py` (`shared_resources\CATALOG.md`/`resource_relationships.yaml`
@@ -160,7 +160,7 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
    Up, Decisions table, and most recent Work Log entry in one call; read its output rather than
    grepping for headings and re-deriving section boundaries by hand.
 5. Scan `change_requests\` per `agents_change_requests.md`'s "Scanning at session start" section —
-   this is what surfaces a Piece 3 automation PR (`design\sync_automation.md`).
+   this is what surfaces an unattended-automation PR, if that's enabled on this hub.
 6. State status and next step in 1-3 lines, leading with the machine identity from step 1, folding
    in anything steps 3/5 surfaced. Do not replay full history.
 

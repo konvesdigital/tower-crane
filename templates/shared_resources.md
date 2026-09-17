@@ -1,7 +1,6 @@
 <!--
-Canonical Track-1 skill stub source: shared_resources (toolkit-governed — design\directive_economy.md,
-MANDATORY for every consumer since 2026-08-01 — design\resource_sharing_model.md's "Mechanism
-delivery: mandatory, not optional").
+Canonical Track-1 skill stub source: shared_resources (toolkit-governed).
+MANDATORY for every consumer since 2026-08-01 — mechanism delivery is mandatory, not optional.
 Home: ~\Documents\Claude\tower_crane\toolkit\templates\shared_resources.md
 Reached via a thin skill stub at .claude\skills\shared_resources\SKILL.md (sourced from
 toolkit\templates\skills\shared_resources\SKILL.md), same copy-and-substitute pattern as
@@ -24,7 +23,7 @@ see `templates\filing.md` if the hub-root/`toolkit\` split is unfamiliar). Unlik
 at the hub root, this one folder is not off-limits to write from inside a project session — see
 "Saving" below. It holds three kinds of entry, indexed in one catalog,
 `shared_resources\CATALOG.md` (`Name | Kind | File | Category | Tier | Description | Added |
-Status`). `Category`/`Tier` are optional metadata (`design\shared_resources_relationship_graph.md`)
+Status`). `Category`/`Tier` are optional metadata
 — a broad domain tag plus a Category-scoped retrieval-circumstance pointer — and a companion file,
 `shared_resources\resource_relationships.yaml`, holds typed edges between entries plus each
 Category's situational-tier circumstance definitions. See "Saving" and "Retrieval" below for how
@@ -32,7 +31,7 @@ these get written and read; an entry with no Category is unaffected by any of th
 optional sidecar, `shared_resources\trigger_index.yaml`, holds hand-authored concept-slot groups per
 entry (plus a slot-set per Category, applied to every entry in it) — a deterministic recognition
 layer under the Category/Tier skill mechanism, consulted by a `UserPromptSubmit` hook rather than by
-an agent's own judgment (`design\shared_resources_mechanical_trigger.md`); see Saving step 2a below
+an agent's own judgment; see Saving step 2a below
 for how entries get triggers, and `MENU.md`'s `shared_resources_trigger_match`/
 `shared_resources_read_tracker` rows for the opt-ins. The same file's `procedures:` block can also
 mechanically surface the "Retrieval Audit" flow itself (below), without needing the exact
@@ -123,7 +122,7 @@ organizational scheme applied on top of it.
    touches it.) Answer stored as `identity_eligible` — see step 6. If the message that triggered
    this save itself carried a `shared_resources
    mechanical trigger` hit (the `additionalContext` block `shared_resources_trigger_match.py`
-   injects, when opted in — `design\shared_resources_mechanical_trigger.md`), treat the entry it
+   injects, when opted in), treat the entry it
    named as a live candidate for "this might not be new" — folding into that entry or tying an edge
    to it in step 3 — before treating this as a fresh save. A matcher hit firing on the very message
    that starts a save is exactly the situation it's most useful for: the content is topically close
@@ -146,7 +145,7 @@ organizational scheme applied on top of it.
        match names a new tier from the circumstance just given. Tier names/definitions stay
        revisable going forward — expect renaming, broadening, or splitting as more entries test a
        tier's boundary, never a one-time-locked taxonomy.
-2a. **Draft one group of concept slots** (`design\shared_resources_mechanical_trigger.md` Parts 3–4).
+2a. **Draft one group of concept slots.**
 
     **Evidence source, checked in this order** (Part 4) — real evidence of how the operator actually
     talks beats a guess at the entry's own vocabulary:
@@ -207,8 +206,8 @@ organizational scheme applied on top of it.
       framing `insight`'s retrieval hook already uses (below): describing the situation that needs
       this entry, not the entry's own solution/vocabulary. This is the angle most likely to be
       missed by just restating the content, and it's exactly the shape of phrasing that motivated
-      this mechanism in the first place (`design\shared_resources_mechanical_trigger.md`'s Part 1 —
-      the real incident's own phrasing named neither the entry nor its vocabulary).
+      this mechanism in the first place — a real incident's own phrasing named neither the entry
+      nor its vocabulary.
 
     A **second group** only gets drafted when the circumstance being described genuinely doesn't
     reduce to alternate wording of the first group's concepts — a resource reachable via two
@@ -238,8 +237,7 @@ organizational scheme applied on top of it.
     through the existing skill-gate/search/browse paths, not this mechanical one.
 3. **Show the active node's existing edge-neighborhood, don't ask an open question.** If a
    process/entry already in play this session has existing edges in `resource_relationships.yaml`,
-   show them compactly (the same `Entry | Edges` shape `design\shared_resources_relationship_graph.md`'s
-   worked SEO table uses) and ask whether to tie the new entry to it the same way — answerable
+   show them compactly (an `Entry | Edges` table) and ask whether to tie the new entry to it the same way — answerable
    yes/no/adjust, not a blank "what should this tie to?" Edge types: `process-material`
    (directional, "reach for this while doing that" — the dominant shape), `prerequisite`
    (directional, a real specific dependency, not a generic "A is foundational" claim),
@@ -247,8 +245,7 @@ organizational scheme applied on top of it.
    (undirected, no specific claim — the zero-effort default, always available, needs no
    justification). If step 2a's citation grep found this entry's filename literally cited inside an
    existing file (or vice versa), that pair gets a `process-material` edge with `strength: required`
-   (`design\shared_resources_mechanical_trigger.md` Part 3's edge-assist) — a deterministic outcome
-   from the grep hit, not a judgment call the way the rest of this step is; every other
+   — a deterministic outcome from the grep hit, not a judgment call the way the rest of this step is; every other
    `process-material` edge tied here is unset-strength (the default relax-to-one-slot behavior) —
    only mark `required` from an actual literal-citation hit, never from a strong-but-inferred
    relationship.
@@ -275,8 +272,7 @@ organizational scheme applied on top of it.
    doesn't exist yet), keyed by Category name — e.g. `identity_eligible: {SEO: true}`. **If step
    2a's draft was source (1)** — this session's
    own live conversation actually being why this entry exists — **append that real exchange's own
-   wording to the new entry's `evidence:` list, tagged `[save]`** (`design\
-   shared_resources_mechanical_trigger.md` Part 4's evidence bank; format documented in
+   wording to the new entry's `evidence:` list, tagged `[save]`** (format documented in
    `trigger_index.yaml`'s own header comment) — this is the single richest evidence-capture moment
    there is, since the entry wouldn't exist without it. For `insight`, see "Insights are different" below —
    its save flow is a negotiation, not a fixed write, but ends the same way. Either way, finish with
@@ -394,23 +390,22 @@ unresolved `## Broadcast` section:
 
 A Category-level fallback skill or Tier-scoped skill (built via Saving's step 7 above) never
 hardcodes which entries exist — it routes through this procedure, live, every time it fires. This
-is what a flat "read this whole file in full" instruction (the retired `seo_*_index.md` shape)
-couldn't guarantee: that instruction was easy for a session to satisfy from memory instead of
-actually doing (`2026-08-31_toolkit_private_seo-skill-index-not-read-in-full.md`). Naming the
-concrete next action — read *this specific file* — closes that gap structurally instead of
-restating the same prose instruction more emphatically:
+is what a flat "read this whole file in full" instruction (a single monolithic index file naming
+every entry) couldn't guarantee: that instruction was easy for a session to satisfy from memory
+instead of actually doing. Naming the concrete next action — read *this specific file* — closes
+that gap structurally instead of restating the same prose instruction more emphatically:
 
 1. **Identify the specific active anchor entry** for the current task — a nameable file, not an
-   abstract "the whole tier" — from the task's own shape (e.g. a monthly report in progress names
-   `monthly_movement_report_workflow.md` directly; a head-to-head competitor comparison names
-   `seo_evaluator_gem.md` directly). A Category-level fallback skill does this across the whole
-   Category's live graph; a Tier-scoped skill does it within just its own Tier.
+   abstract "the whole tier" — from the task's own shape (e.g. a recurring report in progress
+   names `weekly_ticket_triage_workflow.md` directly; a head-to-head competitor comparison names
+   `competitor_pricing_reference.md` directly). A Category-level fallback skill does this across
+   the whole Category's live graph; a Tier-scoped skill does it within just its own Tier.
 2. **Read that entry.** Not a paraphrase from memory of a previous read — `CATALOG.md` and
    `resource_relationships.yaml` float on HEAD and may have changed since.
 3. **Look up its graph neighbors in `resource_relationships.yaml`** and state them by title —
-   never preload their content just because an edge exists. E.g. completing a monthly report's
-   "why" analysis surfaces `trend_shape_vs_period_totals.md` and `gsc_position_diagnostic.md` by
-   name via their `process-material` edges into `monthly_movement_report_workflow.md`, without a
+   never preload their content just because an edge exists. E.g. completing a recurring report's
+   "why" analysis surfaces `trend_shape_vs_period_totals.md` and `backlog_age_diagnostic.md` by
+   name via their `process-material` edges into `weekly_ticket_triage_workflow.md`, without a
    separate full-file read to discover they exist.
 4. **Anything not directly linked but still in the same Category/Tier stays reachable via an
    ordinary browse** (see "Discovery" below) — the graph narrows what's surfaced by default, it
@@ -449,9 +444,9 @@ distinct match.
    single match is automatically wanted.
 3. **Apply** — adopt the selected entry:
    - **`reference`/`tool`** — turn it into a project-local Claude Code Skill rather than a
-     standing `@import` (`design\directive_economy.md`'s Track 1: autonomous on-demand
-     loading — the model notices when a live question matches and pulls the content in, instead
-     of it sitting resident in every session forever). Concretely:
+     standing `@import` (Track 1's autonomous on-demand loading — the model notices when a live
+     question matches and pulls the content in, instead of it sitting resident in every session
+     forever). Concretely:
      1. Read the entry's own file. Many entries are themselves a thin index over further
         material rather than the content itself (see the entry's own file for whether it points
         further, and if so, on demand rather than preloading all of it).
@@ -465,12 +460,12 @@ distinct match.
         adoption marker, same convention as an `insight`'s (see "Insights are different"), so
         browse's in-use indicator and forget can find it later — plus a sha256 of the entry
         file's own current content, so a later `resume` can notice if that content has changed
-        since the trigger above was drafted from it (`design\directive_economy.md`'s "Drift
-        mechanics", checked by `scripts\check_shared_resource_drift.py` — see "Checking adopted
+        since the trigger above was drafted from it (drift mechanics, checked by
+        `scripts\check_shared_resource_drift.py` — see "Checking adopted
         references at resume" below) — plus the entry file's own path relative to the hub root
         (`hub-rel:`), so a later `relocate.py` run can recompute the stub's embedded path for
         whichever host it's running on rather than leaving it baked to the host that adopted it
-        (`design\directive_economy.md`'s "Adopted-stub path portability" — the stub body's own
+        (the stub body's own
         `Read ~/.../shared_resources/<file>` line stays a concrete, resolved path for this host
         right now; `hub-rel:` is only the portable anchor used to regenerate it later, never
         written into the body itself). **Place the marker as the first line of the stub's body,
@@ -486,8 +481,7 @@ distinct match.
         writing anything.** Same checkpoint this file already requires for Saving, above.
      5. On confirmation, write the skill stub to this project's own
         `.claude\skills\<name>\SKILL.md` only — never into `toolkit\`. This content is
-        private-only by construction (see "Two homes within Track 1" in
-        `design\directive_economy.md`): no canonical stub source for it ever lives in the public
+        private-only by construction: no canonical stub source for it ever lives in the public
         toolkit repo, not even the trigger wording or the target path.
      6. **Then run the "Adopted Shared Resources" check, below** — every `reference`/`tool` Apply
         ends here, not just the ones that turn out project-defining.
@@ -585,7 +579,8 @@ per-entry adoption step at all. Counting individual `CATALOG.md` rows would wron
 one-skill, whole-category fallback adoption as a sliver of coverage. Instead:
 
 - **Denominator**: every distinct `Tier` value with at least one active `CATALOG.md` entry in this
-  Category (for SEO: Primary, Evaluation, Planning, Process — 4).
+  Category (e.g. a Category with Primary, Evaluation, Planning, and Process Tiers has a
+  denominator of 4).
 - **Numerator**: how many of those Tiers this project has an adopted skill actually covering.
   Read this project's own `.claude\skills\*\SKILL.md` stubs tagged with this Category (`category:`
   frontmatter) to see which Tier(s) each one's own scope names — a Category's first-ever skill is
@@ -623,7 +618,7 @@ one-skill, whole-category fallback adoption as a sliver of coverage. Instead:
   If more than one Category has independently reached 100%, list them comma-separated after the
   label (`{{CATEGORY_1}}, {{CATEGORY_2}}, reached via the skills above.`) rather than writing a
   separate paragraph per Category — one shared closing sentence covers all of them (this mechanism
-  favors speed over precision; see `design\shared_resources_mechanical_trigger.md`). If this
+  favors speed over precision). If this
   Category is newly reaching 100% and the Project-defining paragraph doesn't exist yet, add it;
   the roster line itself never needed to change to get here, so there is nothing to consolidate.
 - **A large majority but not all** (rule of thumb: roughly four-fifths or more, or "all but one" of
@@ -666,10 +661,10 @@ never change.
 
 Triggered by something like *"shared resources — the position diagnostic trigger keeps firing on
 unrelated stuff"* or *"shared resources — add a trigger for X, it should have caught this."* A
-resource's groups/slots in `trigger_index.yaml` are a calibration, not a locked decision
-(`design\shared_resources_mechanical_trigger.md`'s own framing: a real reliability trade, not a
-perfect guarantee) — this is the narrow write that lets them drift toward better precision/recall in
-either direction, same self-approving spirit as Saving.
+resource's groups/slots in `trigger_index.yaml` are a calibration, not a locked decision — this
+mechanism trades some precision/recall for speed rather than promising a perfect guarantee, and
+this is the narrow write that lets them drift toward better precision/recall in either direction,
+same self-approving spirit as Saving.
 
 **Three levers, not one — term, slot, group** (Part 3's "Calibration levers"), each answering a
 different plain-language question:
@@ -714,9 +709,8 @@ machinery, both ending in a concrete drafted fix rather than an open question:
   say so, and immediately draft the specific term/slot addition using *this turn's own
   critical-feedback wording* as the drafting evidence — present it for one-step approval, never an
   open "what should the trigger be" question. On approval, also append that same wording to the
-  entry's `evidence:` list tagged `[miss]` (`design\shared_resources_mechanical_trigger.md` Part
-  4) — this preserves the real quote for future recalibration, not just spending it on this one
-  edit. (The other case below — a fired-but-unneeded candidate — is evidence a term is too loose,
+  entry's `evidence:` list tagged `[miss]` — this preserves the real quote for future recalibration,
+  not just spending it on this one edit. (The other case below — a fired-but-unneeded candidate — is evidence a term is too loose,
   never evidence of real phrasing, so it never gets logged to `evidence:`.)
 - **A fired-but-unneeded candidate, mentioned later.** Occasional, not forced on every hit: "by the
   way, `X` was surfaced earlier but wasn't needed here, because of `[reason]` — want to narrow its
@@ -728,8 +722,7 @@ machinery, both ending in a concrete drafted fix rather than an open question:
 Triggered by something like *"shared resources — backfill triggers"* (a whole-catalog pass) or
 *"shared resources — add triggers for `<entry>`"* (one entry). Every entry that predates this
 mechanism, or was saved without trigger phrases, has no `trigger_index.yaml` entry yet — this closes
-that gap without a separate registration step
-(`design\shared_resources_mechanical_trigger.md`'s "Backfill"):
+that gap without a separate registration step:
 
 1. List every **active** `CATALOG.md` entry with no `trigger_index.yaml` entry yet. An archived
    entry is still reachable via ordinary browse either way — skip it unless asked for by name.
@@ -765,8 +758,7 @@ like *"shared resources — backfill Adopted Shared Resources"* (every consumer)
    `consumer_CLAUDE.md.tmpl`, positioned per "Fixed location" above — before drafting any listing
    content. Confirm before writing, same as everything else here.
 1. For the project(s) in scope, read its effective adopted set (`private_opted_in:` plus any
-   `private_categories:` subscription's current members, per `design\
-   shared_resources_relationship_graph.md`'s "Category subscription") and group by Category.
+   `private_categories:` subscription's current members) and group by Category.
 2. For each Category with any adoption at all, run the same two gates and the same Tier-coverage
    computation as Apply's own check, above — reading each adopted `.claude\skills\*\SKILL.md`
    stub's own scope to determine which Tier(s) it actually covers, never assuming skill-count
@@ -787,12 +779,11 @@ miss caught via user correction; a fired-but-unneeded candidate) — all three e
 concrete, one-step-approvable fix, just with a different entry point. Enter this whenever: the
 literal `"shared resources"` phrase is used to ask it directly ("did we use the right resources,"
 "what would have caught this"); a `trigger_index.yaml` `procedures:` hit surfaces it as a candidate
-(`design\shared_resources_mechanical_trigger.md` Part 5 — a deterministic, narrower entry point that
-doesn't require the exact phrase, scoped only to this flow, never to the rest of this file); or the
-user otherwise asks what was retrieved and why.
+(a deterministic, narrower entry point that doesn't require the exact phrase, scoped only to this
+flow, never to the rest of this file); or the user otherwise asks what was retrieved and why.
 
-**Why this exists as its own named flow, not left to ad hoc reconstruction:** a 2026-09-06 Cast and
-Hue session needed three separate manual asks in sequence to get from "what did you use and why" to
+**Why this exists as its own named flow, not left to ad hoc reconstruction:** a real consumer
+session once needed three separate manual asks in sequence to get from "what did you use and why" to
 a drafted trigger fix — and even then, the session incorrectly treated the fix as blocked pending a
 ticket, when trigger adjustment has always been the same self-approving, no-ticket write as Saving.
 This flow exists to do all of that in one pass and to state the self-serve fact plainly, at the exact
@@ -978,6 +969,5 @@ already has.
 ### Checking adopted references at resume
 
 This now lives in `templates\shared_resources_resume_check.md` — the Track-2 companion piece every
-consumer always imports alongside this skill (`design\directive_economy.md`'s "shared_resources.md's
-own mechanism moves to Track 1"), since a broken reference must fail loudly at the next `resume`, not
+consumer always imports alongside this skill, since a broken reference must fail loudly at the next `resume`, not
 whenever a session happens to re-trigger this mechanism. Nothing to do here — it runs on its own.

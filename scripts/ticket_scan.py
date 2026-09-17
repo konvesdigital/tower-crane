@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
 """
 ticket_scan.py - pure-Python, zero-AI mechanical scan of change_requests\\*.md, the token-free
-gate `scripts\\run_automation.py` (Piece 3, design\\sync_automation.md) checks before ever paying
+gate `scripts\\run_automation.py` (Piece 3) checks before ever paying
 for a headless Claude Code invocation.
 
 Two responsibilities, both importable (no `claude` subprocess calls live here):
 
   scan() / parse_ticket() - categorize every OPEN ticket using the exact rule CLAUDE.md's
     "Scanning at session start" already documents for a human session. No PR-outcome states exist
-    here (design\\automation_repo_targeting.md, design\\local_first_reframe.md's "Local ticket
-    processing" - local ticket fixes commit directly, no PR is ever opened for a ticket) - just
+    here (local ticket fixes commit directly, no PR is ever opened for a ticket) - just
     VERIFIED_PASS, on top of the ordinary human-session categories.
 
   filter_by_project() - narrows a scan() result to tickets that plausibly mention a given consumer
     project (case-insensitive substring over each ticket's raw text), reached via `--project` on
-    the CLI. Added for design\\command_procedure_audit.md's A4 finding: a connected project's own
+    the CLI. A connected project's own
     `resume`-time ticket scan (templates\\filing_resume_check.md) needs this to reuse the same
     categorization the hub's own scan already gets, instead of re-deriving it by hand from every
     OPEN ticket's round-trip log - see that function's own docstring for the residual manual check
@@ -27,8 +26,8 @@ Two responsibilities, both importable (no `claude` subprocess calls live here):
     bookkeeping itself goes straight to the outer (private) repo's main (Piece 1's already-locked
     precedent: a filed ticket / its own metadata is inert until acted on, so it stays ungated). Runs
     against PROJECT_ROOT, not SHARED_ROOT - change_requests\\ lives in the outer repo, a sibling of
-    the inner toolkit\\ repo this module's SHARED_ROOT points at (design\\local_first_reframe.md's
-    outer/inner split). The CLI's `--apply` also prints the remaining OPEN tickets' categorization
+    the inner toolkit\\ repo this module's SHARED_ROOT points at (the outer/inner repo split).
+    The CLI's `--apply` also prints the remaining OPEN tickets' categorization
     right after applying, so an interactive (human) session's resume-time scan is one call instead
     of a dry-run-then-hand-apply round trip - `run_automation.py` never uses the CLI at all, only
     the importable functions, so this is purely an interactive-session convenience.
@@ -57,7 +56,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
 # change_requests\ and .claude\ are private/per-machine hub state, not shipped toolkit content -
-# both live at the outer root (design\local_first_reframe.md's outer/inner split), one level
+# both live at the outer root (the outer/inner repo split), one level
 # above SHARED_ROOT (toolkit\).
 PROJECT_ROOT = SHARED_ROOT.parent
 CHANGE_REQUESTS_DIR = PROJECT_ROOT / 'change_requests'
@@ -71,7 +70,7 @@ class Category:
     STILL_FAILS = 'still_fails'
     OPERATOR_OVERRIDE = 'operator_override'      # operator directly instructed a DONE flip - no
                                                   # verify to wait on, no other side's sign-off
-                                                  # needed (design\single_operator_identity.md)
+                                                  # needed
     UNKNOWN_STATE = 'unknown_state'              # non-empty log, none of the above - log, don't guess
     REGISTRATION = 'registration'                # Type: registration - excluded from all automation
 
@@ -236,7 +235,7 @@ def needs_fix_candidates(tickets, state, max_attempts=3):
 
 # --- mechanical actions: no judgment required, safe to perform without an AI invocation -----------
 # change_requests\ lives in the outer (private) repo, PROJECT_ROOT - a sibling of the inner toolkit\
-# repo SHARED_ROOT points at (design\local_first_reframe.md's outer/inner split). Ticket bookkeeping
+# repo SHARED_ROOT points at (the outer/inner repo split). Ticket bookkeeping
 # git operations must target PROJECT_ROOT, never SHARED_ROOT.
 def _run_git(args, cwd=PROJECT_ROOT):
     return subprocess.run(['git', '-C', str(cwd)] + args, capture_output=True, text=True, check=True)
@@ -244,8 +243,8 @@ def _run_git(args, cwd=PROJECT_ROOT):
 
 def apply_mechanical_actions(tickets, dry_run=False):
     """Handle VERIFIED_PASS and OPERATOR_OVERRIDE (flip DONE) - the only categories needing
-    mechanical action now that ticket fixes never open a PR (design\\automation_repo_targeting.md).
-    OPERATOR_OVERRIDE (design\\single_operator_identity.md) needs no consumer verify and no other
+    mechanical action now that ticket fixes never open a PR.
+    OPERATOR_OVERRIDE needs no consumer verify and no other
     side's sign-off - it's here mainly as a safety net for the case where the overriding session
     logged the phrase but, for whatever reason, didn't flip Status itself; the common case is it's
     already DONE by the time this scan sees it, so scan() (OPEN-only) won't even surface it.
@@ -303,8 +302,8 @@ def filter_by_project(tickets, names):
     being awaited right now - a ticket can legitimately affect more than one consumer. For an
     AWAITING_CONSUMER hit specifically, the caller must still confirm the ticket's own last
     round-trip line actually names this project before treating it as this project's turn
-    (design\\command_procedure_audit.md's A4 finding names this residual manual step explicitly -
-    it's not eliminated, only narrowed to the tickets this filter actually surfaces)."""
+    (this residual manual step is not eliminated, only narrowed to the tickets this filter
+    actually surfaces)."""
     needles = [n.lower() for n in names]
     return [t for t in tickets if any(n in t.text.lower() for n in needles)]
 

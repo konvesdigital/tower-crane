@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # _hub_dispatch.py - fixed, host-invariant wrapper a consumer's own .claude\settings.json hook
-# command invokes (design\consumer_reference_indirection.md, toolkit\design\ in the hub). Copied
+# command invokes. Copied
 # verbatim into every consumer that connects from this build forward, at .claude\hooks\
 # _hub_dispatch.py - its content never changes, ever, regardless of host, so it is never
 # regenerated once scaffolded (unlike everything else this design touches). Canonical source lives

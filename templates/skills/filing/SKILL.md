@@ -1,10 +1,10 @@
 <!--
-Canonical Track-1 skill stub source: filing (toolkit-governed — design\directive_economy.md).
+Canonical Track-1 skill stub source: filing (toolkit-governed).
 Home: ~\Documents\Claude\tower_crane\toolkit\templates\skills\filing\SKILL.md
 Scaffolded into a consumer's own project-local .claude\skills\filing\SKILL.md — not @imported;
 a consumer re-copies this file (materialize_skill_stub() with {{IMPORT_BASE}} resolved to its own
-home-relative import path AND use_pointer set per its own connection style - design\
-consumer_reference_indirection.md, 2026-08) to pick up a changed trigger description here. The
+home-relative import path AND use_pointer set per its own connection style (reference-indirection
+migration status), 2026-08) to pick up a changed trigger description here. The
 {{READ_INSTRUCTION:filing.md}} placeholder below renders to ONE of two forms depending on
 use_pointer: the direct-substitution wording (not-yet-migrated consumers, the default) or the
 .claude\hub_pointer.md-indirected wording (new connections). Both are independently valid

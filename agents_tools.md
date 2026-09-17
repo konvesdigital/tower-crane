@@ -6,12 +6,19 @@ fires — it is not preloaded.
 
 ## Adding a new tool
 **Trigger: "new tool" — ask public or private first** (or jump straight in via `"new private
-tool"`). Public reaches every consumer via the shared `toolkit\` repo; private
-(`design\private_tools.md`) reaches every consumer the same automatic way but stays in this
-machine's own outer repo, never touching `toolkit\`'s public GitHub origin.
+tool"`). Public reaches every consumer via the shared `toolkit\` repo; private reaches every
+consumer the same automatic way but stays in this machine's own outer repo, never touching
+`toolkit\`'s public GitHub origin.
 
 **Language:** consumer-runtime scripts (hooks, subagents) are cross-platform Python by default;
 this repo's maintainer scripts are Python throughout too.
+
+**Comments:** input/output logic only — no why-this-exists, no history, no worked examples, no
+citation of the design doc or incident that motivated it. A script is only ever reached by way of a
+prose procedure that already carries that context ("run `X.py`"); it never needs to re-justify
+itself. Applies to every edit, not just new scripts — don't add narrative to a script you're
+touching for an unrelated reason, and strip it opportunistically when you're already in the file
+for something else.
 
 **Skill triggers, if this tool is a Track-1 skill:** a short, closed-form command the user would
 say verbatim ("checkpoint," "archive") gets an **exact-phrase** trigger — fuzzy matching on that

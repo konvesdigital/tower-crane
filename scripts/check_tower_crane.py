@@ -22,16 +22,15 @@ Two passes, plus an optional compliance-guidance writer:
       - IMPORT DRIFT tripwire: a consumer whose CLAUDE.md no longer imports a piece its
         registry lists (decision 8 - opt-out is detectable, not preventable);
       - mandatory-piece glance: filing + compliance + shared_resources not imported -> WARN (a
-        SKILL_PIECES entry like 'filing' is also satisfied by its Track-1 skill-stub form -
-        design\\directive_economy.md);
-      - Track-1 skill stub drift (toolkit-governed only, design\\directive_economy.md): for each
-        skill name any SKILL_PIECES entry scaffolds, plus every STANDALONE_SKILLS entry (design\\
-        consumer_update.md / design\\optimize_ux.md - a Track-1 skill with no @import companion,
-        e.g. `update`, `commands`), a consumer's project-local .claude/skills/<name>/SKILL.md must
+        SKILL_PIECES entry like 'filing' is also satisfied by its Track-1 skill-stub form);
+      - Track-1 skill stub drift (toolkit-governed only): for each
+        skill name any SKILL_PIECES entry scaffolds, plus every STANDALONE_SKILLS entry (a
+        Track-1 skill with no @import companion, e.g. `update`, `commands`), a consumer's
+        project-local .claude/skills/<name>/SKILL.md must
         still match the canonical templates/skills/<name>/SKILL.md (with {{IMPORT_BASE}} resolved and
         the leading maintainer-comment header stripped - config_lib.materialize_skill_stub).
 
-  Hub self-use skill drift (design\\optimize_ux.md, addendum to Pass B): the hub is not a
+  Hub self-use skill drift (addendum to Pass B): the hub is not a
     registered consumer of its own scaffolder, so `hub_commands` (installed only via
     self_hooks.py's "skills" opt-in key) isn't covered by the per-consumer loop above - checked
     separately, once, against this hub's own .claude/skills/ regardless of --consumer scoping.
@@ -42,10 +41,9 @@ Two passes, plus an optional compliance-guidance writer:
     exact fixes, date + SHA stamped) via guidance_lib.py. A now-compliant consumer's section is
     cleared (the file itself is removed once no section has content). NEVER edits a consumer's
     live files - only drops the guidance file the consumer's own agent scans. This is one of two
-    writers sharing that file: broadcast_guidance.py owns the sibling '## Broadcast' section -
-    see design\\broadcast_guidance.md.
+    writers sharing that file: broadcast_guidance.py owns the sibling '## Broadcast' section.
 
-  --diagnose (design\\connection_diagnostics.md) - fact-reporting only mode for a non-standard
+  --diagnose - fact-reporting only mode for a non-standard
     connect_project/disconnect_consumer.py state that doesn't fit either script's deterministic
     branches. Prints a flat present/absent fact list from two source categories (Tower-Crane-
     specific current-state files, and durable git-history signals that survive hand-deletion or
@@ -56,10 +54,9 @@ Two passes, plus an optional compliance-guidance writer:
 
 Exit code: 0 if no FAILs, 1 otherwise. WARNs never fail the build.
 
-OS-reach Tier 2 port of check_tower_crane.ps1 (design\\portability.md, "OS-reach Tier 2: full
-cross-platform design"). Logic is a direct translation - see that doc's Build order for the
-parity-check approach used to verify this against the original (no existing golden suite for
-the checker itself, so parity is validated by diffing old-vs-new output against the same
+Cross-platform port of an earlier check_tower_crane.ps1. Logic is a direct translation
+(no existing golden suite for the checker itself, so parity was validated by diffing
+old-vs-new output against the same
 registry). Generated files (COMPLIANCE_GUIDANCE.md) now use LF line endings universally (the
 locked line-endings decision, bundled into this port).
 """
@@ -87,7 +84,7 @@ from registry_lib import parse_registry, effective_scope, host_path, reconcile_s
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
 # consumers\ is private hub state, not shipped toolkit content - it lives at the outer root
-# (design\local_first_reframe.md's outer/inner split), one level above SHARED_ROOT (toolkit\).
+# (the outer/inner repo split), one level above SHARED_ROOT (toolkit\).
 PROJECT_ROOT = SHARED_ROOT.parent
 HOOKS_DIR = SHARED_ROOT / 'hooks'
 TEMPLATES_DIR = SHARED_ROOT / 'templates'
@@ -95,13 +92,13 @@ OPTINS_DIR = TEMPLATES_DIR / 'optins'
 SKILLS_DIR = TEMPLATES_DIR / 'skills'
 CONSUMERS_DIR = PROJECT_ROOT / 'consumers'
 TESTS_DIR = SHARED_ROOT / 'tests'
-# design\private_tools.md - the private, automatic analog to toolkit\ itself. Lives at the outer
+# The private, automatic analog to toolkit\ itself. Lives at the outer
 # root as a sibling of toolkit\, same level as consumers\; may not exist yet on a fresh clone.
 PRIVATE_ROOT = PROJECT_ROOT / 'toolkit_private'
 PRIVATE_OPTINS_DIR = PRIVATE_ROOT / 'templates' / 'optins'
 PRIVATE_SKILLS_DIR = PRIVATE_ROOT / 'templates' / 'skills'
 
-# Toolkit-governed Track-1 skill pieces (design\directive_economy.md): piece name -> the Track-2
+# Toolkit-governed Track-1 skill pieces: piece name -> the Track-2
 # "resume check" companion a consumer imports instead of a flat @import <name>.md, plus the list
 # of skill-stub folder names it scaffolds (usually one, but 'continuity' splits into two:
 # 'checkpoint' + 'archive', since 'resume' itself stays Track 2). Mirrors
@@ -112,8 +109,7 @@ SKILL_PIECES = {
     'shared_resources': {'companion': 'shared_resources_resume_check', 'skills': ['shared_resources']},
 }
 
-# Standalone Track-1 skills with no @import companion (design\consumer_update.md, design\
-# optimize_ux.md, design\capability_relationships.md): still toolkit-governed, so a consumer's
+# Standalone Track-1 skills with no @import companion: still toolkit-governed, so a consumer's
 # stub still gets the same drift check below. Mirrors scripts\new_consumer.py's
 # STANDALONE_SKILLS - keep in sync.
 STANDALONE_SKILLS = ['update', 'commands', 'capability_relationships']
@@ -164,7 +160,7 @@ def parse_expected(lines):
 
 # registry (consumers/<slug>.md) parsing lives in registry_lib.py (parse_registry, effective_scope,
 # host_path, reconcile_scope_floor) - imported above, shared with relocate.py/update_consumers.py/
-# broadcast_guidance.py so the schema (design\multi_machine_hub.md's scope:/hosts: map) has exactly
+# broadcast_guidance.py so the schema (the scope:/hosts: map) has exactly
 # one parser instead of N drifting copies.
 
 
@@ -334,7 +330,7 @@ def test_consumer(c, config, this_host):
         # over-match into the next line.
         md_imports = re.findall(r'@.*?templates/(\w+)\.md', md)
 
-        # design\consumer_reference_indirection.md: a new-connection consumer's CLAUDE.md carries
+        # A new-connection consumer's CLAUDE.md carries
         # only the single @.claude/hub_pointer.md line - the real per-piece imports live one hop
         # deeper, in that gitignored, per-host file. Resolve through it so every check below
         # (mandatory-piece glance, import-drift tripwire) keeps working transparently for either
@@ -415,7 +411,7 @@ def test_consumer(c, config, this_host):
                              f"Consumer has a '{name}' skill stub but tower_crane has no canonical source "
                              f"at templates/skills/{name}/SKILL.md.", None))
             continue
-        # design\consumer_reference_indirection.md: a stub matching EITHER the direct-substitution
+        # A stub matching EITHER the direct-substitution
         # rendering (not-yet-migrated consumer) OR the .claude/hub_pointer.md-indirected rendering
         # (new connection) is compliant - both are independently valid canonical shapes.
         expected_direct = materialize_skill_stub(canon_path, config['import_base'], use_pointer=False)
@@ -428,7 +424,7 @@ def test_consumer(c, config, this_host):
                              f"Re-copy {canon_path} into .claude/skills/{name}/SKILL.md, replacing "
                              f"{{{{IMPORT_BASE}}}} with '{config['import_base']}'."))
 
-    # --- _hub_dispatch.py drift (design\consumer_reference_indirection.md) -------------------
+    # --- _hub_dispatch.py drift -------------------------------------------------------------
     # Tracked, host-invariant content - byte-identical on every host, forever, so this is a plain
     # verbatim compare (no substitution), same shape as the skill-stub drift check above.
     dispatch_path = cpath / HUB_DISPATCH_RELPATH
@@ -443,7 +439,7 @@ def test_consumer(c, config, this_host):
                              f"{HUB_DISPATCH_RELPATH} has drifted from the canonical source.",
                              f"Re-copy {canon_dispatch_path} into {HUB_DISPATCH_RELPATH} verbatim."))
 
-    # --- private_opted_in: (design\private_tools.md, decision 4) ----------------------------
+    # --- private_opted_in: ---------------------------------------------------------------
     # Each entry is either a private hook (has a canonical snippet in PRIVATE_OPTINS_DIR) or a
     # private Track-1 skill (has a canonical stub in PRIVATE_SKILLS_DIR) - inferred by which
     # exists, since private tool names are unique within toolkit_private\. Unlike the public
@@ -561,7 +557,7 @@ def invoke_reference_scan(config, this_host, consumer_filter, write_guidance_fla
             report('FAIL', f"{f.name} : no parseable `yaml` registry block.")
             continue
 
-        # 2-host write-back floor (design\multi_machine_hub.md): applies to every consumer this
+        # 2-host write-back floor: applies to every consumer this
         # tool touches, regardless of whether it's reachable on THIS machine - a human opening the
         # file directly must always see state that matches reality.
         if reconcile_scope_floor(f, c):
@@ -590,7 +586,7 @@ def invoke_reference_scan(config, this_host, consumer_filter, write_guidance_fla
 
 
 def check_hub_self_use_skills(config):
-    """Hub self-use skill drift (design\\optimize_ux.md): the hub isn't a registered consumer of
+    """Hub self-use skill drift: the hub isn't a registered consumer of
     its own scaffolder, so a skill installed via self_hooks.py's "skills" opt-in key (e.g.
     hub_commands, capability_relationships) never passes through the per-consumer loop above.
     Scans every templates/optins/*.json for a "skills" list and, for each name that's actually
@@ -628,7 +624,7 @@ def check_hub_self_use_skills(config):
 
 
 # ==================================================================================================
-# --diagnose - fact-reporting only, no verdict (design\connection_diagnostics.md)
+# --diagnose - fact-reporting only, no verdict
 # ==================================================================================================
 # Tower-Crane-authored commit-message patterns, matched against a consumer's own git log (Category
 # B - durable, survives hand-deletion of the files those commits touched).
@@ -715,7 +711,7 @@ def diagnose_consumer_files(path):
         diagnose_fact('## Shared Workflow Protocol' in text, "'## Shared Workflow Protocol' heading", '    ')
         diagnose_fact('## Tower Crane (disconnected)' in text, "'## Tower Crane (disconnected)' marker", '    ')
         diagnose_fact(HUB_POINTER_IMPORT_LINE in text,
-                      f"'{HUB_POINTER_IMPORT_LINE}' indirection line (design\\consumer_reference_indirection.md)",
+                      f"'{HUB_POINTER_IMPORT_LINE}' indirection line",
                       '    ')
         live_imports = sorted(set(re.findall(r'(?m)^@\S+/(\w+)\.md\s*$', text)) & set(DIAGNOSE_IMPORT_NAMES))
         if live_imports:
@@ -813,7 +809,7 @@ def run_diagnose(path, slug):
     print(f"path: {path or '(not given)'}")
     print(f"slug: {slug or '(not given)'}")
 
-    # Priority principle (design\connection_diagnostics.md): durable git history survives hand-
+    # Priority principle: durable git history survives hand-
     # deletion/corruption of the current-state files Category A reads, so it's checked - and shown
     # - first, not after.
     print()
@@ -866,8 +862,8 @@ def main():
     parser.add_argument('--skip-golden', action='store_true', help="Skip pass A.")
     parser.add_argument('--skip-reference', action='store_true', help="Skip pass B (and guidance writing).")
     parser.add_argument('--diagnose', action='store_true',
-                         help="Fact-reporting mode for a non-standard connect/disconnect state "
-                              "(design\\connection_diagnostics.md) - present/absent facts only, "
+                         help="Fact-reporting mode for a non-standard connect/disconnect state - "
+                              "present/absent facts only, "
                               "no verdict or fix. Combine with --path and/or --slug. Runs "
                               "standalone; ignores every other flag above.")
     parser.add_argument('--path', default=None, help="--diagnose: consumer project path to inspect.")

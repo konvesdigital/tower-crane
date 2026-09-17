@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-consumer_resume_check.py - the consumer-side `resume`'s Shape-B fix
-(design\\command_procedure_audit.md's B1 audit re-run on consumer `resume`, scoped 2026-08-24):
-chains templates\\continuity_resume_check.md's `resume` step 3's two already-scripted, notify-only
+consumer_resume_check.py - the consumer-side `resume`'s Shape-B fix: chains
+templates\\continuity_resume_check.md's `resume` step 3's two already-scripted, notify-only
 hub-staleness checks into one call instead of two separately prose-sequenced Bash invocations
 every session - the consumer-side analogue of the hub's own resume_check.py (B1), deliberately
 smaller: a connected project's own `resume` only ever needs to ask "has the hub toolkit\\ I import

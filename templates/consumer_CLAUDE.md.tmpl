@@ -21,10 +21,10 @@ Substitution tokens the scaffolder replaces:
                                   true regardless of what (if anything) is adopted, so it's part of
                                   the scaffold, not conditionally written later (see that
                                   paragraph's own rationale, below).
-  {{PROTOCOL_IMPORTS}}          - the single @.claude/hub_pointer.md indirection line
-                                  (design\consumer_reference_indirection.md) - that gitignored,
-                                  per-host file carries the real @import lines for the selected
-                                  protocol pieces, regenerated fresh by "connect project"/relocate.py
+  {{PROTOCOL_IMPORTS}}          - the single @.claude/hub_pointer.md indirection line (the
+                                  reference-indirection pattern) - that gitignored, per-host file
+                                  carries the real @import lines for the selected protocol pieces,
+                                  regenerated fresh by "connect project"/relocate.py
 The scaffolder strips this comment block from the materialized copy.
 
 Deliberately NOT in this template: any top-of-file assertion like "this file is directives only."

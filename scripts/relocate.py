@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 relocate.py - regenerate every registered consumer's hook command(s) from config.local.json,
-the "config -> regenerate" action of the portability foundation (design\\portability.md).
+the "config -> regenerate" action of the portability foundation.
 
 Reads config.local.json, walks the consumer registry (consumers/*.md), and for each consumer
 that lives on THIS machine rewrites the hook command in its .claude/settings.json to the concrete
@@ -20,9 +20,7 @@ Cross-repo note: this writes into each consumer's OWN repo working tree (it does
 consumer's next session verifies the hook still fires and commits - the change-request round-trip
 (a behavior-changing edit to a live consumer). Run --dry-run first to preview.
 
-OS-reach Tier 2 port of relocate.ps1 (design\\portability.md, "OS-reach Tier 2: full
-cross-platform design"). Logic is a direct translation - see that doc's Build order for the
-parity-check approach used to verify this against the original.
+Cross-platform port of an earlier relocate.ps1. Logic is a direct translation.
 """
 
 import argparse
@@ -40,12 +38,12 @@ from registry_lib import parse_registry, host_path, reconcile_scope_floor
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
 # consumers\ is private hub state, not shipped toolkit content - it lives at the outer root
-# (design\local_first_reframe.md's outer/inner split), one level above SHARED_ROOT (toolkit\).
+# (the outer/inner repo split), one level above SHARED_ROOT (toolkit\).
 PROJECT_ROOT = SHARED_ROOT.parent
 TEMPLATES_DIR = SHARED_ROOT / 'templates'
 OPTINS_DIR = TEMPLATES_DIR / 'optins'
 CONSUMERS_DIR = PROJECT_ROOT / 'consumers'
-# design\private_tools.md - a moved/renamed hub needs its consumers' private hook commands
+# A moved/renamed hub needs its consumers' private hook commands
 # regenerated too, same as public ones.
 PRIVATE_OPTINS_DIR = PROJECT_ROOT / 'toolkit_private' / 'templates' / 'optins'
 
@@ -72,11 +70,11 @@ def read_registry_entry(path):
     return obj
 
 
-# fix_imports() now lives in config_lib.py (design\grt_connectivity_audit.md item (ii), moved
+# fix_imports() now lives in config_lib.py (moved
 # 2026-08-19 so commit_consumer_changes()'s own push-failure reconciliation can call it
 # in-process) - imported above alongside the other Tower-Crane-owned-file regenerators.
 
-# design\resource_sharing_model.md's "Saving now propagates itself" fix, one level down
+# The "Saving now propagates itself" fix, one level down
 # (project_progress.md's 2026-08-11 Work Log): this pass writes into a consumer's own repo with
 # no live session there to notice and checkpoint it, so it closes its own loop instead of leaving
 # uncommitted state for a human to remember later.
@@ -87,7 +85,7 @@ COMMIT_LABELS = {
     'committed-no-remote': '  [git] committed in this consumer\'s own repo (no origin remote to push to).',
     'commit-failed': None,   # commit_consumer_changes() already logged the warn line itself
     'push-failed': None,     # ditto
-    # design\grt_connectivity_audit.md item (ii): a real divergence was auto-resolved by
+    # A real divergence was auto-resolved by
     # resetting and regenerating this host's own Tower-Crane-owned values - never a text merge.
     # _reconcile_diverged_push() already logged the detail; this is just the summary line.
     'reconciled-pushed': '  [git] push conflict auto-reconciled (reset + regenerated), committed and pushed.',
@@ -142,7 +140,7 @@ def main():
         print()
         print(f"Consumer: {c['name']} ({f.stem})")
 
-        # 2-host write-back floor (design\multi_machine_hub.md) - applies regardless of whether
+        # 2-host write-back floor - applies regardless of whether
         # this consumer is reachable on this machine.
         if reconcile_scope_floor(f, c):
             print(f"  [fixed] scope -> multi_machine (2+ hosts: entries present).")
@@ -168,18 +166,18 @@ def main():
 
         imports_changed = fix_imports(this_path, c['imports'], config['import_base'], args.dry_run,
                                        log=print)
-        # design\consumer_reference_indirection.md: regenerate stubs to whichever form this
+        # Regenerate stubs to whichever form this
         # consumer already uses - a migrated consumer's CLAUDE.md carries the pointer indirection
         # line; an un-migrated one doesn't and stays on the direct-substitution form.
         claude_md_this = Path(this_path) / 'CLAUDE.md'
         use_pointer_here = claude_md_this.exists() and HUB_POINTER_IMPORT_LINE in claude_md_this.read_text(encoding='utf-8')
         skills_changed = fix_skill_stubs(this_path, TEMPLATES_DIR, config['import_base'], args.dry_run,
                                           log=print, use_pointer=use_pointer_here)
-        # design\directive_economy.md's "Adopted-stub path portability" - a private
+        # The "Adopted-stub path portability" fix - a private
         # shared_resources\-adopted stub has no canonical source, so it regenerates from its own
         # marker's hub-rel: anchor instead of a diff against templates\skills\.
         adopted_changed = fix_adopted_stub_paths(this_path, PROJECT_ROOT, args.dry_run, log=print)
-        # design\consumer_reference_indirection.md - both are no-ops for a not-yet-migrated
+        # Both are no-ops for a not-yet-migrated
         # consumer (fix_hub_pointer/fix_hub_dispatch_wrapper each check for their own file's prior
         # presence before touching anything, so an old-style consumer never gets these introduced).
         pointer_changed = fix_hub_pointer(this_path, config, c['imports'], args.dry_run, log=print)
@@ -210,9 +208,9 @@ def main():
             continue
 
         # Build tool -> new concrete command map from the canonical opt-ins (public + private -
-        # design\private_tools.md; a private command's path already contains 'hooks/<tool>.py'
+        # a private command's path already contains 'hooks/<tool>.py'
         # same as a public one, so the rewrite below needs no separate pattern per source). Shared
-        # with new_consumer.py's host-merge reuse (design\consumer_reconnect.md) - config_lib.py's
+        # with new_consumer.py's host-merge reuse - config_lib.py's
         # build_new_cmd_map/build_dispatch_cmd_map/apply_hook_command_fixes. Target form mirrors
         # use_pointer_here (same signal fix_skill_stubs already keys off, above) - a consumer
         # already migrated to the dispatch-wrapper form must regenerate TO that form, never forced

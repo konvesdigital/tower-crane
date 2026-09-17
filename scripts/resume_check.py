@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-resume_check.py - `resume`'s Shape-B fix (design\\command_procedure_audit.md, finding B1): chains
+resume_check.py - `resume`'s Shape-B fix: chains
 the already-scripted, notify-only `resume` checks into one call instead of separately
 prose-sequenced Bash invocations every session.
 

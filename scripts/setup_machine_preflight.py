@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-setup_machine_preflight.py - templates\\setup_machine.md's revised Step 0 (design\\
-command_procedure_audit.md's C1-C6): mechanizes the fixed, real-branching sequence that used to be
+setup_machine_preflight.py - templates\\setup_machine.md's revised Step 0: mechanizes the fixed,
+real-branching sequence that used to be
 100% prose - shape detection (flat vs. already-nested vs. ambiguous), the in-place nesting mechanic,
-building or attaching the outer layer, and the host_id context lookup (C6). Same Shape-B rationale
+building or attaching the outer layer, and the host_id context lookup. Same Shape-B rationale
 as resume_check.py/checkpoint_git.py (B1/B2): a mechanical sequence with real branches deserves one
 deterministic call, not a checklist re-decided from scratch the one time it runs.
 
@@ -63,7 +63,7 @@ Subcommands (mutually exclusive):
       expected and fine on a genuinely first-ever machine.
 
   --reattach-origin --git-remote-url URL
-      Mutating (design\\hub_uninstall_end_state.md). Restores a removed 'origin' remote on an
+      Mutating. Restores a removed 'origin' remote on an
       already-nested, already-historied repo - unlike --attach-existing (the C2 workaround for a
       repo with NO local history yet), this never runs `git init`/`checkout -b`: local `main` and
       its history are untouched, just `remote add` + `fetch` + restoring the upstream-tracking
@@ -72,7 +72,7 @@ Subcommands (mutually exclusive):
       detect`'s NESTED output reports `[ORIGIN-MISSING]` per-repo when this is needed.
 
   --clear-uninstall-note
-      Mutating (design\\hub_uninstall_end_state.md). Deletes a stale TOWER_CRANE_UNINSTALLED.md
+      Mutating. Deletes a stale TOWER_CRANE_UNINSTALLED.md
       from cwd (the outer hub root) if present - the note a prior "uninstall" wrote, now stale since
       this machine is being set up again. No-op, not an error, if the file isn't there.
 
@@ -118,7 +118,7 @@ def _origin_status(repo_dir):
 
 
 def _report_origin_and_note(outer_dir, toolkit_dir):
-    """Shared by both NESTED branches of cmd_detect() (design\\hub_uninstall_end_state.md): reports
+    """Shared by both NESTED branches of cmd_detect(): reports
     each repo's 'origin' status and whether a stale uninstall note is sitting in the outer root -
     both only ever missing/present because a prior "uninstall" ran here, never on a first-ever
     machine (whose repos always have 'origin' from --new-outer/--attach-existing)."""
@@ -130,7 +130,7 @@ def _report_origin_and_note(outer_dir, toolkit_dir):
             print(f"[ORIGIN-OK] {label} ({repo_dir}) has an 'origin' remote configured.")
         else:
             print(f"[ORIGIN-MISSING] {label} ({repo_dir}) has no 'origin' remote - likely a prior "
-                  "\"uninstall\" on this exact clone (design\\hub_uninstall_end_state.md). Ask the "
+                  "\"uninstall\" on this exact clone. Ask the "
                   "user for this repo's remote URL, then run `--reattach-origin --git-remote-url "
                   f"<url>` from inside {repo_dir}.")
     note_path = outer_dir / 'TOWER_CRANE_UNINSTALLED.md'
@@ -324,7 +324,7 @@ def cmd_attach_existing(cwd, git_remote_url):
 
 
 def cmd_reattach_origin(cwd, git_remote_url):
-    """--reattach-origin --git-remote-url URL (design\\hub_uninstall_end_state.md): restores a
+    """--reattach-origin --git-remote-url URL: restores a
     removed 'origin' remote on an already-nested, already-historied repo. Unlike
     cmd_attach_existing (the C2 workaround for a repo with NO local history yet), never runs
     `git init`/`checkout -b` - local main and its history are untouched, just `remote add` +
@@ -371,7 +371,7 @@ def cmd_reattach_origin(cwd, git_remote_url):
 
 
 def cmd_clear_uninstall_note(cwd):
-    """--clear-uninstall-note (design\\hub_uninstall_end_state.md): deletes a stale
+    """--clear-uninstall-note: deletes a stale
     TOWER_CRANE_UNINSTALLED.md from cwd (the outer hub root) if present - the note a prior
     "uninstall" wrote, now stale since this machine is being set up again. No-op, not an error, if
     the file isn't there."""
@@ -419,7 +419,7 @@ def cmd_known_hosts(cwd):
 
 
 def cmd_write_bash_allowlist(cwd):
-    """--write-bash-allowlist (design\\bash_permission_allowlist.md): merges the hub-scope Bash/
+    """--write-bash-allowlist: merges the hub-scope Bash/
     PowerShell rules from templates\\bash_allowlist.json into THIS machine's own, gitignored
     .claude\\settings.local.json - so the routine resume/checkpoint/update commands AGENTS.md
     already documents never reach the ambient auto-mode permission classifier. Self-locating like
@@ -442,8 +442,7 @@ def cmd_write_bash_allowlist(cwd):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="templates\\setup_machine.md's Step 0 pre-flight sequence, mechanized "
-                     "(design\\command_procedure_audit.md's C1-C6)."
+        description="templates\\setup_machine.md's Step 0 pre-flight sequence, mechanized."
     )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('--detect', action='store_true', help="Classify the current shape.")
@@ -456,10 +455,9 @@ def main():
                         help="List host identities already known to this hub (C6).")
     group.add_argument('--write-bash-allowlist', action='store_true',
                         help="Merge the hub-scope Bash allowlist into this machine's own "
-                             "settings.local.json (design\\bash_permission_allowlist.md).")
+                             "settings.local.json.")
     group.add_argument('--reattach-origin', action='store_true',
-                        help="Restore a removed 'origin' remote on an already-nested repo "
-                             "(design\\hub_uninstall_end_state.md).")
+                        help="Restore a removed 'origin' remote on an already-nested repo.")
     group.add_argument('--clear-uninstall-note', action='store_true',
                         help="Delete a stale TOWER_CRANE_UNINSTALLED.md from the outer root, if "
                              "present.")

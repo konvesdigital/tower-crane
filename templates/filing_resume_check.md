@@ -23,9 +23,8 @@ entry this session didn't write, most likely means the operator took a manual ac
 as expected, not as something to flag or second-guess.
 
 At session start, and on every `resume`, scan the hub root's `change_requests\` folder for OPEN
-tickets that need this project's attention. Run (`design\command_procedure_audit.md`'s A4 finding
-— the consumer-side port of the hub's own A3 fix, same idea: don't re-derive a categorization a
-script already computes exactly):
+tickets that need this project's attention. Run (the consumer-side port of the hub's own scan fix,
+same idea: don't re-derive a categorization a script already computes exactly):
 
 ```
 <python_launcher> "<hub root>\toolkit\scripts\ticket_scan.py" --project "<this project's full

@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """
-registry_lib.py - shared consumers\\<slug>.md registry parser/writer (design\\multi_machine_hub.md,
-"Problem 2 - scoping pass").
+registry_lib.py - shared consumers\\<slug>.md registry parser/writer.
 
 Schema (2026-08 migration, replacing the old single `path:`/`host:` pair):
   scope: local | multi_machine
-  remote: <git remote URL> (optional, top-level - design\\consumer_reconnect.md)
+  remote: <git remote URL> (optional, top-level)
   hosts:
     <host_id>:
       path: <absolute path, forward-slash form>
@@ -17,10 +16,10 @@ correct it to `multi_machine` the moment 2+ hosts: entries exist, regardless of 
 value. reconcile_scope_floor() below is that correction, meant to be called by every script that
 walks the registry (check_tower_crane.py Pass B, relocate.py).
 
-`remote` (design\\consumer_reconnect.md) is a project-level property (sibling to `scope`/`owner`,
+`remote` is a project-level property (sibling to `scope`/`owner`,
 not nested under any one host) recording the consumer's OWN git remote URL, captured once at first
 registration from `git remote get-url origin` when available. Deliberately static - seed-once, no
-continuous drift-check (see that design doc's rationale). Absent for a consumer registered before
+continuous drift-check. Absent for a consumer registered before
 this field existed, or one with no git remote configured at registration time; `new_consumer.py`
 reads it to offer a clone-before-scaffold bootstrap when connecting an already-registered consumer
 to an empty target folder.
@@ -200,7 +199,7 @@ def reconcile_scope_floor(path, consumer):
 
 def add_host_to_text(raw_text, host_id, path_str, registered_date):
     """Adds a `hosts.<host_id>` entry to a registry file's raw text - the slug-collision /
-    'connect a second machine' merge (design\\multi_machine_hub.md's locked routing: additive
+    'connect a second machine' merge (an additive
     merge, never a duplicate file or blind overwrite). Idempotent: a no-op (already_present=True)
     if that host already has an entry, never touching its existing path/registered date. Also
     applies the 2-host floor to `scope:` if this addition brings the host count to 2+.
@@ -248,7 +247,7 @@ def add_host_to_text(raw_text, host_id, path_str, registered_date):
 
 
 def remove_host_from_text(raw_text, host_id):
-    """Inverse of add_host_to_text() - design\\connect_disconnect.md's host-removal primitive. Removes a
+    """Inverse of add_host_to_text() - the host-removal primitive. Removes a
     `hosts.<host_id>` entry from a registry file's raw text. Also re-applies the 2-host floor in
     reverse: if this removal brings the host count below 2, `scope:` auto-reverts to `local`
     (symmetric with add_host_to_text's floor-up behavior) - a consumer that's no longer actually
@@ -324,7 +323,7 @@ def format_hosts_block(hosts):
 
 def set_remote_if_absent(raw_text, remote):
     """Adds a top-level `remote:` line (sibling to `scope:`, before `hosts:`) if this registry
-    entry doesn't already have one - design\\consumer_reconnect.md's seed-once backfill for a
+    entry doesn't already have one - a seed-once backfill for a
     consumer registered before the field existed. Never overwrites an existing `remote:` value.
     Returns (new_text, was_added)."""
     m = YAML_BLOCK_RE.search(raw_text)

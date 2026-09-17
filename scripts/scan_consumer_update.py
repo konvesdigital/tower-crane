@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """
-scan_consumer_update.py - the deterministic scan/apply half of the consumer-side `update` skill
-(design\\consumer_update.md). Scope is FUNCTIONALITY PARITY with a fresh new_consumer.py scaffold
+scan_consumer_update.py - the deterministic scan/apply half of the consumer-side `update` skill.
+Scope is FUNCTIONALITY PARITY with a fresh new_consumer.py scaffold
 only - hooks, toolkit Track-1 skills (STANDALONE_SKILLS + SKILL_PIECES), and mandatory/default-on
 protocol pieces a consumer project hasn't adopted yet. Deliberately excludes shared_resources
 content - that's DATA, not functionality, and adopting it is the "shared resources" command's own
-job (search/browse/select/apply), never this script's (design\\consumer_update.md's "Functionality,
-not data" correction, 2026-08-01).
+job (search/browse/select/apply), never this script's ("Functionality, not data", 2026-08-01).
 
 Mirrors update_toolkit.py's indexed list-and-choose shape without its trust-review gate: the
 source here is the same local hub a consumer already imports mandatory pieces from at the same
@@ -22,7 +21,7 @@ update_toolkit.py) - deterministic given unchanged project/hub state, which hold
 
 Ground truth for "already have" is this project's own local state (.claude\\settings.json,
 CLAUDE.md @import lines, .claude\\skills\\ listing) - never the hub's consumers\\<slug>.md
-registry entry (design\\consumer_update.md's "Ground truth for 'already have'"). Registry
+registry entry. Registry
 write-back for hooks/skills this script applies is a separate, manual filing-channel step - see
 the reminder this script prints after an --apply that touches either category.
 """
@@ -45,7 +44,7 @@ TEMPLATES_DIR = SHARED_ROOT / 'templates'
 OPTINS_DIR = TEMPLATES_DIR / 'optins'
 SKILLS_DIR = TEMPLATES_DIR / 'skills'
 PROJECT_ROOT = SHARED_ROOT.parent  # hub root
-# design\private_tools.md - private, automatic tools living outside toolkit\, never shipped.
+# Private, automatic tools living outside toolkit\, never shipped.
 # Every entry under PRIVATE_SKILLS_DIR is consumer-offerable (unlike STANDALONE_SKILLS, there's no
 # separate hub-only-skill filter list on the private side - toolkit_private\ has nothing else in it).
 PRIVATE_ROOT = PROJECT_ROOT / 'toolkit_private'
@@ -58,7 +57,7 @@ _FRONTMATTER_RE = re.compile(r'^---\s*\r?\n(.*?)\r?\n---\s*\r?\n', re.DOTALL)
 
 def read_skill_category(skill_md_path):
     """The `category:` frontmatter field of a toolkit_private skill stub, or None if absent -
-    design\\shared_resources_relationship_graph.md's "Category subscription" section. Same field
+    the "Category subscription" mechanism. Same field
     scan_private()'s subscription match below needs and the SEO skill bundle's own stubs carry.
     Strips the canonical source's leading maintainer HTML comment first (same regex
     materialize_skill_stub() uses) since scan_private() reads straight from PRIVATE_SKILLS_DIR's
@@ -158,8 +157,7 @@ def _skill_current(project_root, name, canon_path, import_base=None):
     None (a private, toolkit_private skill). Mirrors check_tower_crane.py's test_consumer() skill-
     stub drift comparison, so "already adopted" here means "adopted and current," not just "a
     folder with this name exists" - closes the presence-vs-currency gap tracked in
-    project_progress.md's Current Status / design\\shared_resources_pipeline_reliability.md
-    (Family B): a stub can be present but stale (e.g. a changed trigger description, or the
+    project_progress.md's Current Status: a stub can be present but stale (e.g. a changed trigger description, or the
     2026-09-14 SEO Primary-tier chain-load fix) and previously stayed invisible to both
     `update`/`update consumers` because presence alone was treated as proof of currency."""
     stub_path = project_root / '.claude' / 'skills' / name / 'SKILL.md'
@@ -190,11 +188,11 @@ def scan_skills(state, project_root, cfg):
 
 
 def scan_private(cfg, state, project_root):
-    """design\\private_tools.md - same shape as scan_hooks/scan_skills combined, pointed at
+    """Same shape as scan_hooks/scan_skills combined, pointed at
     toolkit_private\\ instead of toolkit\\. Silently yields nothing if toolkit_private\\ doesn't
     exist yet on this machine (no private tools built yet, or a fresh clone).
 
-    design\\shared_resources_relationship_graph.md's "Category subscription": each scanned skill
+    The "Category subscription" mechanism: each scanned skill
     item also carries its own `category:` frontmatter (None if absent) and a `subscribed` flag -
     True when that category is in this project's own `private_categories:` registry list - so a
     subscribed item is structurally called out rather than just another anonymous number in the
@@ -254,7 +252,7 @@ def scan_pieces(state):
 
 
 def scan_permissions(state):
-    """design\\bash_permission_allowlist.md: the consumer-scope Bash/PowerShell allowlist in
+    """The consumer-scope Bash/PowerShell allowlist in
     templates\\bash_allowlist.json - one aggregate item (like a hook's whole event block) if
     ANY pattern in it is still missing from this project's own settings.json, never one item per
     pattern."""
@@ -300,7 +298,7 @@ def print_items(items):
         if it['category'] != current_cat:
             current_cat = it['category']
             print(f"-- {labels[current_cat]} --")
-        # design\shared_resources_relationship_graph.md "Category subscription": call out a
+        # "Category subscription": call out a
         # private skill matching one of this project's own private_categories: subscriptions,
         # rather than leaving it just another anonymous number the operator must recognize by name.
         tags = []
@@ -368,7 +366,7 @@ def apply_skill(project_root, cfg, item):
 
 
 def apply_private(project_root, cfg, item):
-    """design\\private_tools.md - dispatches to the same hook-merge / skill-copy shape as
+    """Dispatches to the same hook-merge / skill-copy shape as
     apply_hook/apply_skill, pointed at toolkit_private\\. Private skills are copy-only (no
     {{IMPORT_BASE}} substitution - see apply_skill's public case for the contrast)."""
     name = item['name']

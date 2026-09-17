@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """
 check_stale_paths.py - resume-time nudge for a stale hand-written absolute path left in a
-connected consumer's own tracked prose (design\\grt_connectivity_audit.md item (iv)).
+connected consumer's own tracked prose.
 
 Corrected target, found during grounding research before this was built: the real incident this
 item was named after (a hand-written line naming a real backup-drive path that only exists on one
 of the operator's two machines) is NOT a same-tracked-file-different-host-value collision the way
 the actual skill-stub issue (item (i)/(ii)) was - it's a legitimate single-host-only reference,
-already explicitly named as needing human judgment in
-design\\consumer_reference_indirection.md's "Explicitly out of scope" section.
+already explicitly named as needing human judgment, out of scope for automated fixing.
 check_file_surface.py's check 8c (host-id-substring matching, public-repo diff gate) wouldn't catch
 this shape at all - the signal here isn't a host name, it's a plain path that happens not to exist
 on whichever machine is currently reading it.
@@ -45,7 +44,7 @@ from registry_lib import parse_registry, host_path
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
 # consumers\ is private hub state, not shipped toolkit content - it lives at the outer root
-# (design\local_first_reframe.md's outer/inner split), one level above SHARED_ROOT (toolkit\).
+# (the outer/inner repo split), one level above SHARED_ROOT (toolkit\).
 PROJECT_ROOT = SHARED_ROOT.parent
 CONSUMERS_DIR = PROJECT_ROOT / 'consumers'
 

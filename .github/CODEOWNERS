@@ -1,13 +1,12 @@
-# Fix 3 Checkpoint 2 (design\update_trust_review.md) - require operator review specifically on
-# the canonical AI-directive file, not the whole repo. Paired with branch protection on `main`
-# requiring this review before merge - live since the 2026-07-27 public flip (classic branch
-# protection needs a public repo, or a paid plan, to take effect on GitHub's Free tier).
+# Fix 3 Checkpoint 2 - require operator review specifically on the canonical AI-directive file,
+# not the whole repo. Paired with branch protection on `main` requiring this review before merge -
+# live since the 2026-07-27 public flip (classic branch protection needs a public repo, or a paid
+# plan, to take effect on GitHub's Free tier).
 /AGENTS.md @konvesdigital
 
-# AGENTS.md's own structural companion files (2026-08-11 split, design\update_trust_review.md's
-# "Fix 3 single-file vs. split-into-pieces" row) - each holds procedural content that used to live
-# inside AGENTS.md itself and was covered by the line above. Same reviewer requirement, so a PR
-# touching only one of these can't merge unreviewed.
+# AGENTS.md's own structural companion files (2026-08-11 split) - each holds procedural content
+# that used to live inside AGENTS.md itself and was covered by the line above. Same reviewer
+# requirement, so a PR touching only one of these can't merge unreviewed.
 /agents_tools.md @konvesdigital
 /agents_consumers.md @konvesdigital
 /agents_change_requests.md @konvesdigital
@@ -18,8 +17,8 @@
 # Phase 3 entirely. Found live 2026-07-27 while building the file-surface classifier below.
 /.github/ @konvesdigital
 
-# Widened 2026-07-27 (security stress-test pass, design\security_stress_test.md): the scope above
-# only protected AGENTS.md and .github\ itself - every OTHER shared script (config_lib.py,
+# Widened 2026-07-27 (security stress-test pass): the scope above only protected AGENTS.md and
+# .github\ itself - every OTHER shared script (config_lib.py,
 # relocate.py, run_automation.py, etc.) and every template had no mandatory-reviewer requirement,
 # even though every consumer project runs all of them unmodified (float-on-HEAD). Covers the whole
 # shared-tool surface now, superseding the narrower per-script lines this originally had.

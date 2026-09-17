@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-check_shared_resource_drift.py - the second half of design\\directive_economy.md's "Drift
-mechanics": a notify-only, resume-time check for whether a Track-1 shared_resources\\ skill
+check_shared_resource_drift.py - the second half of the "Drift
+mechanics" mechanism: a notify-only, resume-time check for whether a Track-1 shared_resources\\ skill
 stub's trigger description has gone stale relative to its source entry's current content.
 
 This is deliberately NOT check_shared_resource_refs.py (B2). That script answers "does the
 adopted reference still exist" (a hard, blocking existence check - [FAIL], exit 1). This script
 answers a softer question: "has the source content changed since this stub's trigger was drafted,
 such that the trigger might no longer cover everything the source now talks about." A source file
-going missing is a narrow, local, self-healing failure (design's own "Drift mechanics": the model
+going missing is a narrow, local, self-healing failure (the model
 just gets a not-found on that one file and proceeds without it). A source file changing content
 without going missing is the real drift risk - the trigger is a static snapshot written once at
 adopt time, never re-read the way the index itself is, so it can silently under-match a new topic
@@ -49,7 +49,7 @@ from pathlib import Path
 MARKER_RE = re.compile(
     r'<!--\s*shared_resources:\s*(?P<entry>.+?)\s+adopted\s+\d{4}-\d{2}-\d{2}'
     r'(?:\s+index-sha256:(?P<hash>[0-9a-f]{64}))?'
-    # design\directive_economy.md's "Adopted-stub path portability" and
+    # The "Adopted-stub path portability" and
     # resource_sharing_model.md's "Per-host availability for pointer entries" both add optional
     # trailing marker fields (hub-rel:/hosts-ignored:) this script doesn't use but must tolerate.
     r'(?:\s+hub-rel:\S+)?'

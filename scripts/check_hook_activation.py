@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 check_hook_activation.py - narrow notify-only check for the rung-2 half of
-design\\resource_sharing_model.md's three-rung settings ladder (machine-only /
+this project's three-rung settings ladder (machine-only /
 private-ecosystem / public-default).
 
 Rung 2 (private ecosystem: synced across the operator's own machines, never public) is built as

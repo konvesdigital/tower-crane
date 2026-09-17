@@ -2,7 +2,7 @@
 # shared_resources_trigger_match.py
 # SHARED TOOL - lives in tower_crane\hooks\, referenced by any project that opts in.
 #
-# design\shared_resources_mechanical_trigger.md Part 3 - a deterministic, script-only recognition
+# A deterministic, script-only recognition
 # layer under shared_resources\'s existing skill-gate mechanism. Today, a Category-level fallback /
 # Tier-scoped skill (templates\shared_resources.md's Saving step 7) only fires when the agent's own
 # judgment classifies the live task as matching that skill's trigger description - a real, repeated
@@ -75,7 +75,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="repla
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
 # shared_resources\ is private hub state, not shipped toolkit content - it lives at the outer root
-# (design\local_first_reframe.md's outer/inner split), one level above SHARED_ROOT (toolkit\), same
+# (the outer/inner repo split), one level above SHARED_ROOT (toolkit\), same
 # convention check_shared_resource_catalog.py / check_shared_resource_hosts.py already use.
 HUB_ROOT = SHARED_ROOT.parent
 TRIGGER_INDEX_PATH = HUB_ROOT / 'shared_resources' / 'trigger_index.yaml'
@@ -95,7 +95,7 @@ EDGE_FIELD_RE = re.compile(r'^    (from|to|strength):\s*(\S+)\s*$')
 
 def _parse_slot_literal(text):
     """Parse a `["a", "b"]`-shaped line as a Python list literal (ast.literal_eval - no external
-    YAML dependency, design\\portability.md's multi-machine stance). Returns [] on anything
+    YAML dependency, matching this project's multi-machine stance). Returns [] on anything
     malformed rather than raising - one bad hand-edited line should degrade that one slot, not take
     the whole matcher down."""
     try:
@@ -116,11 +116,12 @@ def parse_trigger_index(text):
 
     Returns (categories: {name: [slot, ...]}, entries: {resource_stem: [group, ...]}, procedures:
     {procedure_name: [group, ...]}) where each group is a list of slots and each slot is a list of
-    alternate term strings. `procedures` (design doc Part 5) is structurally identical to `entries`,
-    just keyed under `- procedure:` instead of `- resource:` and never resolved against CATALOG.md.
+    alternate term strings. `procedures` (added in a later revision) is structurally identical to
+    `entries`, just keyed under `- procedure:` instead of `- resource:` and never resolved against
+    CATALOG.md.
 
-    An entry's optional `evidence:` block (design\\shared_resources_mechanical_trigger.md Part 4 -
-    dated real-quote drafting material) is intentionally never recognized here - it's drafting
+    An entry's optional `evidence:` block (dated real-quote drafting material) is intentionally
+    never recognized here - it's drafting
     material only, not consumed at match time. It falls through this loop's "anything unfamiliar is
     skipped" contract same as any other unrecognized line, by design, not by omission."""
     categories = {}

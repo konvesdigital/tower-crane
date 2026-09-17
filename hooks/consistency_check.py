@@ -8,10 +8,10 @@
 #
 # History: originally a PowerShell wrapper (consistency_check.ps1) around this exact Python
 # analysis, which it wrote to a temp file and ran via `& python`. Converted to pure Python
-# 2026-07-20 (portability foundation, design\portability.md): removes the PowerShell runtime from
+# 2026-07-20 (part of this project's portability work): removes the PowerShell runtime from
 # the consumer side and the temp-file dance - Python was already a hard dependency. The AST
 # analysis below is UNCHANGED from the wrapper; the golden suite (tests\consistency_check\) is the
-# net that proves it. See change_requests\2026-07-20_consistency_check_ps1-to-python.md.
+# net that proves it.
 #
 # HARD-GUARDRAIL CONTRACT (fixed 2026-07-23 - see project_progress.md Work Log): a FAIL exits 2 and
 # echoes the report to stderr, not just stdout. This is deliberate, not incidental - Claude Code
@@ -161,7 +161,7 @@ def check_file(path):
         # These are Load-referenced inside their scope but were never collected,
         # so the flat undefined-name check wrongly flagged them. This does NOT make
         # the check scope-aware (still one flat namespace) - it only stops valid
-        # code from failing. See change_requests\2026-07-17_consistency-check_*.
+        # code from failing.
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
             a = node.args
             for arg in (a.posonlyargs + a.args + a.kwonlyargs):
@@ -315,9 +315,10 @@ def main():
     if not target:
         sys.exit(0)
 
-    # GENERALIZATION NOTE (carried from the wrapper): the original GRT script fell back to a
-    # hardcoded GRT path if CLAUDE_PROJECT_DIR was unset. That's unsafe once shared across projects
-    # (it would write another project's logs into GRT's folder). Now it skips the run and says why.
+    # GENERALIZATION NOTE (carried from the wrapper): an earlier, single-project version of this
+    # script fell back to a hardcoded project path if CLAUDE_PROJECT_DIR was unset. That's unsafe
+    # once shared across projects (it would write one project's logs into another's folder). Now it
+    # skips the run and says why.
     project_root = os.environ.get("CLAUDE_PROJECT_DIR")
     if not project_root:
         print("[WARN] consistency_check.py: CLAUDE_PROJECT_DIR not set - skipping "

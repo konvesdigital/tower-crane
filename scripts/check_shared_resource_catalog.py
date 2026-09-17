@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """
 check_shared_resource_catalog.py - internal-consistency checks for shared_resources\\CATALOG.md
-and shared_resources\\resource_relationships.yaml (design\\shared_resources_relationship_graph.md).
+and shared_resources\\resource_relationships.yaml.
 These two hand-maintained files only work if they agree with each other; nothing previously
-checked that they do. Flagged as a gap in that design doc's "What this doc does not decide" (the
-edge-validity check) and found alongside it while scoping this script (the File-column and
-Tier-name checks) - all three are the same "hand-edited data trusted without a check" shape as
-design\\shared_resources_pipeline_reliability.md's Family B.
+checked that they do. The edge-validity check closes a known gap; the File-column and
+Tier-name checks were found alongside it while scoping this script - all three are the same
+"hand-edited data trusted without a check" shape found elsewhere in this project.
 
 Four checks, all notify-only (never blocks anything - nothing currently runs this automatically):
 
@@ -16,16 +15,16 @@ Four checks, all notify-only (never blocks anything - nothing currently runs thi
    check, only from the two below where relevant).
 2. Tier-name consistency - a row's `Tier` cell (when set and not `Primary`) must match a tier
    `name:` actually defined under its `Category` in resource_relationships.yaml's `tiers:` block.
-   Tier names are expected to get renamed/split over time (the design doc: "Tier names/definitions
-   stay revisable going forward"), and nothing enforces the two files staying in sync when that
-   happens.
+   Tier names are expected to get renamed/split over time (tier names/definitions stay revisable
+   going forward), and nothing enforces the two files staying in sync when that happens.
 3. identity_eligible declared - every (non-archived) Category on any CATALOG.md row must have a
    corresponding entry in resource_relationships.yaml's `identity_eligible:` block (added
    2026-09-09 alongside the "Adopted Shared Resources" tiered-directive mechanism -
    templates\\shared_resources.md's Saving step 1 asks this the moment a new Category is
    introduced; an undeclared Category means that question was skipped, not answered `false`).
 4. Edge validity - every edge's `from`/`to` or `a`/`b` in resource_relationships.yaml must resolve
-   to some CATALOG.md row, by filename stem (the design doc's node-naming convention). An edge to
+   to some CATALOG.md row, by filename stem (resource_relationships.yaml's own node-naming
+   convention). An edge to
    an *archived* entry PASSes deliberately (decided 2026-09-02): the archived file still exists and
    is still fully readable, and the retrieval procedure doesn't filter graph neighbors by Status -
    only a stem matching no row at all (a typo, or a genuine deletion without edge cleanup) is a
@@ -44,7 +43,7 @@ filter downstream - caught live while scoping this script).
 
 resource_relationships.yaml is hand-parsed (regex/line-based, same style as registry_lib.py's own
 yaml handling) rather than via a `yaml` import - this hub has no external Python dependency today
-(design\\portability.md's multi-machine stance), and the file's shape is simple and always
+(matching this project's multi-machine stance), and the file's shape is simple and always
 machine-written by templates\\shared_resources.md's Saving procedure, so a small dedicated parser
 is more portable than a new hard dependency for one script.
 

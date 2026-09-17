@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-check_multi_machine.py - resume-time nudge for design\\multi_machine_hub.md's Problem 2: a
+check_multi_machine.py - resume-time nudge: a
 `scope: multi_machine` consumer with no `hosts.<this_host_id>` entry yet is surfaced proactively
-instead of staying silent ("`multi_machine` is a standing invitation, not teleportation" - the
-design doc's own framing). Notify-only, never mutates - same shape as check_hook_activation.py's
+instead of staying silent ("`multi_machine` is a standing invitation, not teleportation").
+Notify-only, never mutates - same shape as check_hook_activation.py's
 Rung-2 check. The actual connect action stays the "connect project" flow (new_consumer.py's
 slug-collision merge routing).
 
@@ -22,7 +22,7 @@ from registry_lib import parse_registry, effective_scope
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
 # consumers\ is private hub state, not shipped toolkit content - it lives at the outer root
-# (design\local_first_reframe.md's outer/inner split), one level above SHARED_ROOT (toolkit\).
+# (the outer/inner repo split), one level above SHARED_ROOT (toolkit\).
 PROJECT_ROOT = SHARED_ROOT.parent
 CONSUMERS_DIR = PROJECT_ROOT / 'consumers'
 

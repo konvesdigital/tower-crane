@@ -1,6 +1,6 @@
 1. <!--
 Shared protocol piece: capability_relationships.md (OPTIONAL / self-scaffolding, Track 1,
-on-demand, no always-resident companion - design\capability_relationships.md). Unlike every other
+on-demand, no always-resident companion). Unlike every other
 Track-1 piece so far, this one fires from BOTH a consumer session and a hub session under the same
 skill name - see the SKILL.md stub's own header comment for how the two distribution paths
 (new_consumer.py's STANDALONE_SKILLS scaffold / self_hooks.py's "skills" opt-in) both resolve to a

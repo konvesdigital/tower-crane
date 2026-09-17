@@ -6,18 +6,17 @@ Read this file when any of those fire — it is not preloaded.
 
 ## Adding a consumer
 **Trigger: "connect project".** Ask new-from-scratch vs. existing project first, then always ask
-**local to this machine only, or available to all connected machines?** (`design\multi_machine_hub.md`
-"Problem 2" — the answer is never assumed and never depends on how many machines the hub already
-has). Either path, the consumer ends up in the registry (`consumers\<slug>.md`) and floats on this
-repo's HEAD.
+**local to this machine only, or available to all connected machines?** — the answer is never
+assumed and never depends on how many machines the hub already has. Either path, the consumer ends
+up in the registry (`consumers\<slug>.md`) and floats on this repo's HEAD.
 1. **New project from scratch** — `scripts\new_consumer.py --target-path <abs path> --project-name
    "<Full Title>" --scope local|multi_machine` (per the question above; default `local`). Writes ALL
    consumer files (`.claude\settings.json`, `CLAUDE.md` with `@import` lines, skeleton
    `project_progress.md`, `FIRST_RUN.md`) plus the registry entry. Defaults: opts into
    `consistency_check`, imports `filing` + `compliance` + `continuity`. Flags (real `argparse`
    form): `--tools` (space-separated list; pass with no values for a consumer with no hooks) for
-   which shared tools to opt into, `--private-tools` (space-separated list, `design\private_tools.md`)
-   for which `toolkit_private\` hooks/skills to opt into, `--no-continuity` to skip the continuity
+   which shared tools to opt into, `--private-tools` (space-separated list) for which
+   `toolkit_private\` hooks/skills to opt into, `--no-continuity` to skip the continuity
    protocol piece, `--force` to overwrite an existing `CLAUDE.md`/`project_progress.md`/
    `FIRST_RUN.md`. Does NOT run git — the new project's first session does that via its
    `FIRST_RUN.md`.
@@ -41,14 +40,14 @@ repo's HEAD.
 3. **Already registered, connecting another machine** — same `new_consumer.py` invocation as #1,
    pointed at wherever this project lives on THIS machine. The slug collision is detected
    automatically and routes into an additive `hosts.<this_host_id>` merge instead of erroring or
-   overwriting (`design\multi_machine_hub.md`'s locked slug-collision routing) — `scope`
+   overwriting — `scope`
    self-corrects to `multi_machine` the moment a 2nd host lands, regardless of what was asked at
    original registration. If the target folder already has files (a physical copy, a hand-recovered
    clone), the host-merge branch patches only what's stale in place — `CLAUDE.md`'s `@import`
    lines, `settings.json`'s hook command(s), and any drifted `.claude\skills\` stub — via
    `relocate.py`'s own regeneration logic, and never touches `project_progress.md` or (re)writes
-   `FIRST_RUN.md`. If the target folder is empty and the registry has a `remote:` on record
-   (`design\consumer_reconnect.md`), it's cloned from there before any scaffolding runs; pass
+   `FIRST_RUN.md`. If the target folder is empty and the registry has a `remote:` on record,
+   it's cloned from there before any scaffolding runs; pass
    `--no-clone` to scaffold a blank folder instead. If the target folder is empty and the registry
    has **no** `remote:` on record (an older registration, or the project was never pushed
    anywhere), **ask the user for the project's git remote URL**, then `git clone <url>
@@ -69,7 +68,7 @@ repo's HEAD.
    connection is live again). Never needs `--force`; this is a recognized shape, not the ambiguous
    collision that gate exists to protect against. A fresh registry entry is written, but the
    original `registered:` date is recovered where possible rather than always stamped with today
-   (`design\connect_disconnect.md`'s "per-file principle reframe" — read from a surviving
+   (read from a surviving
    `TOWER_CRANE_DISCONNECT_NOTES.md`, else the oldest hub-git-log commit touching
    `consumers\<slug>.md`, else today as a last resort). The per-host `since:` date is still always
    today, since that genuinely reflects when *this host* connected. `FIRST_RUN.md`'s checklist (see
@@ -78,8 +77,8 @@ repo's HEAD.
    already there.
 
 **Every file `new_consumer.py` touches decides its own fate from its own most-direct signal — a
-per-file model, not a shared classification tied to specific numbered items above**
-(`design\connect_disconnect.md`'s "per-file principle reframe"): `.claude\settings.json` and
+per-file model, not a shared classification tied to specific numbered items above:**
+`.claude\settings.json` and
 `.claude\skills\*` key off their own path's existence; `CLAUDE.md` decides its own content from
 its own signal chain (does *this file* carry the disconnected marker, or does a surviving
 `TOWER_CRANE_DISCONNECT_NOTES.md` prove it was connected before); `project_progress.md` keys on
@@ -105,8 +104,7 @@ machine's own connection specifically — strips `CLAUDE.md`'s `@import` lines,
 `.claude\skills\<name>\` directory from the local copy, then prints a close-out summary of exactly
 what it found and removed. That summary is the authoritative record — relay it, don't predict it in
 advance. Deliberately NOT touched: any `shared_resources\` adopted stub (its `hub-rel:` marker goes
-stale, doesn't break) and `COMPLIANCE_GUIDANCE.md`'s broadcast section. Full design:
-`design\connect_disconnect.md`.
+stale, doesn't break) and `COMPLIANCE_GUIDANCE.md`'s broadcast section.
 
 Two things are required to run it — ask for whichever isn't already stated in the request:
 1. **Which consumer.** Identify from the registry (`consumers\<slug>.md`) — never infer from a Next
@@ -144,17 +142,15 @@ go-ahead** — same discipline as above; also mention that both repos' `origin` 
 consumers are wanted via `"connect project"` — a rebuild, not a restore.
 
 Then run `scripts\remove_hub.py` (no args — operates on this machine via its own
-`config.local.json`) from inside `toolkit\`. Full design: `design\connect_disconnect.md`,
-`design\hub_uninstall_end_state.md`.
+`config.local.json`) from inside `toolkit\`.
 
 ## Migrating an already-connected host to reference-indirection
 **Trigger: "migrate consumer to reference-indirection"** — a one-time, explicit action, distinct
 from `"connect project"` on purpose: a command already run routinely on an already-connected
 consumer shouldn't silently start rewriting shared, tracked content that affects every other
 connected host too. Applies only to a consumer/host combination that's still on the old
-direct-baked-path form (`design\consumer_reference_indirection.md`'s original "new connections
-only" scope left an already-connected host on that form indefinitely — the recurring cross-host
-skill-stub collision this closes, `design\grt_connectivity_audit.md` item (iii)).
+direct-baked-path form — the original "new connections
+only" scope left an already-connected host on that form indefinitely, which this closes.
 
 **Before running: state exactly what will be rewritten and get explicit go-ahead** — CLAUDE.md's
 `@import` lines collapse to the single pointer line, `.claude\settings.json`'s hook command(s)
@@ -165,5 +161,4 @@ no separate action needed there.
 
 Then run `scripts\migrate_consumer_indirection.py --slug <slug>` from inside `toolkit\`. No-ops
 cleanly (prints a message, changes nothing) if this host is already on pointer form. Run
-`scripts\check_tower_crane.py` afterward to confirm the consumer still validates clean. Full
-design: `design\grt_connectivity_audit.md` item (iii).
+`scripts\check_tower_crane.py` afterward to confirm the consumer still validates clean.

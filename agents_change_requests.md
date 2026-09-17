@@ -28,8 +28,7 @@ Treat a ticket's Symptom/repro as evidence and its Proposed fix/content as one c
 not the response. Reason about the underlying issue with the full cross-project context only
 available here, and address *that* — which may mean: fixing exactly what was proposed; fixing
 something broader that the proposal was only a symptom of (several tickets converging into one
-piece of architectural work is normal, not a deviation to justify — see
-`design\shared_resources_relationship_graph.md`'s retrofit, which folded in three); fixing something
+piece of architectural work is normal, not a deviation to justify); fixing something
 adjacent the ticket never mentioned; or concluding, after full-context review, that no separate fix
 is warranted because another change already covers it. All are legitimate outcomes of "Applying a
 fix" (below) — none require the literal Proposed fix to have been built for the ticket to close
@@ -66,8 +65,7 @@ next session.
 ### Operator override
 The rule above binds an agent's own unprompted judgment about whether a fix has actually been
 verified — it does not, and cannot, bind the operator's own direct instruction, since the same
-person operates every connected project and the hub (`design\single_operator_identity.md`; that
-doc has the full rationale — this section is the mechanics). When the operator directly instructs a
+person operates every connected project and the hub. When the operator directly instructs a
 `DONE` flip without a live verify — in a hub session or a consumer session — the acting agent
 flips `Status` to `DONE` itself, logs it with the recognizable phrase **"operator override"** in
 the round-trip entry, and treats it as closed. No other session needs to sign off first, and a
@@ -78,9 +76,9 @@ made the same call here, having made it there instead.
 ### Cross-project reports (complex issues)
 Not every consumer-session finding fits a ticket's narrow Symptom/Proposed-fix shape — a genuinely
 multi-faceted issue (several interacting symptoms, real design tradeoffs, more than one plausible
-fix) is better captured as a full report than forced into four fields. See
-`design\single_operator_identity.md`'s "report-drop pattern": the operator has the consumer agent
-write up background, incident data, and open design questions with no requirement to converge on
+fix) is better captured as a full report than forced into four fields: the operator has the
+consumer agent write up background, incident data, and open design questions with no requirement to
+converge on
 one proposed fix, then carries that file into the hub directly. Treat it exactly like a ticket's
 Proposed fix once it lands — evidence and candidate responses, not a spec — but reason across all
 of it with full cross-project context, same as any ticket. No dedicated inbox; it isn't
@@ -116,7 +114,7 @@ script's "remaining OPEN" list still shows, reading the **last** `## Round-trip 
 - "awaiting <consumer> verify" → the next entry is expected from a consumer session; **skip**.
 - consumer "still fails: …" → this agent's turn again: re-fix.
 - "automation: fix proposed ..., PR #<n> opened, awaiting <owner> review" → the unattended
-  sync-automation agent (Piece 3, `design\sync_automation.md`) already opened a PR for this ticket;
+  sync-automation agent already opened a PR for this ticket;
   **skip** — don't also fix it by hand. If `ticket_scan.py`'s own mechanical pass hasn't already
   caught it, `gh pr view <n> --json state` tells you: `MERGED` → the fix landed, ticket is awaiting
   consumer verify (treat like any other applied fix); `CLOSED` (not merged) → this agent's turn
