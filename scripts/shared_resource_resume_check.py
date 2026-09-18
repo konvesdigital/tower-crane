@@ -1,28 +1,22 @@
 #!/usr/bin/env python3
 """
-shared_resource_resume_check.py - templates\\shared_resources_resume_check.md's "At resume"
-Shape-B fix: chains its two already-scripted, notify-only checks into one call instead of two separately
-prose-sequenced Bash invocations every resume this project has adopted a shared_resources entry -
-a smaller-scale instance of the exact same disease B1 found and fixed for `resume` step 3.
+shared_resource_resume_check.py - chains templates\\shared_resources_resume_check.md's "At
+resume" notify-only checks into one call.
 
-Runs, in order, each exactly as "At resume" already documents invoking it standalone:
+Runs, in order:
   1. check_shared_resource_refs.py    ([FAIL]/[HOST-GAP] - a broken adopted reference/pointer, or
                                         a Hosts: block missing this machine)
   2. check_shared_resource_drift.py   ([DRIFT]/[N/A] - an adopted stub's content hash vs. the
                                         source entry's current content)
 
-Both take --project-root and always exit 0 (notify-only), so this script does no pass/fail
-interpretation of its own - it just runs each in turn and prints its output verbatim under a
-numbered header, same "consolidate the CALL, not the interpretation" split resume_check.py/
-consumer_resume_check.py already established. Only relevant if this project has adopted a
-reference/tool entry (or an insight with a live Track-1 destination) - templates\\
-shared_resources_resume_check.md already gates the whole section on that; this script doesn't
-duplicate that check.
+Both take --project-root and always exit 0 (notify-only). This script does no pass/fail
+interpretation of its own - it runs each in turn and prints its output verbatim under a numbered
+header. Only relevant if this project has adopted a reference/tool entry (or an insight with a
+live Track-1 destination); this script doesn't check that gate itself.
 
 Usage: python shared_resource_resume_check.py --project-root "<this project's absolute root>"
 Run from anywhere; resolves the hub's toolkit\\ folder relative to this script's own location, not
-the caller's cwd - same self-locating pattern every other consumer-invoked script in this toolkit
-uses (e.g. scan_consumer_update.py, consumer_resume_check.py).
+the caller's cwd.
 """
 
 import argparse
@@ -48,8 +42,7 @@ def _run(python_launcher, script_name, project_root):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Chains shared_resources_resume_check.md's two notify-only checks "
-                     "(check_shared_resource_refs.py, check_shared_resource_drift.py) into one "
+        description="Chains shared_resources_resume_check.md's notify-only checks into one "
                      "consolidated report."
     )
     parser.add_argument('--project-root', required=True, help="This project's absolute root.")

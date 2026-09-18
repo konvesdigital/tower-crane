@@ -1,51 +1,27 @@
 #!/usr/bin/env python3
 """
-checkpoint_git.py - the `checkpoint` action's git mechanics: mechanizes the two-repo
-commit/guardrail/leak-scan/push sequence that used to be 100% re-decided from prose
-(toolkit\\agents_continuity.md's
-"checkpoint" step 2) every single invocation. The doc-editing half of checkpoint (step 1 -
-updating project_progress.md's Current Status / Next Up / Decisions / Work Log) stays a Claude
-Code judgment call, same split as update_toolkit.py keeps the diff-review-and-assessment step out
-of its own mechanical --check/--approve.
-
-Two repos live in this folder (the outer/inner repo split) and this script
-handles both in one call:
+checkpoint_git.py - the `checkpoint` action's git mechanics across both repos in this folder (the
+outer/inner repo split):
   - the OUTER project repo (this folder's own root - project_progress.md, consumers\\,
     change_requests\\, config.local.json)
   - the INNER toolkit\\ repo (this file's own SHARED_ROOT) - only touched if it exists and has
     pending changes.
 
-Untracked-file safety (the reason this script exists as more than a thin wrapper around `git add
--A && git commit && git push`): a session sometimes drops a temporary file - a scratch report, a
-draft, an experiment - directly in either repo's root. Usually there's nothing unaccounted for,
-but that can never be assumed. `git add -u` (stage modifications/deletions to files git ALREADY
-tracks) is always safe and runs automatically - no prompt, no friction, in the common case where
-nothing new needs a decision. A genuinely NEW (untracked) file is different: it looks identical to
-"a legitimate new design doc this session wrote" and "a stray temp file that should never be
-committed" from git's point of view, so nothing here even tries to guess which - every untracked
-file in either repo is surfaced and must be explicitly resolved (staged via --include/
---include-all, or explicitly left alone via --skip-untracked) before ANYTHING is committed. Same
-"never a blind git add -A, scope explicitly" discipline config_lib.py's _commit_scoped() already
-applies to routine hub/consumer writes via a fixed candidate-path tuple - checkpoint can't use a
-fixed tuple (a session's own edits legitimately land in any tracked file), so it uses a
-tracked/untracked split instead: automatic for tracked, always a conscious decision for untracked.
+The doc-editing half of checkpoint (updating project_progress.md's Current Status / Next Up /
+Decisions / Work Log) stays a separate step, not handled by this script.
 
-Leak-scan-first ordering (Locked in command_procedure_audit.md, "Leak-scan ordering"): the old
-prose order ran check_file_surface.py's outgoing-leak gate only right before the push, after the
-inner repo's own commit had already happened - catching a leak at the last possible moment, after
-the work of committing to it was already done. This script runs that gate FIRST, before either
-repo's commit step: toolkit\\'s pending changes (tracked + whichever untracked files get resolved
-into this round) are staged, then scanned against origin/main via check_file_surface.py's new
-`--head-sha worktree` mode, before anything is committed anywhere. A FAIL unstages toolkit\\ and
-skips its commit/push for this run, but does not block the outer repo, which is unrelated.
+Untracked-file safety: `git add -u` (stage modifications/deletions to files git already tracks)
+is always safe and runs automatically. A genuinely untracked file in either repo is surfaced and
+must be explicitly resolved (staged via --include/--include-all, or explicitly left alone via
+--skip-untracked) before anything is committed.
 
-last_reviewed_sha self-heal (the "B2 addendum" found live 2026-08-23): a checkpoint
-push to toolkit\\'s origin advances origin/main directly (this clone's admin-bypass write access),
-but nothing previously touched update_toolkit.py's own trust anchor (.last_reviewed_sha) when that
-happened - the next `update_toolkit.py --check`/`--notify` would see a gap and report a false "N
-commit(s) available" nag about this same clone's own, already-reviewed-by-writing content. After a
-successful toolkit\\ push here, this script advances last_reviewed_sha to the new HEAD directly
-(trust-on-first-use already applies - this clone authored the content).
+Leak-scan-first ordering: toolkit\\'s pending changes (tracked + whichever untracked files get
+resolved into this round) are staged, then scanned against origin/main via
+check_file_surface.py's `--head-sha worktree` mode, before anything is committed anywhere. A FAIL
+unstages toolkit\\ and skips its commit/push for this run, but does not block the outer repo.
+
+last_reviewed_sha self-heal: after a successful toolkit\\ push, this script advances
+update_toolkit.py's trust anchor (.last_reviewed_sha) to the new HEAD directly.
 
 Usage:
   python scripts\\checkpoint_git.py --message "<summary>"
@@ -184,8 +160,7 @@ def run_standing_constraints_check(cfg):
 def toolkit_stage_and_leak_scan(cfg, to_stage):
     """Phase 1 of the toolkit\\ side: stage (tracked + resolved-untracked) and run the leak-scan
     gate - and nothing else. Split out from the commit/push phase below so this can run, and
-    complete, BEFORE either repo's commit step (Locked ordering, design\\
-    command_procedure_audit.md's "Leak-scan ordering") - the outer repo's own commit happens in
+    complete, BEFORE either repo's commit step - the outer repo's own commit happens in
     between this and toolkit_commit_push() in main(). Returns a dict: {'status': 'n/a'|'clean'|
     'no-origin'|'leak-blocked'|'ready', 'changed_this_round': set()} (changed_this_round only set
     when status is 'ready')."""
@@ -344,7 +319,7 @@ def main():
 
     cfg = get_shared_config(TOOLKIT_ROOT)
 
-    # Leak-scan-first (locked ordering): toolkit\'s staging and
+    # Leak-scan-first: toolkit\'s staging and
     # leak-scan gate run to completion here, BEFORE either repo's commit step - the outer repo's
     # own commit (do_outer, below) and toolkit\'s own commit (toolkit_commit_push, further below)
     # both happen only after this resolves.

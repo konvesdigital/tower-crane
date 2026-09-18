@@ -1,29 +1,17 @@
 #!/usr/bin/env python3
 """
-check_standing_constraints.py - the mechanical half of the "propose upstream" authoring assistant's
-change-review gate: a deterministic exact-match check for whether a proposed change touches
-AGENTS.md's "## Standing Constraints" section.
+check_standing_constraints.py - deterministic exact-match check for whether a proposed change
+touches AGENTS.md's "## Standing Constraints" section.
 
-Why this needs to be a script rather than an agent judgment call: the whole point of the
-refuse-and-ask gate is to fire reliably on ANY edit to that section, including a subtle
-paraphrase that quietly weakens a MUST/MUST NOT clause - the same fuzzy-match-detection discipline
-this project already applies to code (hooks\\consistency_check.py), aimed at prose instead. An
-exact-text compare is the only thing that can't be argued past.
-
-This is advisory, not a hard block (Locked 2026-07-26 - "overridable warning") - it always exits 0
-and leaves the decision to the human via the calling procedure (AGENTS.md's "propose upstream").
-Output is a small set of stable text markers the calling agent reads, same protocol as
-update_toolkit.py's [PASS]/[BLOCKED]/=== BEGIN DIFF ===:
+Advisory, not a hard block - it always exits 0 and leaves the decision to the human via the
+calling procedure. Output is a small set of stable text markers the calling agent reads:
 
   [UNCHANGED]  Standing Constraints section is byte-identical to the base ref's version.
   [CHANGED]    it differs - printed alongside the literal before/after text.
 
-A second caller, `checkpoint`'s soft disclosure guardrail, reuses this same exact-text detector
-before committing a `toolkit\\`
-change - but compared against the previous *pushed* state, not a merge-base with `main` (checkpoint
-commits straight to `main`, no PR branch). Pass `--head worktree` for this mode: `--base` is then
-read literally (no merge-base computation) and the "after" text comes from the file currently on
-disk, uncommitted changes included, instead of a committed ref.
+`--head worktree` compares against the previous *pushed* state instead of a merge-base with
+`main`: `--base` is then read literally (no merge-base computation) and the "after" text comes
+from the file currently on disk, uncommitted changes included, instead of a committed ref.
 
 Usage:
   python scripts\\check_standing_constraints.py [--base main] [--file AGENTS.md]
@@ -75,9 +63,8 @@ def read_file_at(ref, rel_path):
 
 def read_worktree_file(rel_path):
     # Deliberately no explicit encoding: must decode with the same platform-default codec
-    # subprocess(text=True) uses for git show's output below, or byte-identical files compare
-    # unequal on a non-UTF8-default console (verified live on Windows/cp1252 - forcing utf-8 here
-    # while git show implicitly uses cp1252 turned em-dashes into false [CHANGED] positives).
+    # subprocess(text=True) uses for git show's output below, or byte-identical files can compare
+    # unequal on a non-UTF8-default console.
     path = SHARED_ROOT / rel_path
     if not path.exists():
         return None
@@ -87,7 +74,7 @@ def read_worktree_file(rel_path):
 def main():
     parser = argparse.ArgumentParser(
         description="Exact-match check: does a proposed change touch AGENTS.md's Standing "
-                     "Constraints section? (Fix 3 Checkpoint 1's mechanical gate.)"
+                     "Constraints section?"
     )
     parser.add_argument('--base', default='main',
                          help="Ref to compare against (default: main). With --head worktree, this "
@@ -141,7 +128,7 @@ def main():
     print(head_section if head_section is not None else "(section absent)")
     print("=== END ===")
     print()
-    print("This is an overridable warning, not a hard block (Locked 2026-07-26) - surface it to the "
+    print("This is an overridable warning, not a hard block - surface it to the "
           "user plainly. If called from 'propose upstream': get explicit confirmation this edit is "
           "deliberate before continuing. If called from checkpoint's pre-commit disclosure guardrail: "
           "this is a notice only, nothing to confirm - the push cannot be blocked, only disclosed.")

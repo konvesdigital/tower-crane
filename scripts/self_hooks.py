@@ -1,37 +1,25 @@
 #!/usr/bin/env python3
 """
-self_hooks.py - toggle tower_crane's own hooks ON for this repo/machine (self-use / dogfooding),
+self_hooks.py - toggle tower_crane's own hooks on for this repo/machine (self-use / dogfooding),
 off by default.
 
-Tower Crane is not a registered consumer of itself (no consumers\\<slug>.md entry) - self-use is
-kept deliberately separate from the consumer registry/scaffolder/checker machinery, which is built
-for tracking OTHER projects. Every available tool already has a single canonical opt-in snippet
-at templates\\optins\\<tool>.json - this script is the only piece that was actually missing: a
-personal, per-machine way to flip one on/off for THIS repo's own use.
+Every available tool has a canonical opt-in snippet at templates\\optins\\<tool>.json.
 
-An opt-in snippet may carry a 'hooks' key (merged into .claude\\settings.local.json, as always) and/
-or a 'skills' key - a list of Track-1 skill names whose canonical templates\\skills\\<name>\\SKILL.md
-gets copied into this hub's own .claude\\skills\\<name>\\SKILL.md (hub_commands - the
-hub-operator side of the "commands" discoverability mechanism, distributed this
-way since the hub isn't a registered consumer of new_consumer.py's scaffolder). Any {{IMPORT_BASE}}
-placeholder in the canonical stub is resolved the same way new_consumer.py resolves it for a real
-consumer - using this same hub's own computed import_base - before the copy is written; a stub with
-no such placeholder (e.g. hub_commands) is unaffected, since the substitution is a no-op on it. This
-lets a single canonical stub serve both a consumer scaffold and this hub's own self-install (see
-the capability_relationships skill for the first case that needed
-this - a skill that fires the same way from either a consumer or a hub session).
+An opt-in snippet may carry a 'hooks' key (merged into .claude\\settings.local.json) and/or a
+'skills' key - a list of Track-1 skill names whose canonical templates\\skills\\<name>\\SKILL.md
+gets copied into this hub's own .claude\\skills\\<name>\\SKILL.md. Any {{IMPORT_BASE}} placeholder
+in the canonical stub is resolved using this hub's own computed import_base before the copy is
+written; a stub with no such placeholder is unaffected.
 
   --list              (default) show every available tool and whether it's currently on here.
   --enable <tool>     merge templates\\optins\\<tool>.json's hook(s) into .claude\\settings.local.json.
   --disable <tool>    remove them again.
 
 Every run also rewrites .claude\\self_hooks_status.md, a plain human-readable mirror of current
-on/off state - open it directly, no command needed just to *check* (same "generated artifact,
-never hand-edited" pattern as check_tower_crane.py's COMPLIANCE_GUIDANCE.md).
+on/off state.
 
-Both .claude\\settings.local.json and .claude\\self_hooks_status.md are gitignored: this is
-personal/per-machine state, never committed, never shipped in a release - a fresh clone or a
-downloaded hub always starts with nothing enabled.
+Both .claude\\settings.local.json and .claude\\self_hooks_status.md are gitignored: personal/
+per-machine state, never committed, never shipped in a release.
 """
 
 import argparse
@@ -43,9 +31,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config_lib import get_shared_config, get_expanded_optin, materialize_skill_stub
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
-# Self-use only ever targets THIS hub's own repo, whose layout is always outer-root/toolkit\ post-
-# split - .claude\ (where Claude Code actually writes session state) lives at the outer root, one
-# level above SHARED_ROOT (toolkit\), not inside it.
+# Self-use always targets this hub's own repo: .claude\ (where Claude Code writes session state)
+# lives at the outer root, one level above SHARED_ROOT (toolkit\).
 PROJECT_ROOT = SHARED_ROOT.parent
 OPTINS_DIR = SHARED_ROOT / 'templates' / 'optins'
 SKILLS_DIR = SHARED_ROOT / 'templates' / 'skills'
@@ -56,8 +43,7 @@ SKILLS_INSTALL_DIR = CLAUDE_DIR / 'skills'
 
 
 def write_utf8(path, content):
-    # Python's utf-8 encoding never writes a BOM (unlike PS 5.1's -Encoding utf8); newline='\n'
-    # keeps embedded '\n' as LF instead of Windows-translating it to CRLF on write.
+    # Writes utf-8 with no BOM; newline='\n' keeps embedded '\n' as LF, not CRLF.
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding='utf-8', newline='\n')
 
@@ -67,16 +53,12 @@ def available_tools():
 
 
 def _localize(optin, config):
-    """Self-use hook commands never need to be an absolute, rename-fragile path: unlike a real
-    consumer (a separate project referencing this hub externally), self-use always runs THIS same
-    hub's own toolkit\\ nested one level under its own project root (SHARED_ROOT == PROJECT_ROOT /
-    'toolkit', enforced by this file's own layout comment above). So once get_expanded_optin has
-    substituted the concrete {{SHARED_ROOT}} path, swap that absolute prefix back out for Claude
-    Code's own $CLAUDE_PROJECT_DIR env var - the command then resolves correctly no matter where
-    or what this repo is later moved/renamed to, with no relocate-equivalent ever needed for a
-    self-use hook again. (Found the hard way: a hand-edited absolute path here is exactly what
-    broke self-use hooks after a folder rename, 2026-08-08 - see project_progress.md Work Log.)
-    """
+    """Self-use hook commands never need to be an absolute, rename-fragile path: self-use always
+    runs this same hub's own toolkit\\ nested one level under its own project root (SHARED_ROOT ==
+    PROJECT_ROOT / 'toolkit'). Once get_expanded_optin has substituted the concrete
+    {{SHARED_ROOT}} path, swaps that absolute prefix back out for Claude Code's own
+    $CLAUDE_PROJECT_DIR env var, so the command resolves correctly regardless of where this repo
+    is later moved or renamed."""
     prefix = config['shared_root']
     for groups in optin.get('hooks', {}).values():
         for grp in groups:
@@ -106,8 +88,7 @@ def save_settings(settings):
 
 
 # Normalize a hook-group dict to a comparable string. Collapses '\\\\' -> '/' so a canonical
-# forward-slash command and a compressed-JSON escaped-backslash command compare equal (same
-# normalization check_tower_crane.py's drift check uses).
+# forward-slash command and a compressed-JSON escaped-backslash command compare equal.
 def _normalize(entry):
     return json.dumps(entry, separators=(',', ':')).replace('\\\\', '/')
 

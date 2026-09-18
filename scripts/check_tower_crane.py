@@ -1,17 +1,14 @@
 #!/usr/bin/env python3
 """
-check_tower_crane.py - cross-consumer checker for tower_crane, the executable teeth behind
-"mandatory pre-apply validation" (consumer_platform design, component 2 / decision 4).
+check_tower_crane.py - cross-consumer checker for tower_crane.
 
 Two passes, plus an optional compliance-guidance writer:
 
-  Pass A - Golden regression suite (decision 4, "golden"):
+  Pass A - golden regression suite:
     For each tests/<tool>/ folder that has an expected.yaml, invoke hooks/<tool>.py against
-    every fixture and assert the checker's exit code + a required substring. Catches the class
-    of bug a reference-only scan ships blind to (valid code starts failing / a real failure
-    stops being caught).
+    every fixture and assert the checker's exit code + a required substring.
 
-  Pass B - Reference & drift scan (decision 4, "reference"):
+  Pass B - reference & drift scan:
     Read every consumers/<name>.md registry entry and, for each consumer:
       - assert its path exists on disk (WARN + skip if gone);
       - for each opted-in tool: assert the canonical snippet exists, the hook file it
@@ -20,7 +17,7 @@ Two passes, plus an optional compliance-guidance writer:
       - for each @import in the consumer's CLAUDE.md: assert the referenced protocol piece
         exists shared-side (broken import);
       - IMPORT DRIFT tripwire: a consumer whose CLAUDE.md no longer imports a piece its
-        registry lists (decision 8 - opt-out is detectable, not preventable);
+        registry lists;
       - mandatory-piece glance: filing + compliance + shared_resources not imported -> WARN (a
         SKILL_PIECES entry like 'filing' is also satisfied by its Track-1 skill-stub form);
       - Track-1 skill stub drift (toolkit-governed only): for each
@@ -35,30 +32,24 @@ Two passes, plus an optional compliance-guidance writer:
     self_hooks.py's "skills" opt-in key) isn't covered by the per-consumer loop above - checked
     separately, once, against this hub's own .claude/skills/ regardless of --consumer scoping.
 
-  Compliance guidance (decision 11, the two-way channel, down direction):
-    With --write-guidance, for each reachable consumer that has consumer-actionable FAILs,
-    write the '## Checker deviations' section of <consumer>/COMPLIANCE_GUIDANCE.md (deviations +
-    exact fixes, date + SHA stamped) via guidance_lib.py. A now-compliant consumer's section is
-    cleared (the file itself is removed once no section has content). NEVER edits a consumer's
-    live files - only drops the guidance file the consumer's own agent scans. This is one of two
-    writers sharing that file: broadcast_guidance.py owns the sibling '## Broadcast' section.
+  Compliance guidance: with --write-guidance, for each reachable consumer that has
+    consumer-actionable FAILs, write the '## Checker deviations' section of
+    <consumer>/COMPLIANCE_GUIDANCE.md (deviations + exact fixes, date + SHA stamped) via
+    guidance_lib.py. A now-compliant consumer's section is cleared (the file itself is removed
+    once no section has content). Never edits a consumer's live files - only drops the guidance
+    file the consumer's own agent scans. This is one of two writers sharing that file:
+    broadcast_guidance.py owns the sibling '## Broadcast' section.
 
   --diagnose - fact-reporting only mode for a non-standard
     connect_project/disconnect_consumer.py state that doesn't fit either script's deterministic
     branches. Prints a flat present/absent fact list from two source categories (Tower-Crane-
     specific current-state files, and durable git-history signals that survive hand-deletion or
-    corruption) - never a verdict, never a fix, mirroring hooks\\consistency_check.py's own
-    report-don't-fix split. Standalone-reachable (--path and/or --slug) and auto-invoked inline by
-    new_consumer.py's/disconnect_consumer.py's fatal-error paths via config_lib.print_diagnose_inline.
-    Runs standalone - does not touch Pass A/B's PASS/WARN/FAIL counters or exit code.
+    corruption) - never a verdict, never a fix. Standalone-reachable (--path and/or --slug) and
+    auto-invoked inline by new_consumer.py's/disconnect_consumer.py's fatal-error paths via
+    config_lib.print_diagnose_inline. Runs standalone - does not touch Pass A/B's PASS/WARN/FAIL
+    counters or exit code.
 
 Exit code: 0 if no FAILs, 1 otherwise. WARNs never fail the build.
-
-Cross-platform port of an earlier check_tower_crane.ps1. Logic is a direct translation
-(no existing golden suite for the checker itself, so parity was validated by diffing
-old-vs-new output against the same
-registry). Generated files (COMPLIANCE_GUIDANCE.md) now use LF line endings universally (the
-locked line-endings decision, bundled into this port).
 """
 
 import argparse
@@ -83,8 +74,7 @@ from guidance_lib import read_sections, write_section, SECTION_CHECKER
 from registry_lib import parse_registry, effective_scope, host_path, reconcile_scope_floor
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
-# consumers\ is private hub state, not shipped toolkit content - it lives at the outer root
-# (the outer/inner repo split), one level above SHARED_ROOT (toolkit\).
+# consumers\ lives one level above SHARED_ROOT (toolkit\).
 PROJECT_ROOT = SHARED_ROOT.parent
 HOOKS_DIR = SHARED_ROOT / 'hooks'
 TEMPLATES_DIR = SHARED_ROOT / 'templates'
@@ -160,8 +150,7 @@ def parse_expected(lines):
 
 # registry (consumers/<slug>.md) parsing lives in registry_lib.py (parse_registry, effective_scope,
 # host_path, reconcile_scope_floor) - imported above, shared with relocate.py/update_consumers.py/
-# broadcast_guidance.py so the schema (the scope:/hosts: map) has exactly
-# one parser instead of N drifting copies.
+# broadcast_guidance.py.
 
 
 # ==================================================================================================
@@ -284,10 +273,9 @@ def test_consumer(c, config, this_host):
                                                  None))
 
         # consumer's settings.json must still contain the canonical snippet (drift) - EITHER the
-        # direct-path form (optin, computed above) OR the dispatch-wrapper form (design\
-        # consumer_reference_indirection.md: a new-connection consumer's settings.json legitimately
-        # contains this shape instead, and both are equally compliant, never mixed-and-matched
-        # tolerance for an actually-wrong command).
+        # direct-path form (optin, computed above) OR the dispatch-wrapper form (a new-connection
+        # consumer's settings.json legitimately contains this shape instead; both are equally
+        # compliant, never mixed-and-matched tolerance for an actually-wrong command).
         dispatch_optin = get_dispatch_optin(optin_path, tool, config)
         if consumer_settings is not None:
             missing = False
@@ -567,7 +555,7 @@ def invoke_reference_scan(config, this_host, consumer_filter, write_guidance_fla
         owner_suffix = f" - owner: {c['owner']}" if c['owner'] else ''
         print(f"Consumer: {c['name']} ({f.stem}) - scope: {effective_scope(c)}{owner_suffix}")
 
-        # Federate (#1): a consumer with no hosts.<this_host> entry isn't on THIS disk, so its
+        # A consumer with no hosts.<this_host> entry isn't on THIS disk, so its
         # path/settings can't be validated here. Skip silently (not a WARN).
         if this_host not in c['hosts']:
             print(f"  [skip] not connected on this machine ('{this_host}') - hosts: "

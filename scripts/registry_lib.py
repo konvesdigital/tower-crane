@@ -2,7 +2,7 @@
 """
 registry_lib.py - shared consumers\\<slug>.md registry parser/writer.
 
-Schema (2026-08 migration, replacing the old single `path:`/`host:` pair):
+Schema:
   scope: local | multi_machine
   remote: <git remote URL> (optional, top-level)
   hosts:
@@ -10,24 +10,22 @@ Schema (2026-08 migration, replacing the old single `path:`/`host:` pair):
       path: <absolute path, forward-slash form>
       registered: <YYYY-MM-DD - when THIS host connected, not the project's overall registered:>
 
-`scope` is a declared field with a mechanical floor, not purely derived (see the design doc's
-correction): registration sets it directly, but any tool that touches the registry must persist-
-correct it to `multi_machine` the moment 2+ hosts: entries exist, regardless of the declared
-value. reconcile_scope_floor() below is that correction, meant to be called by every script that
-walks the registry (check_tower_crane.py Pass B, relocate.py).
+`scope` is a declared field with a mechanical floor, not purely derived: registration sets it
+directly, but any tool that touches the registry must persist-correct it to `multi_machine` the
+moment 2+ hosts: entries exist, regardless of the declared value. reconcile_scope_floor() below is
+that correction, meant to be called by every script that walks the registry (check_tower_crane.py
+Pass B, relocate.py).
 
-`remote` is a project-level property (sibling to `scope`/`owner`,
-not nested under any one host) recording the consumer's OWN git remote URL, captured once at first
-registration from `git remote get-url origin` when available. Deliberately static - seed-once, no
-continuous drift-check. Absent for a consumer registered before
-this field existed, or one with no git remote configured at registration time; `new_consumer.py`
-reads it to offer a clone-before-scaffold bootstrap when connecting an already-registered consumer
-to an empty target folder.
+`remote` is a project-level property (sibling to `scope`/`owner`, not nested under any one host)
+recording the consumer's OWN git remote URL, captured once at first registration from `git remote
+get-url origin` when available. Deliberately static - seed-once, no continuous drift-check. Absent
+for a consumer registered before this field existed, or one with no git remote configured at
+registration time; `new_consumer.py` reads it to offer a clone-before-scaffold bootstrap when
+connecting an already-registered consumer to an empty target folder.
 
 Single source of truth for registry parsing - check_tower_crane.py, relocate.py,
 update_consumers.py, and broadcast_guidance.py all import parse_registry() from here instead of
-each hand-rolling their own copy (they did, pre-migration; consolidated here since the schema
-change touches all of them identically).
+each hand-rolling their own copy.
 """
 
 import re
@@ -181,7 +179,7 @@ def host_path(consumer, host_id):
 
 
 def reconcile_scope_floor(path, consumer):
-    """The design doc's '2-host write-back floor': if 2+ hosts: entries are present but the
+    """The 2-host write-back floor: if 2+ hosts: entries are present but the
     declared `scope:` line isn't already multi_machine, persist-correct it now. Meant to be
     called by every registry-touching tool (check_tower_crane.py Pass B, relocate.py) on each
     consumer it visits. Returns True if the file was rewritten; mutates consumer['scope'] to
@@ -255,9 +253,8 @@ def remove_host_from_text(raw_text, host_id):
 
     Returns (new_text, was_present, host_count_after). `host_count_after` of 0 means the caller
     should hard-delete the registry file instead of writing new_text back (an entry with an empty
-    hosts: block is not a valid end state - connect_disconnect.md's "hard delete, git history is the
-    record" decision, 2026-08-12). Raises ValueError if the file has no parseable yaml block or no
-    `hosts:` key.
+    hosts: block is not a valid end state). Raises ValueError if the file has no parseable yaml
+    block or no `hosts:` key.
     """
     m = YAML_BLOCK_RE.search(raw_text)
     if not m:

@@ -1,46 +1,29 @@
 #!/usr/bin/env python3
 """
-ticket_scan.py - pure-Python, zero-AI mechanical scan of change_requests\\*.md, the token-free
-gate `scripts\\run_automation.py` (Piece 3) checks before ever paying
-for a headless Claude Code invocation.
+ticket_scan.py - pure-Python, zero-AI mechanical scan of change_requests\\*.md.
 
 Two responsibilities, both importable (no `claude` subprocess calls live here):
 
-  scan() / parse_ticket() - categorize every OPEN ticket using the exact rule CLAUDE.md's
-    "Scanning at session start" already documents for a human session. No PR-outcome states exist
-    here (local ticket fixes commit directly, no PR is ever opened for a ticket) - just
-    VERIFIED_PASS, on top of the ordinary human-session categories.
+  scan() / parse_ticket() - categorize every OPEN ticket using the same rule a human session's
+    "Scanning at session start" check applies. No PR-outcome states exist here (local ticket fixes
+    commit directly, no PR is ever opened for a ticket) - just VERIFIED_PASS, on top of the
+    ordinary categories.
 
   filter_by_project() - narrows a scan() result to tickets that plausibly mention a given consumer
     project (case-insensitive substring over each ticket's raw text), reached via `--project` on
-    the CLI. A connected project's own
-    `resume`-time ticket scan (templates\\filing_resume_check.md) needs this to reuse the same
-    categorization the hub's own scan already gets, instead of re-deriving it by hand from every
-    OPEN ticket's round-trip log - see that function's own docstring for the residual manual check
-    it deliberately does not eliminate.
+    the CLI.
 
   apply_mechanical_actions() - perform the one category that needs no judgment at all: flip a
     consumer-verified ticket to DONE. Every write here touches only change_requests\\<file>.md -
-    `git add change_requests`, never `-A` - so the "auto-merge never for
-    hooks\\/scripts\\/templates\\/agents\\" boundary stays unambiguous even though this ticket-inbox
-    bookkeeping itself goes straight to the outer (private) repo's main (Piece 1's already-locked
-    precedent: a filed ticket / its own metadata is inert until acted on, so it stays ungated). Runs
-    against PROJECT_ROOT, not SHARED_ROOT - change_requests\\ lives in the outer repo, a sibling of
-    the inner toolkit\\ repo this module's SHARED_ROOT points at (the outer/inner repo split).
-    The CLI's `--apply` also prints the remaining OPEN tickets' categorization
-    right after applying, so an interactive (human) session's resume-time scan is one call instead
-    of a dry-run-then-hand-apply round trip - `run_automation.py` never uses the CLI at all, only
-    the importable functions, so this is purely an interactive-session convenience.
+    `git add change_requests`, never `-A`. Runs against PROJECT_ROOT, not SHARED_ROOT -
+    change_requests\\ lives in the outer repo, a sibling of the inner toolkit\\ repo this module's
+    SHARED_ROOT points at. The CLI's `--apply` also prints the remaining OPEN tickets'
+    categorization right after applying.
 
   Attempt-tracking (load_state/record_attempt/is_backed_off) is separate from categorization so a
     ticket whose fix keeps failing check_tower_crane.py backs off after max_attempts instead of
     starving every other candidate behind it forever (run_automation.py always picks the oldest
     fix-worthy ticket first).
-
-No golden-suite fixtures - matches the established convention for scripts\\*.py maintainer tooling
-(relocate.py, broadcast_guidance.py, self_hooks.py all have none either;
-check_tower_crane.py's golden discovery is hardcoded to hooks\\<tool>.py, not scripts\\). Verified
-via manual/live testing against real ticket files instead - see project_progress.md.
 """
 
 import argparse
@@ -68,9 +51,7 @@ class Category:
     AWAITING_CONSUMER = 'awaiting_consumer'
     VERIFIED_PASS = 'verified_pass'
     STILL_FAILS = 'still_fails'
-    OPERATOR_OVERRIDE = 'operator_override'      # operator directly instructed a DONE flip - no
-                                                  # verify to wait on, no other side's sign-off
-                                                  # needed
+    OPERATOR_OVERRIDE = 'operator_override'      # operator directly instructed a DONE flip
     UNKNOWN_STATE = 'unknown_state'              # non-empty log, none of the above - log, don't guess
     REGISTRATION = 'registration'                # Type: registration - excluded from all automation
 
@@ -106,12 +87,9 @@ ENTRY_START_RE = re.compile(r'^(?:- |\*\*\d{4}-\d{2}-\d{2}\b)')
 
 def _log_entries(section_body):
     """Split a log section's body into bullet entries. An entry starts at a line beginning with
-    '- ' (no leading whitespace; matches every real ticket's wrapped-paragraph style, e.g.
-    change_requests\\2026-07-20_consistency_check_ps1-to-python.md's multi-line bullets) OR at a
-    line beginning with a bold dated header, e.g. '**2026-09-01 — ...**' (the shape several
-    round-trip entries drifted into without the leading '- ' - recognized here rather than
-    rewriting every such entry back to the dash form, so a future entry in either shape still
-    parses). Any following line matching neither start pattern is that entry's continuation."""
+    '- ' (no leading whitespace) OR at a line beginning with a bold dated header, e.g.
+    '**2026-09-01 — ...**'. Any following line matching neither start pattern is that entry's
+    continuation."""
     entries = []
     current = []
     for line in section_body.splitlines():
@@ -180,8 +158,7 @@ def scan(change_requests_dir=CHANGE_REQUESTS_DIR):
 # --- append a dated round-trip/processing log line -----------------------------------------------
 def append_log_line(ticket_path, line):
     """Append one line (caller includes the leading '- ') to the ticket's log section. Used by
-    both apply_mechanical_actions() here and run_automation.py's own "fix proposed" line, so every
-    automation-authored append goes through one code path."""
+    both apply_mechanical_actions() here and run_automation.py's own "fix proposed" line."""
     text = ticket_path.read_text(encoding='utf-8')
     if not text.endswith('\n'):
         text += '\n'
@@ -234,23 +211,18 @@ def needs_fix_candidates(tickets, state, max_attempts=3):
 
 
 # --- mechanical actions: no judgment required, safe to perform without an AI invocation -----------
-# change_requests\ lives in the outer (private) repo, PROJECT_ROOT - a sibling of the inner toolkit\
-# repo SHARED_ROOT points at (the outer/inner repo split). Ticket bookkeeping
-# git operations must target PROJECT_ROOT, never SHARED_ROOT.
+# change_requests\ lives in the outer (private) repo, PROJECT_ROOT, a sibling of the inner
+# toolkit\ repo SHARED_ROOT points at. Ticket bookkeeping git operations must target PROJECT_ROOT,
+# never SHARED_ROOT.
 def _run_git(args, cwd=PROJECT_ROOT):
     return subprocess.run(['git', '-C', str(cwd)] + args, capture_output=True, text=True, check=True)
 
 
 def apply_mechanical_actions(tickets, dry_run=False):
     """Handle VERIFIED_PASS and OPERATOR_OVERRIDE (flip DONE) - the only categories needing
-    mechanical action now that ticket fixes never open a PR.
-    OPERATOR_OVERRIDE needs no consumer verify and no other
-    side's sign-off - it's here mainly as a safety net for the case where the overriding session
-    logged the phrase but, for whatever reason, didn't flip Status itself; the common case is it's
-    already DONE by the time this scan sees it, so scan() (OPEN-only) won't even surface it.
-    Mutates each affected Ticket's .status in place so a status change is visible to
-    needs_fix_candidates() in the SAME tick, not next hour's scan. Returns a summary dict. One
-    commit+push covering everything changed, not one per ticket."""
+    mechanical action now that ticket fixes never open a PR. Mutates each affected Ticket's
+    .status in place so a status change is visible to needs_fix_candidates() in the same tick.
+    Returns a summary dict. One commit+push covering everything changed, not one per ticket."""
     today = date.today().isoformat()
     touched_files = []
     summary = {'done_flipped': [], 'errors': []}
@@ -284,26 +256,14 @@ def apply_mechanical_actions(tickets, dry_run=False):
 
 
 def filter_by_project(tickets, names):
-    """Case-insensitive substring match against each ticket's full raw text, for ANY of `names` -
-    a consumer session's own `filing` scan (templates\\filing_resume_check.md) uses this to narrow
-    the categorized list down to tickets that plausibly involve THIS project, since scan()/
-    parse_ticket() have no per-consumer concept otherwise (this script is shared by the hub's own
-    scan, where every OPEN ticket is relevant regardless of filer). Takes multiple names, not one,
-    because real ticket text names a project inconsistently - a slug uses underscores
-    (`some_project`), a "Filed by:" line uses the full Title-Case name (`Some Project`), and
-    round-trip prose freely uses an ad-hoc abbreviation instead of either - none is a reliable
-    single string to match on alone (a slug in particular never matches a "Filed by:" line, since
-    that line never contains underscores). Pass every form this project is known by.
+    """Case-insensitive substring match against each ticket's full raw text, for any of `names`.
+    Takes multiple names because a project may be named inconsistently across ticket text (a
+    slug, a full title, an ad-hoc abbreviation) - pass every form this project is known by.
 
-    Deliberately still coarse even with multiple names, same reliability class as a human skimming
-    for any of them: a hit only means one of `names` appears somewhere in the ticket's text (Filed
-    by:, Symptom/repro prose, a cross-consumer verify-request's free-text naming - none of these
-    have one fixed structured field to grep instead), NOT that this project is necessarily who's
-    being awaited right now - a ticket can legitimately affect more than one consumer. For an
-    AWAITING_CONSUMER hit specifically, the caller must still confirm the ticket's own last
-    round-trip line actually names this project before treating it as this project's turn
-    (this residual manual step is not eliminated, only narrowed to the tickets this filter
-    actually surfaces)."""
+    A hit only means one of `names` appears somewhere in the ticket's text, not that this project
+    is necessarily who's being awaited right now - a ticket can legitimately affect more than one
+    consumer. For an AWAITING_CONSUMER hit specifically, the caller must still confirm the
+    ticket's own last round-trip line actually names this project."""
     needles = [n.lower() for n in names]
     return [t for t in tickets if any(n in t.text.lower() for n in needles)]
 
@@ -319,12 +279,9 @@ def main():
     parser.add_argument('--json', action='store_true', help="Emit the categorized report as JSON instead of text.")
     parser.add_argument('--project', nargs='+', default=None,
                          help="Filter to tickets whose text mentions ANY of these project "
-                              "names/slug/abbreviations (case-insensitive substring) - for a "
-                              "consumer session's own scan, not used by the hub's own resume-time "
-                              "scan (every ticket is relevant there). Pass every form this project "
-                              "is known by (slug, full name, common abbreviation) - see "
-                              "filter_by_project()'s docstring for why one alone isn't reliable, "
-                              "and for the residual manual check this doesn't eliminate.")
+                              "names/slug/abbreviations (case-insensitive substring). Pass every "
+                              "form this project is known by (slug, full name, common "
+                              "abbreviation).")
     args = parser.parse_args()
 
     tickets = scan()

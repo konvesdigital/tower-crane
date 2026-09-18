@@ -1,34 +1,21 @@
 #!/usr/bin/env python3
 """
-resume_check.py - `resume`'s Shape-B fix: chains
-the already-scripted, notify-only `resume` checks into one call instead of separately
-prose-sequenced Bash invocations every session.
+resume_check.py - chains resume's notify-only checks into one call.
 
-Runs, in order, each exactly as `resume` already documents invoking it standalone:
+Runs, in order:
   1. update_toolkit.py --notify           (toolkit\\ dirty / incoming / outgoing state)
   2. check_hook_activation.py             (--project-root <outer repo root>)
   3. check_multi_machine.py               (no args)
   4. check_stale_paths.py                 (no args)
-  5. check_shared_resource_catalog.py     (no args - added 2026-09-02, resume-only per user
-                                            request, deliberately not run at `quick resume`: it
-                                            checks shared_resources\\CATALOG.md/
-                                            resource_relationships.yaml internal consistency,
-                                            hub-root content that doesn't change within a single
-                                            mid-session `checkpoint`-then-reopen gap)
+  5. check_shared_resource_catalog.py     (no args - resume-only, not run at `quick resume`)
 
-All five are guaranteed side-effect-free and always exit 0 (each is a notify-only heads-up, never a
-gate - see their own docstrings), so this script does no pass/fail interpretation of its own; it
-just runs each in turn and prints its output verbatim under a numbered header, silent sub-sections
-included, so the reader (or the agent following `resume`) still applies the exact same per-tag
-reporting rules `resume`'s own steps already state: dirty/incoming/outgoing lines from step 1,
-[UNWIRED]/[BROKEN] from step 2, [NUDGE] from step 3, [STALE-PATH] from step 4, [FAIL]/[MISMATCH]
-from step 5. Consolidating the CALL, not the interpretation - each check's own semantics are
-untouched.
+All five are side-effect-free and always exit 0. This script does no pass/fail interpretation of
+its own - it runs each in turn and prints its output verbatim under a numbered header, silent
+sub-sections included. Reporting tags per step: dirty/incoming/outgoing lines (step 1),
+[UNWIRED]/[BROKEN] (step 2), [NUDGE] (step 3), [STALE-PATH] (step 4), [FAIL]/[MISMATCH] (step 5).
 
 Usage: python scripts\\resume_check.py [--project-root <path>]
---project-root defaults to this toolkit\\ checkout's own parent (the outer repo root) - the same
-value check_multi_machine.py/check_stale_paths.py already compute for themselves via SHARED_ROOT,
-so this script works correctly regardless of the caller's own cwd.
+--project-root defaults to this toolkit\\ checkout's own parent (the outer repo root).
 """
 
 import argparse
@@ -55,9 +42,7 @@ def _run(python_launcher, script_name, extra_args=None):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Chains resume's four notify-only checks (update_toolkit.py --notify, "
-                     "check_hook_activation.py, check_multi_machine.py, check_stale_paths.py) into "
-                     "one consolidated report."
+        description="Chains resume's notify-only checks into one consolidated report."
     )
     parser.add_argument('--project-root', default=str(PROJECT_ROOT),
                          help="Outer repo root, passed through to check_hook_activation.py. "

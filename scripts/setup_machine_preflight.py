@@ -1,22 +1,17 @@
 #!/usr/bin/env python3
 """
-setup_machine_preflight.py - templates\\setup_machine.md's revised Step 0: mechanizes the fixed,
-real-branching sequence that used to be
-100% prose - shape detection (flat vs. already-nested vs. ambiguous), the in-place nesting mechanic,
-building or attaching the outer layer, and the host_id context lookup. Same Shape-B rationale
-as resume_check.py/checkpoint_git.py (B1/B2): a mechanical sequence with real branches deserves one
-deterministic call, not a checklist re-decided from scratch the one time it runs.
+setup_machine_preflight.py - templates\\setup_machine.md's Step 0: shape detection (flat vs.
+already-nested vs. ambiguous), the in-place nesting mechanic, building or attaching the outer
+layer, and the host_id context lookup.
 
-What this script deliberately does NOT do:
-  - Ask "reconnect vs. new" (C1) or "where did you actually clone this" (C5's fallback question) -
-    those are judgment questions for the user, not facts a script can check. `--detect` surfaces the
-    evidence; the agent asks the human-facing question and picks the next subcommand accordingly.
-  - Check `gh --version` (C4) - reversed to a lazy, exactly-when-needed check in setup_machine.md's
-    own prose. Front-loading it here would be the exact over-eager-capability-check C4 rejected.
-  - Commit or push anything `--new-outer` scaffolds - that reuses the ordinary checkpoint_git.py
-    (B2) flow instead of duplicating its commit/leak-scan/push logic here (`checkpoint_git.py
-    --include-all` stages and commits fresh, all-untracked scaffold content exactly the same way it
-    stages any other checkpoint).
+What this script does NOT do:
+  - Ask "reconnect vs. new" or "where did you actually clone this" - those are judgment questions
+    for the user, not facts a script can check. `--detect` surfaces the evidence; the agent asks
+    the human-facing question and picks the next subcommand accordingly.
+  - Check `gh --version`.
+  - Commit or push anything `--new-outer` scaffolds - that goes through the ordinary
+    checkpoint_git.py flow instead (`checkpoint_git.py --include-all` stages and commits fresh,
+    all-untracked scaffold content the same way it stages any other checkpoint).
 
 Subcommands (mutually exclusive):
   --detect
@@ -27,8 +22,8 @@ Subcommands (mutually exclusive):
         nested     - already correctly structured, either as outer-root-with-toolkit-subfolder or
                      as a toolkit\\ checkout one level under an already-populated outer folder.
                      Nothing further needed here - proceed to setup_machine.md's Step 1.
-        ambiguous  - neither shape found. C5: ask the user directly where they actually cloned
-                     things, relative to where this session is running.
+        ambiguous  - neither shape found. Ask the user directly where they actually cloned things,
+                     relative to where this session is running.
       Prints the classification plus the evidence it was decided on.
 
   --nest
@@ -52,29 +47,24 @@ Subcommands (mutually exclusive):
       subfolder) and a plain `git clone` would refuse it.
 
   --known-hosts
-      Read-only (C6). Lists host identities this hub already knows about - every consumer registry's
+      Read-only. Lists host identities this hub already knows about - every consumer registry's
       `hosts:` map (`consumers\\*.md`) plus `project_progress.md`'s own Work Log host tags
-      (`**YYYY-MM-DD — HOST session:**`), exactly the two sources C6 names - so Step 5's host_id
-      question can offer them as context instead of proposing only the raw hostname with nothing to
-      compare it to. Deliberately does NOT scan `project_progress_archive.md`: its heading
-      parenthetical isn't reliably a host tag at all (real examples found live: `(later session)`,
-      `(discussion)` - free text, not host identities), so treating it as one would reintroduce the
-      exact "designed around our own artifacts" mistake C6 explicitly rejected. Empty output is
-      expected and fine on a genuinely first-ever machine.
+      (`**YYYY-MM-DD — HOST session:**`). Does not scan `project_progress_archive.md`: its heading
+      parenthetical isn't reliably a host tag at all (real examples found: `(later session)`,
+      `(discussion)` - free text, not host identities). Empty output is expected on a genuinely
+      first-ever machine.
 
   --reattach-origin --git-remote-url URL
-      Mutating. Restores a removed 'origin' remote on an
-      already-nested, already-historied repo - unlike --attach-existing (the C2 workaround for a
-      repo with NO local history yet), this never runs `git init`/`checkout -b`: local `main` and
-      its history are untouched, just `remote add` + `fetch` + restoring the upstream-tracking
-      relationship. Never merges or resets - any real divergence from being disconnected is left for
-      the ordinary `update`/`checkpoint` flow to surface, same as any other remote reconnect. `cmd_
-      detect`'s NESTED output reports `[ORIGIN-MISSING]` per-repo when this is needed.
+      Mutating. Restores a removed 'origin' remote on an already-nested, already-historied repo -
+      unlike --attach-existing, this never runs `git init`/`checkout -b`: local `main` and its
+      history are untouched, just `remote add` + `fetch` + restoring the upstream-tracking
+      relationship. Never merges or resets - any real divergence from being disconnected is left
+      for the ordinary `update`/`checkpoint` flow to surface. `cmd_detect`'s NESTED output reports
+      `[ORIGIN-MISSING]` per-repo when this is needed.
 
   --clear-uninstall-note
-      Mutating. Deletes a stale TOWER_CRANE_UNINSTALLED.md
-      from cwd (the outer hub root) if present - the note a prior "uninstall" wrote, now stale since
-      this machine is being set up again. No-op, not an error, if the file isn't there.
+      Mutating. Deletes a stale TOWER_CRANE_UNINSTALLED.md from cwd (the outer hub root) if
+      present. No-op, not an error, if the file isn't there.
 
 Self-locating like every other script here: TOOLKIT_ROOT/PROJECT_ROOT are computed fresh from this
 file's own current location on each run, never cached - so --known-hosts (which only makes sense
@@ -118,10 +108,8 @@ def _origin_status(repo_dir):
 
 
 def _report_origin_and_note(outer_dir, toolkit_dir):
-    """Shared by both NESTED branches of cmd_detect(): reports
-    each repo's 'origin' status and whether a stale uninstall note is sitting in the outer root -
-    both only ever missing/present because a prior "uninstall" ran here, never on a first-ever
-    machine (whose repos always have 'origin' from --new-outer/--attach-existing)."""
+    """Shared by both NESTED branches of cmd_detect(): reports each repo's 'origin' status and
+    whether a stale uninstall note is sitting in the outer root."""
     for label, repo_dir in (("outer hub repo", outer_dir), ("toolkit\\", toolkit_dir)):
         status = _origin_status(repo_dir)
         if status is None:
@@ -146,8 +134,8 @@ def cmd_detect(cwd):
     missing_sub = has_toolkit_signature(toolkit_sub) if toolkit_sub.is_dir() else TOOLKIT_SIGNATURE
 
     if not missing_here:
-        # cwd itself is a toolkit clone. Nested (old Scenario A) if the parent already looks like
-        # an outer hub; otherwise flat, needing --nest.
+        # cwd itself is a toolkit clone. Nested if the parent already looks like an outer hub;
+        # otherwise flat, needing --nest.
         parent_found = has_outer_signature(cwd.parent)
         if parent_found:
             print(f"[NESTED] cwd ({cwd}) is a toolkit\\ checkout; its parent ({cwd.parent}) already "
@@ -324,13 +312,12 @@ def cmd_attach_existing(cwd, git_remote_url):
 
 
 def cmd_reattach_origin(cwd, git_remote_url):
-    """--reattach-origin --git-remote-url URL: restores a
-    removed 'origin' remote on an already-nested, already-historied repo. Unlike
-    cmd_attach_existing (the C2 workaround for a repo with NO local history yet), never runs
+    """--reattach-origin --git-remote-url URL: restores a removed 'origin' remote on an
+    already-nested, already-historied repo. Unlike cmd_attach_existing, never runs
     `git init`/`checkout -b` - local main and its history are untouched, just `remote add` +
     `fetch` + restoring the upstream-tracking relationship. Never merges or resets - any real
     divergence from being disconnected is left for the ordinary `update`/`checkpoint` flow to
-    surface, same as any other remote reconnect."""
+    surface."""
     if not git_remote_url:
         print("[ABORT] --reattach-origin requires --git-remote-url.")
         sys.exit(1)
@@ -371,10 +358,8 @@ def cmd_reattach_origin(cwd, git_remote_url):
 
 
 def cmd_clear_uninstall_note(cwd):
-    """--clear-uninstall-note: deletes a stale
-    TOWER_CRANE_UNINSTALLED.md from cwd (the outer hub root) if present - the note a prior
-    "uninstall" wrote, now stale since this machine is being set up again. No-op, not an error, if
-    the file isn't there."""
+    """--clear-uninstall-note: deletes a stale TOWER_CRANE_UNINSTALLED.md from cwd (the outer hub
+    root) if present. No-op, not an error, if the file isn't there."""
     note_path = cwd / 'TOWER_CRANE_UNINSTALLED.md'
     if note_path.exists():
         note_path.unlink()
@@ -419,11 +404,10 @@ def cmd_known_hosts(cwd):
 
 
 def cmd_write_bash_allowlist(cwd):
-    """--write-bash-allowlist: merges the hub-scope Bash/
-    PowerShell rules from templates\\bash_allowlist.json into THIS machine's own, gitignored
-    .claude\\settings.local.json - so the routine resume/checkpoint/update commands AGENTS.md
-    already documents never reach the ambient auto-mode permission classifier. Self-locating like
-    every other command here (ignores cwd); safe to re-run any time (append-if-missing)."""
+    """--write-bash-allowlist: merges the hub-scope Bash/PowerShell rules from
+    templates\\bash_allowlist.json into this machine's own, gitignored .claude\\settings.local.json.
+    Self-locating like every other command here (ignores cwd); safe to re-run any time
+    (append-if-missing)."""
     toolkit_root = Path(__file__).resolve().parent.parent
     project_root = toolkit_root.parent
     cfg = get_shared_config(toolkit_root)

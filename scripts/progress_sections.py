@@ -2,23 +2,16 @@
 """
 progress_sections.py - prints exactly the four pieces of project_progress.md that AGENTS.md's
 "resume" (step 4) and "quick resume" (step 2) both need: Current Status, Next Up, the Decisions
-table, and only the MOST RECENT Work Log entry. Replaces a by-hand grep-for-headings-then-Read-with-
-offset dance repeated at the start of every session with one deterministic call - same motivation
-as resume_check.py (B1) consolidating the four notify-only sync checks, and ticket_scan.py replacing
-hand-derived ticket categorization.
+table, and only the MOST RECENT Work Log entry.
 
-Section boundaries are fixed by project_progress.md's own documented structure (its own header
-comment / agents_continuity.md's "checkpoint" step 1): four top-level '## ' headings, always in
-this order - Current Status, Next Up, Decisions, Work Log - each running to the next '## ' heading
-or end of file. The Work Log heading itself carries extra trailing text (an inline instruction),
-matched by prefix rather than an exact string so a future rewording doesn't silently break this.
+Section boundaries are fixed by project_progress.md's own documented structure: four top-level
+'## ' headings, always in this order - Current Status, Next Up, Decisions, Work Log - each
+running to the next '## ' heading or end of file. The Work Log heading itself carries extra
+trailing text (an inline instruction), matched by prefix rather than an exact string so a future
+rewording doesn't silently break this.
 
 Work Log entries are newest-first, each starting at a line beginning with '**YYYY-MM-DD' (bold
-dated header - project_progress.md's own convention, confirmed 2026-09-14). Recognized with the
-same tolerant pattern ticket_scan.py already uses for round-trip logs (also accepting a plain
-'- ' dash-bullet start) rather than assuming the bold form only, after that exact single-form
-assumption already caused ticket_scan.py to silently miss real entries once (see
-project_progress.md's own Decisions table, "ticket_scan.py's round-trip-log parser").
+dated header) or a plain '- ' dash-bullet start.
 """
 
 import re

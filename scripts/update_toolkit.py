@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """
-update_toolkit.py - the `update` action: pulls this inner toolkit repo's own `origin`
-remote (the public tower_crane repo, or whichever upstream this clone points at) under a
-diff-review trust gate, instead of a blind `git pull`.
+update_toolkit.py - the `update` action: pulls this inner toolkit repo's own `origin` remote (the
+public tower_crane repo, or whichever upstream this clone points at) under a diff-review trust
+gate, instead of a blind `git pull`.
 
-Mechanical-gate-then-agent split (Locked 2026-07-26, mirrors run_automation.py's Piece 3 shape):
-this script owns every deterministic step - fetch, diff-against-last-reviewed decision, golden
+This script owns every deterministic step - fetch, diff-against-last-reviewed decision, golden
 suite, and the post-approval merge. The diff-review-and-assessment step itself (reading the
 literal diff, writing a plain-language read of what it does) is NOT here - it stays a Claude Code
-procedure (toolkit\\AGENTS.md's "update" section, alongside checkpoint/resume), since it is
-judgment work with no deterministic algorithm.
+procedure (toolkit\\AGENTS.md's "update" section), since it is judgment work with no deterministic
+algorithm.
 
 Two-call protocol, because the review gate needs a human/Claude in the loop between the mechanical
 check and the mechanical merge:
@@ -19,84 +18,64 @@ check and the mechanical merge:
                 throwaway git worktree or via direct ref comparison (never touches this clone's
                 real working tree): check_tower_crane.py's golden suite (Pass A only - Pass B needs
                 the live consumers\\ registry, see below); a consistency_check.py static-analysis
-                sweep over every .py file in hooks\\/scripts\\/agents\\ (closes the gap the golden
-                suite leaves for a brand-new script with no tests\\<tool>\\ fixtures yet); and
-                check_file_surface.py's file-surface classifier (assumes an adversary, not just
-                carelessness - catches a non-Python script, a script outside its expected home, a
-                second AI-directive file, or a binary blob). Any FAIL hard-blocks (Locked
-                2026-07-25 for the golden suite, extended 2026-07-27 to the other two gates - no
-                override). PASS prints the literal diff text and leaves a pending-review marker for
+                sweep over every .py file in hooks\\/scripts\\/agents\\; and check_file_surface.py's
+                file-surface classifier (catches a non-Python script, a script outside its expected
+                home, a second AI-directive file, or a binary blob). Any FAIL hard-blocks, no
+                override. PASS prints the literal diff text and leaves a pending-review marker for
                 --approve/--reject.
   --approve [--through <n-or-sha>]
               Only valid after a --check left a pending PASS. Re-fetches to confirm origin/main
               hasn't moved since the diff was shown, merges (fast-forward), then runs relocate.py
-              against every locally-reachable consumer (self-heal, added 2026-08-18 -
-              run_relocate()'s docstring: relocate.py/update_consumers.py are federated by design,
-              so a canonical skill-stub/hub_pointer/dispatch-wrapper change merged here never
-              reaches this machine's own consumers until something refreshes them - without this
-              step every such change would deterministically fail the next gate on this machine),
-              then runs a FOURTH gate: the full check_tower_crane.py (both passes, including Pass
-              B's cross-consumer drift scan) against the now-live merged content and the real
-              consumers\\ registry - something only possible post-merge, since Pass B needs
-              consumers\\ (outer repo) and a real toolkit\\ location, neither reachable from the
-              pre-merge worktree. A FAIL here automatically rolls the merge back (fast-forward
-              makes this a clean `git reset --hard`) rather than leaving a broken state landed.
-              Only on a clean pass does last_reviewed_sha actually advance.
+              against every locally-reachable consumer (a canonical skill-stub/hub_pointer/
+              dispatch-wrapper change merged here never reaches this machine's own consumers until
+              something refreshes them), then runs a FOURTH gate: the full check_tower_crane.py
+              (both passes, including Pass B's cross-consumer drift scan) against the now-live
+              merged content and the real consumers\\ registry - something only possible
+              post-merge, since Pass B needs consumers\\ (outer repo) and a real toolkit\\
+              location, neither reachable from the pre-merge worktree. A FAIL here automatically
+              rolls the merge back (fast-forward makes this a clean `git reset --hard`) rather than
+              leaving a broken state landed. Only on a clean pass does last_reviewed_sha actually
+              advance.
                 Without --through: approves every pending commit shown by --check (all the way to
-              origin/main). With --through <n-or-sha>: partial approval, added 2026-07-27 (security
-              stress-test pass) - fast-forwards only to the given
-              commit (a 1-based index into the pending-commit list --check printed, or one of those
-              commits' own SHAs), leaving the remaining, newer pending commits queued. Lets a large
-              batch of upstream commits be reviewed a few at a time across multiple `update` calls
-              instead of forcing one all-or-nothing read of a potentially large diff in one sitting
-              (a real residual risk this project's own diff-size gate only partially covers). The
-              mechanical gates below still always run against the FULL pending
-              range regardless of --through, so nothing merges - partial or otherwise - until
-              everything currently fetched has passed every gate; --through only controls how much
-              of what already passed gets merged and trusted in this round.
+              origin/main). With --through <n-or-sha>: partial approval - fast-forwards only to the
+              given commit (a 1-based index into the pending-commit list --check printed, or one of
+              those commits' own SHAs), leaving the remaining, newer pending commits queued. Lets a
+              large batch of upstream commits be reviewed a few at a time across multiple `update`
+              calls. The mechanical gates below still always run against the FULL pending range
+              regardless of --through, so nothing merges - partial or otherwise - until everything
+              currently fetched has passed every gate; --through only controls how much of what
+              already passed gets merged and trusted in this round.
   --reject    Clears the pending marker. Nothing was ever merged during --check (the golden suite
               ran against a worktree, not this clone), so rejecting is just "forget the pending
               review" - the old trusted baseline was never actually left.
 
-last_reviewed_sha lives at toolkit\\.last_reviewed_sha (gitignored -
-a property of this specific clone, not the toolkit content).
+last_reviewed_sha lives at toolkit\\.last_reviewed_sha (gitignored - a property of this specific
+clone, not the toolkit content).
 First run (file absent): trust-on-first-use - the clone's current local HEAD becomes the initial
-baseline (same bootstrap assumption as an SSH known_hosts first connection or a fresh lockfile
-install; nothing to review yet since nothing has been pulled through this gate before).
+baseline.
 
-Update is always the user's choice, never assumed or forced (Locked 2026-07-26) - this script never
-runs itself; nothing schedules --check automatically.
+Update is always the user's choice, never assumed or forced - this script never runs itself;
+nothing schedules --check automatically.
 
-  --notify    The "check for update" proactive notice: plain
-              fetch + comparison against last_reviewed_sha, no golden suite, no pending-file
-              write, never mutates state. Prints one line per direction. Safe on any cadence
-              (resume, cron) - never triggers the full review gate; that stays --check,
-              user-initiated only. Also checks the outgoing direction: local HEAD ahead of
-              origin/main means an
-              earlier checkpoint's push was rejected or never completed - surfaced independently of
-              the incoming last_reviewed_sha comparison, so a stranded local commit is never
-              silently forgotten by a later session on any machine. Also checks for an uncommitted
-              working tree (added 2026-08-11): a dirty toolkit\\ previously passed unnoticed through
-              --notify/resume, only surfacing later when --check's own dirty-tree abort happened to
-              run - now checked here too, on the same immediate-every-resume footing as the other
-              two directions.
+  --notify    The "check for update" proactive notice: plain fetch + comparison against
+              last_reviewed_sha, no golden suite, no pending-file write, never mutates state.
+              Prints one line per direction. Safe on any cadence (resume, cron) - never triggers
+              the full review gate; that stays --check, user-initiated only. Also checks the
+              outgoing direction: local HEAD ahead of origin/main means an earlier checkpoint's
+              push was rejected or never completed. Also checks for an uncommitted working tree.
   --consumer  Modifier, only meaningful with --notify: every --notify message above names a
-              hub-only fix verb
-              (`checkpoint`, `update`) describing the hub's own toolkit\\ clone state relative to
-              its public upstream - correct and actionable when read in a hub session
-              (resume_check.py), but misleading when the identical text surfaces verbatim in a
-              connected consumer session (consumer_resume_check.py), where none of those verbs are
-              reachable and the state described isn't this project's own update status (that's
-              scan_consumer_update.py's separate, already-correct territory). --consumer rephrases
-              every such message as informational-only, pointing at a session opened directly in
-              the hub instead. Never changes the underlying check, only the audience of the text.
+              hub-only fix verb (`checkpoint`, `update`) describing the hub's own toolkit\\ clone
+              state relative to its public upstream - correct and actionable when read in a hub
+              session, but misleading when the identical text surfaces verbatim in a connected
+              consumer session, where none of those verbs are reachable and the state described
+              isn't this project's own update status. --consumer rephrases every such message as
+              informational-only, pointing at a session opened directly in the hub instead. Never
+              changes the underlying check, only the audience of the text.
 
-Remote-identity check (added 2026-07-27, security stress-test pass):
-every subcommand that talks to `origin` first confirms `git remote get-url origin` still matches
-the expected canonical URL recorded in config.local.json (`publish.public_repo_remote`). Nothing
-before this defended against `origin` silently being repointed (local tampering, a bad clone-URL
-paste, a typosquatted fork) - the diff-review gate would have faithfully reviewed and let a user
-approve content from an entirely different repo with no structural signal anything was wrong.
+Remote-identity check: every subcommand that talks to `origin` first confirms
+`git remote get-url origin` still matches the expected canonical URL recorded in
+config.local.json (`publish.public_repo_remote`), guarding against `origin` silently being
+repointed (local tampering, a bad clone-URL paste, a typosquatted fork).
 """
 
 import argparse
@@ -143,10 +122,9 @@ def _origin_remote_mismatch(cfg):
 
 
 def check_origin_remote(cfg):
-    """Hard-abort version of the remote-identity check, used by --check/--approve: prevents a
-    silently repointed origin (local tampering, a bad clone-URL paste, a typosquatted fork) from
-    having its content diff-reviewed and approved as if it were the real upstream, with no signal
-    anything was wrong."""
+    """Hard-abort version of the remote-identity check, used by --check/--approve. Aborts if
+    `origin` doesn't match the expected upstream, refusing to review or merge anything until
+    confirmed deliberate."""
     mismatch = _origin_remote_mismatch(cfg)
     if mismatch is None:
         return
@@ -169,12 +147,10 @@ def _git(args, check=True):
 
 
 def _is_dirty():
-    """TRACKED changes only (--untracked-files=no) - an untracked file may be one checkpoint_git.py's
-    own --skip-untracked deliberately left alone, not a real "run checkpoint" situation (found live
-    2026-08-23 testing checkpoint_git.py's own commit mechanics). Also more
-    correct for cmd_check/cmd_approve's pre-merge abort: an untracked file doesn't block a
-    fast-forward merge unless it collides with an incoming path, which git already reports clearly
-    on its own."""
+    """TRACKED changes only (--untracked-files=no) - an untracked file may be one
+    checkpoint_git.py's own --skip-untracked deliberately left alone. Also more correct for
+    cmd_check/cmd_approve's pre-merge abort: an untracked file doesn't block a fast-forward merge
+    unless it collides with an incoming path, which git already reports clearly on its own."""
     return bool(_git(['status', '--porcelain', '--untracked-files=no']).stdout.strip())
 
 
@@ -264,15 +240,10 @@ def remove_review_worktree(worktree_dir):
 def run_golden_suite_against(worktree_dir, cfg):
     """Runs check_tower_crane.py's golden suite only (--skip-reference: consumers\\/
     config.local.json live outside the inner repo's tree post-split, so pass B has nothing valid to
-    scan from an ephemeral worktree location - that gap is covered separately, post-merge, by
+    scan from an ephemeral worktree location - covered separately, post-merge, by
     run_post_merge_check()). Returns (passed: bool, output: str)."""
-    # get_shared_config needs a config.local.json to exist; reuse this clone's own (per-machine
-    # values are valid regardless of the temporary path). Pre-correct the copy's shared_root AND
-    # private_root (config_lib.py computes the latter as a sibling of the former, so both move
-    # together) to the worktree's own path before writing it out, so config_lib.py's move-detection
-    # sees consistent markers here and doesn't print a "folder moved" notice about this throwaway
-    # worktree - that notice's actionable advice (offer to run relocate.py) is only correct for a
-    # real move of the real hub, never for this ephemeral review copy.
+    # get_shared_config needs a config.local.json to exist; reuse this clone's own. Pre-correct
+    # the copy's shared_root and private_root to the worktree's own path before writing it out.
     with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
         review_cfg = json.load(f)
     review_cfg['shared_root'] = str(worktree_dir.resolve()).rstrip('\\/').replace('\\', '/')
@@ -290,9 +261,7 @@ def run_golden_suite_against(worktree_dir, cfg):
 def run_consistency_sweep(worktree_dir, cfg):
     """Runs hooks\\consistency_check.py (static analysis - undefined names, arity mismatches,
     string-key drift) against every .py file under hooks\\/scripts\\/agents\\ in the incoming
-    worktree. Closes the gap the golden suite leaves: Pass A only exercises tools that already have
-    tests\\<tool>\\ fixtures, so a brand-new script gets zero automatic scrutiny otherwise. Returns
-    (passed: bool, output: str)."""
+    worktree. Returns (passed: bool, output: str)."""
     hook_script = worktree_dir / 'hooks' / 'consistency_check.py'
     if not hook_script.exists():
         return True, "--- consistency_check.py sweep ---\n  (no hooks\\consistency_check.py in incoming content - skipping)"
@@ -303,8 +272,8 @@ def run_consistency_sweep(worktree_dir, cfg):
         if d.is_dir():
             targets.extend(sorted(d.glob('*.py')))
 
-    # sandbox project dir, same convention as check_tower_crane.py's own invoke_golden_suite() -
-    # the hook needs CLAUDE_PROJECT_DIR and writes logs there; without it, it silently skips.
+    # sandbox project dir - the hook needs CLAUDE_PROJECT_DIR and writes logs there; without it,
+    # it silently skips.
     sandbox = Path(tempfile.gettempdir()) / f"update_toolkit_consistency_sandbox_{os.getpid()}"
     sandbox.mkdir(parents=True, exist_ok=True)
     saved_proj_dir = os.environ.get('CLAUDE_PROJECT_DIR')
@@ -349,25 +318,19 @@ def run_file_surface_check(base_sha, target_sha, cfg):
 
 
 def run_relocate(cfg):
-    """Self-heal step (added 2026-08-18, found live via a real cross-machine rollback): runs the
-    now-live, just-merged relocate.py against every locally-reachable consumer BEFORE the
-    post-merge gate below. relocate.py/update_consumers.py/a consumer's own "update" skill are all
-    federated by design - each only ever touches consumers reachable from
-    the machine running it, so a skill-stub/hub_pointer/dispatch-wrapper canonical-content change
+    """Self-heal step: runs the now-live, just-merged relocate.py against every locally-reachable
+    consumer before the post-merge gate below. relocate.py/update_consumers.py/a consumer's own
+    "update" skill are federated by design - each only touches consumers reachable from the
+    machine running it, so a skill-stub/hub_pointer/dispatch-wrapper canonical-content change
     merged on machine A never reaches machine B's own locally-connected consumers until something
-    runs a refresh THERE. Without this step, --approve's merge-then-gate-check was atomic with no
-    window for that refresh to happen first, so ANY pending content that changes canonical
-    skill-stub wording (not specific to any one feature) would deterministically fail the post-merge
-    Pass B stub-drift check and roll back, every time, on every second-or-later machine to review
-    it - a prior real incident independently hit and manually cleared this same drift via a normal
-    relocate.py pass. Invoked as a subprocess (not
-    imported) so it always runs whatever relocate.py actually does post-merge, including any repair
-    logic this very update just added to it - update_toolkit.py never needs its own knowledge of
-    what relocate.py fixes. relocate.py commits and pushes any changes it makes directly into each
-    affected consumer's own repo (its existing, documented behavior even run standalone) - printed
-    in full below so that's never silent. Returns (ran_cleanly, output); a non-zero exit here
-    (relocate.py crashing) is reported but never itself blocks the merge - run_post_merge_check
-    right after this is still the real, authoritative gate."""
+    runs a refresh there. Without this step, any pending content that changes canonical
+    skill-stub wording would deterministically fail the post-merge Pass B stub-drift check and roll
+    back on every second-or-later machine to review it. Invoked as a subprocess (not imported) so
+    it always runs whatever relocate.py actually does post-merge, including any repair logic this
+    very update just added to it. relocate.py commits and pushes any changes it makes directly into
+    each affected consumer's own repo - printed in full below so that's never silent. Returns
+    (ran_cleanly, output); a non-zero exit here is reported but never itself blocks the merge -
+    run_post_merge_check right after this is still the real, authoritative gate."""
     proc = subprocess.run(
         [cfg['python_launcher'], str(SHARED_ROOT / 'scripts' / 'relocate.py')],
         capture_output=True, text=True, cwd=str(SHARED_ROOT),
@@ -546,19 +509,17 @@ def cmd_approve(cfg, through=None):
 
 
 def cmd_notify(cfg, consumer=False):
-    """The 'check for update' proactive notice: a plain fetch +
-    comparison against last_reviewed_sha, no LLM, no golden suite, no pending-file write - never
-    mutates anything, safe to run on any cadence (resume, cron). Surfaces a single line; never
-    triggers the full review gate (that stays --check, user-initiated only). The remote-identity
-    check here is a WARN, not an abort - --notify's whole point is a safe, side-effect-free
-    heads-up, so it still reports a mismatched origin without blocking `resume`.
+    """The 'check for update' proactive notice: a plain fetch + comparison against
+    last_reviewed_sha, no golden suite, no pending-file write - never mutates anything, safe to
+    run on any cadence (resume, cron). Surfaces a single line; never triggers the full review gate
+    (that stays --check, user-initiated only). The remote-identity check here is a WARN, not an
+    abort, so it still reports a mismatched origin without blocking `resume`.
 
-    consumer=True: every
-    message below describes the hub's own toolkit\\ clone relative to its public upstream, and
-    every hub-audience phrasing names a hub-only fix verb (`checkpoint`, `update`). Read verbatim
-    from a connected consumer session, none of those verbs are reachable and the state described
-    isn't this project's own update status - so each message gets an informational-only rephrasing
-    that points at a session opened directly in the hub instead, rather than the literal hub text."""
+    consumer=True: every message below describes the hub's own toolkit\\ clone relative to its
+    public upstream, and every hub-audience phrasing names a hub-only fix verb (`checkpoint`,
+    `update`). Read verbatim from a connected consumer session, none of those verbs are reachable
+    and the state described isn't this project's own update status - so each message gets an
+    informational-only rephrasing that points at a session opened directly in the hub instead."""
     if _is_dirty():
         if consumer:
             print("[update check] the hub's toolkit\\ has uncommitted changes - informational "

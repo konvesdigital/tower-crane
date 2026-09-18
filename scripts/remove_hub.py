@@ -1,23 +1,16 @@
 #!/usr/bin/env python3
 """
-remove_hub.py - reverses setup_machine.md for THIS machine. Disconnects every consumer connected
-on this machine (this-only
-mode, so any OTHER machine's connection to the same consumer is left alone), clears this machine's
-own gitignored per-machine hub state, and removes the 'origin' remote from both the outer hub repo
-and toolkit\\ - so a later setup_machine.md run here starts genuinely clean - no consumer thinks
-this machine is still connected, nothing here remembers this machine was ever configured, and this
-clone can no longer push/pull at all.
+remove_hub.py - reverses setup_machine.md for this machine. Disconnects every consumer connected
+on this machine (this-only mode; any other machine's connection to the same consumer is left
+alone), clears this machine's own gitignored per-machine hub state, and removes the 'origin' remote
+from both the outer hub repo and toolkit\\.
 
-Never touches tracked FILE CONTENT or history in either repo, or .claude\\hooks\\ (Rung 2's tracked-
-across-this-operator's-own-machines personal hook content, part of the three-rung settings ladder -
-not this hub's to delete) - only the 'origin' remote entry, which is local-only
-and fully reversible (`git remote add origin <url>` reattaches). Never touches GitHub or any other
-machine's own clone. Physically deleting the hub folder tree afterward, if wanted, is left to the
-user - this script only clears state/connections and reports whether that's actually safe yet
-(a dirty/unpushed check), writing that verdict (plus what was
-removed) into a local-only, gitignored TOWER_CRANE_UNINSTALLED.md in the outer repo root - safe to
-write real specifics into since it's built after both repos' origin is already gone. It never rm
--rf's its own running directory.
+Never touches tracked file content or history in either repo, or .claude\\hooks\\ - only the
+'origin' remote entry, which is local-only and fully reversible (`git remote add origin <url>`
+reattaches). Never touches GitHub or any other machine's own clone. Does not delete the hub folder
+tree itself - runs a dirty/unpushed check and writes that verdict, plus what was removed, into a
+local-only, gitignored TOWER_CRANE_UNINSTALLED.md in the outer repo root. Never rm -rf's its own
+running directory.
 """
 
 import datetime
@@ -54,11 +47,8 @@ _SKIP_REASON_LABELS = {
 
 
 def _print_consumer_summary(slug, host_result):
-    """One consumer's block within the close-out summary -
-    entirely sourced from disconnect_host()'s/strip_local_references()'s own already-computed
-    result dict, nothing re-derived. Keyed by slug rather than host_id (disconnect_consumer.py's
-    own _print_host_summary()'s label) since every call in this script's loop shares the same
-    host_id (this_host) - what varies here is which consumer, not which host."""
+    """Prints one consumer's close-out block, sourced entirely from host_result (disconnect_host()'s
+    return dict)."""
     if not host_result['removed']:
         reason = _SKIP_REASON_LABELS.get(host_result['skip_reason'], host_result['skip_reason'] or "unknown")
         print(f"{slug}: not removed ({reason})")
@@ -67,7 +57,7 @@ def _print_consumer_summary(slug, host_result):
     print(f"{slug}: removed from the registry{hosts_left_note}")
     local = host_result['local']
     if local is None:
-        return  # do_local_cleanup is always True in this script's call site - defensive only
+        return  # local is only None when do_local_cleanup=False, never the case here
     if local['target_missing']:
         print(f"  local path no longer exists on disk ({local['target_path']}) - nothing local to clean up")
         return
@@ -100,15 +90,13 @@ def _print_consumer_summary(slug, host_result):
 
 
 def _repo_status(repo_path):
-    """Advisory-only snapshot of a repo's dirty/unpushed state, used to decide whether declaring
-    this folder "safe to delete" is honest. Never blocks or
-    mutates anything by itself - same spirit as update_toolkit.py's cmd_notify(). Fetches origin
-    (if present) so the ahead-count is accurate; call this BEFORE _remove_origin() removes it.
+    """Snapshot of a repo's dirty/unpushed state. Never mutates anything. Fetches origin (if
+    present) so the ahead-count is accurate; call this before _remove_origin() removes it.
 
     Returns {'is_repo': bool, 'dirty': bool, 'had_origin': bool, 'ahead': str|None} - 'ahead' is a
     digit-string commit count, or None if unknown/unverifiable (no origin, unresolvable branch, or
-    the fetch itself failed - e.g. offline). An unknown ahead-count is treated as a blocker by the
-    caller, same as a nonzero one - can't claim "safe" without being able to check."""
+    the fetch failed - e.g. offline). The caller treats an unknown ahead-count as a blocker, same
+    as a nonzero one."""
     repo_path = Path(repo_path)
     result = {'is_repo': False, 'dirty': False, 'had_origin': False, 'ahead': None}
     if not (repo_path / '.git').is_dir():
@@ -150,11 +138,9 @@ def _remove_origin(repo_path):
 
 def _build_uninstall_note(this_host, host_results, per_machine_removed, outer_status, toolkit_status,
                            outer_origin_removed, toolkit_origin_removed, blockers):
-    """Builds TOWER_CRANE_UNINSTALLED.md's content - the same
-    facts already computed for the console output above, reformatted for a file meant to be read
-    later, possibly by someone who wasn't at this session. Gitignored (see .gitignore) - safe to
-    write real per-machine specifics into, since both repos' 'origin' is already gone by the time
-    this is called (removal happens before this is built)."""
+    """Builds TOWER_CRANE_UNINSTALLED.md's content from the same facts already computed for the
+    console output above, reformatted for a file meant to be read later. Gitignored (see
+    .gitignore). Call after both repos' 'origin' has already been removed."""
     lines = [
         f"# Tower Crane — uninstalled from this machine ({this_host})",
         "",
@@ -221,11 +207,8 @@ def _build_uninstall_note(this_host, host_results, per_machine_removed, outer_st
 
 
 def print_close_out_summary(this_host, host_results, per_machine_removed):
-    """Close-out block, printed once at the very end of the run (design\\
-    script_action_reporting.md) - extends the same shape new_consumer.py's/disconnect_consumer.py's
-    own close-out summaries use, adapted for remove_hub.py's own structure: one block per consumer
-    disconnected on this machine, plus the per-machine state this script alone clears (a second
-    concern neither of the other two scripts has)."""
+    """Prints the close-out block at the end of the run: one section per consumer disconnected on
+    this machine, plus the per-machine state cleared."""
     print()
     print(f"=== remove_hub: this-machine ({this_host}) teardown summary ===")
     if not host_results:
@@ -292,8 +275,7 @@ def main():
     else:
         print("No per-machine state found to clear (already clean).")
 
-    # Repo status must be captured BEFORE removing origin, so the ahead-count still has a remote
-    # to compare against.
+    # captured before removing origin so the ahead-count still has a remote to compare against
     outer_status = _repo_status(PROJECT_ROOT)
     toolkit_status = _repo_status(SHARED_ROOT)
     outer_origin_removed = _remove_origin(PROJECT_ROOT)

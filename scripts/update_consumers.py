@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 """
 update_consumers.py - hub-operator "update consumers": the push-side counterpart to each
-registered consumer's own pull-side `update` skill. Scope is
-identical - hooks, toolkit Track-1 skills (STANDALONE_SKILLS), and mandatory/default-on protocol
-pieces (SKILL_PIECES) a consumer hasn't adopted yet. Never shared_resources content - that stays
-the "shared resources" command's own job, on either side.
+registered consumer's own pull-side `update` skill. Scope is identical - hooks, toolkit Track-1
+skills (STANDALONE_SKILLS), and mandatory/default-on protocol pieces (SKILL_PIECES) a consumer
+hasn't adopted yet. Never shared_resources content.
 
-Reuses scan_consumer_update.py's per-project scan/apply functions directly (no duplicated logic)
-against every registered consumer's own path, one at a time. Federate model:
-a consumer registered on another machine's clone is skipped silently, same as check_tower_crane.py
-and relocate.py already do.
+Reuses scan_consumer_update.py's per-project scan/apply functions directly against every
+registered consumer's own path, one at a time. A consumer registered on another machine's clone is
+skipped silently.
 
 Two calls:
   --check (default)   scan every locally-reachable consumer and print one aggregated, indexed list
@@ -17,14 +15,10 @@ Two calls:
   --apply <spec>       apply items by their printed number (comma-separated) or 'all', across
                        every consumer shown in the last --check in the same process.
 
-Registry write-back: unlike the per-consumer `update` skill (which can only print a "file a
-ticket" reminder, since a consumer session has no write access to the hub's own repo), this script
-runs IN the hub and owns consumers\\<slug>.md directly - so an applied hook/piece updates that
-registry entry's opted_in:/imported: list immediately, plus a plain audit-trail note, and no
-filing-ticket round-trip is needed for this path. A STANDALONE_SKILLS item (e.g. `update`,
-`commands`) gets only the audit-trail note - matching the existing convention (see
-consumers\\geo_rank_tracker.md's own prose entries for these) of no yaml `imported:` row for a
-skill with no @import companion.
+Registry write-back: this script runs in the hub and owns consumers\\<slug>.md directly, so an
+applied hook/piece updates that registry entry's opted_in:/imported: list immediately, plus a
+plain audit-trail note. A STANDALONE_SKILLS item (e.g. `update`, `commands`) gets only the
+audit-trail note - no yaml `imported:` row for a skill with no @import companion.
 """
 
 import argparse
@@ -57,8 +51,7 @@ def local_consumers(this_host, consumer_filter=None):
         if c is None:
             print(f"  [skip] {f.name}: no parseable yaml registry block.")
             continue
-        # 2-host write-back floor - applies to every consumer this
-        # tool touches, regardless of whether it's reachable on THIS machine.
+        # 2-host write-back floor - applies to every consumer this tool touches.
         if reconcile_scope_floor(f, c):
             print(f"  [fixed] {f.stem}: scope -> multi_machine (2+ hosts: entries present).")
         if this_host not in c['hosts']:
@@ -186,10 +179,7 @@ def update_registry_entry(registry_path, entries, today):
             continue
         yaml_text = _yaml_add_list_item(yaml_text, 'imported', [f'  - piece: {piece_field}', f'    since: {today}'])
 
-    # Both hook- and skill-kind private items get a row here
-    # (unlike public STANDALONE_SKILLS, there's no separate discovery-filter list on the private
-    # side - this row is what the extended check_tower_crane.py needs to know to check the name
-    # against toolkit_private\).
+    # Both hook- and skill-kind private items get a row here.
     for tool in private_names:
         if f"tool: {tool}" in yaml_text:
             continue
@@ -236,10 +226,8 @@ def do_apply(cfg, scanned, global_index, spec, today):
             if apply_permissions(project_root, cfg, item):
                 per_consumer_writeback.setdefault(slug, []).append(('permission', item['name']))
 
-    # The "Saving now propagates itself" fix, one level down
-    # (project_progress.md's 2026-08-11 Work Log): this pushes into a consumer's own repo with no
-    # live session there to notice and checkpoint it, so it closes its own loop per consumer
-    # instead of leaving uncommitted state behind for a human to remember later.
+    # Commits and pushes into each consumer's own repo, since no live session there would
+    # otherwise notice and checkpoint this change.
     for slug, entries in per_consumer_writeback.items():
         c = scanned_by_slug[slug]['consumer']
         update_registry_entry(Path(c['file']), entries, today)

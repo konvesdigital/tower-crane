@@ -19,8 +19,6 @@ current machine with an already-current settings.json it is a no-op.
 Cross-repo note: this writes into each consumer's OWN repo working tree (it does not commit). The
 consumer's next session verifies the hook still fires and commits - the change-request round-trip
 (a behavior-changing edit to a live consumer). Run --dry-run first to preview.
-
-Cross-platform port of an earlier relocate.ps1. Logic is a direct translation.
 """
 
 import argparse
@@ -37,8 +35,7 @@ from config_lib import (get_shared_config, build_new_cmd_map, build_dispatch_cmd
 from registry_lib import parse_registry, host_path, reconcile_scope_floor
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
-# consumers\ is private hub state, not shipped toolkit content - it lives at the outer root
-# (the outer/inner repo split), one level above SHARED_ROOT (toolkit\).
+# consumers\ lives one level above SHARED_ROOT (toolkit\).
 PROJECT_ROOT = SHARED_ROOT.parent
 TEMPLATES_DIR = SHARED_ROOT / 'templates'
 OPTINS_DIR = TEMPLATES_DIR / 'optins'
@@ -70,14 +67,12 @@ def read_registry_entry(path):
     return obj
 
 
-# fix_imports() now lives in config_lib.py (moved
-# 2026-08-19 so commit_consumer_changes()'s own push-failure reconciliation can call it
-# in-process) - imported above alongside the other Tower-Crane-owned-file regenerators.
+# fix_imports() lives in config_lib.py, imported above alongside the other Tower-Crane-owned-file
+# regenerators.
 
-# The "Saving now propagates itself" fix, one level down
-# (project_progress.md's 2026-08-11 Work Log): this pass writes into a consumer's own repo with
-# no live session there to notice and checkpoint it, so it closes its own loop instead of leaving
-# uncommitted state for a human to remember later.
+# This pass writes into a consumer's own repo with no live session there to notice and checkpoint
+# it, so it closes its own loop instead of leaving uncommitted state for a human to remember
+# later.
 COMMIT_LABELS = {
     'not-a-repo': None,  # nothing this function can do - not worth a line every run
     'noop': None,        # nothing changed here - not worth a line every run
@@ -158,9 +153,8 @@ def main():
             continue
 
         # Pull this consumer's own repo current BEFORE reading/regenerating anything below, so the
-        # edit is never computed against a stale snapshot (config_lib.py's sync_consumer_repo() -
-        # see that function's own docstring for the real 2026-08-22 push conflict this closes).
-        # No-op in a dry run - nothing downstream will be written anyway.
+        # edit is never computed against a stale snapshot (see config_lib.py's
+        # sync_consumer_repo()). No-op in a dry run - nothing downstream will be written anyway.
         if not args.dry_run:
             sync_consumer_repo(this_path, log=print)
 
@@ -173,9 +167,8 @@ def main():
         use_pointer_here = claude_md_this.exists() and HUB_POINTER_IMPORT_LINE in claude_md_this.read_text(encoding='utf-8')
         skills_changed = fix_skill_stubs(this_path, TEMPLATES_DIR, config['import_base'], args.dry_run,
                                           log=print, use_pointer=use_pointer_here)
-        # The "Adopted-stub path portability" fix - a private
-        # shared_resources\-adopted stub has no canonical source, so it regenerates from its own
-        # marker's hub-rel: anchor instead of a diff against templates\skills\.
+        # A private shared_resources\-adopted stub has no canonical source, so it regenerates from
+        # its own marker's hub-rel: anchor instead of a diff against templates\skills\.
         adopted_changed = fix_adopted_stub_paths(this_path, PROJECT_ROOT, args.dry_run, log=print)
         # Both are no-ops for a not-yet-migrated
         # consumer (fix_hub_pointer/fix_hub_dispatch_wrapper each check for their own file's prior

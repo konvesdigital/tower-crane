@@ -1,29 +1,23 @@
 #!/usr/bin/env python3
 """
 scan_consumer_update.py - the deterministic scan/apply half of the consumer-side `update` skill.
-Scope is FUNCTIONALITY PARITY with a fresh new_consumer.py scaffold
-only - hooks, toolkit Track-1 skills (STANDALONE_SKILLS + SKILL_PIECES), and mandatory/default-on
-protocol pieces a consumer project hasn't adopted yet. Deliberately excludes shared_resources
-content - that's DATA, not functionality, and adopting it is the "shared resources" command's own
-job (search/browse/select/apply), never this script's ("Functionality, not data", 2026-08-01).
-
-Mirrors update_toolkit.py's indexed list-and-choose shape without its trust-review gate: the
-source here is the same local hub a consumer already imports mandatory pieces from at the same
-trust level, so there is no diff to review - just a list and a choice.
+Scope is functionality parity with a fresh new_consumer.py scaffold only - hooks, toolkit Track-1
+skills (STANDALONE_SKILLS + SKILL_PIECES), and mandatory/default-on protocol pieces a consumer
+project hasn't adopted yet. Excludes shared_resources content - that's data, adopted through the
+"shared resources" command instead.
 
 Two calls:
   --check (default)   scan and print an indexed list of everything available but not adopted.
   --apply <spec>       apply items by their printed number (comma-separated) or 'all'.
 
-Numbering is recomputed fresh on every call (no persisted pending-list file, unlike
-update_toolkit.py) - deterministic given unchanged project/hub state, which holds across the
---check then --apply calls of one sitting. Re-run without --apply first if in doubt.
+Numbering is recomputed fresh on every call (no persisted pending-list file). Re-run without
+--apply first if in doubt.
 
 Ground truth for "already have" is this project's own local state (.claude\\settings.json,
-CLAUDE.md @import lines, .claude\\skills\\ listing) - never the hub's consumers\\<slug>.md
-registry entry. Registry
-write-back for hooks/skills this script applies is a separate, manual filing-channel step - see
-the reminder this script prints after an --apply that touches either category.
+CLAUDE.md @import lines, .claude\\skills\\ listing), never the hub's consumers\\<slug>.md registry
+entry. Registry write-back for hooks/skills this script applies is a separate, manual
+filing-channel step - see the reminder this script prints after an --apply that touches either
+category.
 """
 
 import argparse
@@ -45,8 +39,7 @@ OPTINS_DIR = TEMPLATES_DIR / 'optins'
 SKILLS_DIR = TEMPLATES_DIR / 'skills'
 PROJECT_ROOT = SHARED_ROOT.parent  # hub root
 # Private, automatic tools living outside toolkit\, never shipped.
-# Every entry under PRIVATE_SKILLS_DIR is consumer-offerable (unlike STANDALONE_SKILLS, there's no
-# separate hub-only-skill filter list on the private side - toolkit_private\ has nothing else in it).
+# Every entry under PRIVATE_SKILLS_DIR is consumer-offerable.
 PRIVATE_ROOT = PROJECT_ROOT / 'toolkit_private'
 PRIVATE_OPTINS_DIR = PRIVATE_ROOT / 'templates' / 'optins'
 PRIVATE_SKILLS_DIR = PRIVATE_ROOT / 'templates' / 'skills'
@@ -56,12 +49,9 @@ _FRONTMATTER_RE = re.compile(r'^---\s*\r?\n(.*?)\r?\n---\s*\r?\n', re.DOTALL)
 
 
 def read_skill_category(skill_md_path):
-    """The `category:` frontmatter field of a toolkit_private skill stub, or None if absent -
-    the "Category subscription" mechanism. Same field
-    scan_private()'s subscription match below needs and the SEO skill bundle's own stubs carry.
+    """The `category:` frontmatter field of a toolkit_private skill stub, or None if absent.
     Strips the canonical source's leading maintainer HTML comment first (same regex
-    materialize_skill_stub() uses) since scan_private() reads straight from PRIVATE_SKILLS_DIR's
-    un-materialized source, not an installed, already-stripped copy."""
+    materialize_skill_stub() uses)."""
     if not skill_md_path.exists():
         return None
     text = _LEADING_COMMENT_RE.sub('', skill_md_path.read_text(encoding='utf-8'), count=1)
@@ -74,11 +64,8 @@ def read_skill_category(skill_md_path):
 
 def find_private_categories(cfg, project_root):
     """This project's own `private_categories:` subscriptions, found by matching its
-    hosts.<this host>.path against consumers\\*.md (registry_lib.host_path) - ground truth for
-    "already have" stays local-state per this script's own docstring, but a subscription is a
-    hub-registry concept with nothing local to mirror it, so this is the one lookup that reads
-    consumers\\<slug>.md directly. Empty set if this project isn't registered yet, or no registry
-    entry's host path resolves to project_root."""
+    hosts.<this host>.path against consumers\\*.md (registry_lib.host_path). Empty set if this
+    project isn't registered yet, or no registry entry's host path resolves to project_root."""
     if not CONSUMERS_DIR.is_dir():
         return set()
     host_id = cfg.get('host_id')
@@ -92,8 +79,7 @@ def find_private_categories(cfg, project_root):
             return {pc['name'] for pc in c['private_categories']}
     return set()
 
-# Mirrors scripts\new_consumer.py's SKILL_PIECES / check_tower_crane.py's SKILL_PIECES - keep in
-# sync.
+# Keep in sync with scripts\new_consumer.py's SKILL_PIECES / check_tower_crane.py's SKILL_PIECES.
 SKILL_PIECES = {
     'filing': {'companion': 'filing_resume_check', 'skills': ['filing']},
     'continuity': {'companion': 'continuity_resume_check', 'skills': ['checkpoint', 'archive']},
@@ -101,19 +87,16 @@ SKILL_PIECES = {
 }
 MANDATORY_OR_DEFAULT_PIECES = ['filing', 'compliance', 'shared_resources', 'continuity']
 
-# Mirrors scripts\new_consumer.py's STANDALONE_SKILLS - keep in sync. These are the only
-# templates\skills\* entries a fresh scaffold ever gets; anything else under that folder (e.g.
-# hub_commands, which is hub-operator self-use only, distributed via self_hooks.py) must never be
-# offered here even though it physically lives alongside these in the same directory.
+# Keep in sync with scripts\new_consumer.py's STANDALONE_SKILLS. Anything else under
+# templates\skills\* (e.g. hub_commands, distributed via self_hooks.py) must never be offered here.
 STANDALONE_SKILLS = ['update', 'commands', 'capability_relationships']
 
 
 def read_consumer_state(project_root):
     claude_md_path = project_root / 'CLAUDE.md'
     md_text = claude_md_path.read_text(encoding='utf-8') if claude_md_path.exists() else ''
-    # '.' (not '\S') so an import_base path containing a space still matches - '.' excludes
-    # only newlines, and an @import line is always exactly one line, so this can't over-match
-    # into the next line.
+    # '.' matches an import_base path containing a space; safe since an @import line is always
+    # exactly one line.
     md_imports = set(re.findall(r'@.*?templates/(\w+)\.md', md_text))
 
     settings_path = project_root / '.claude' / 'settings.json'
@@ -154,12 +137,8 @@ def _skill_current(project_root, name, canon_path, import_base=None):
     """True if project_root/.claude/skills/<name>/SKILL.md exists and matches the canonical
     source content exactly - either accepted rendering (direct-substitution or
     pointer-indirected) when import_base is given, or the single copy-only rendering when it's
-    None (a private, toolkit_private skill). Mirrors check_tower_crane.py's test_consumer() skill-
-    stub drift comparison, so "already adopted" here means "adopted and current," not just "a
-    folder with this name exists" - closes the presence-vs-currency gap tracked in
-    project_progress.md's Current Status: a stub can be present but stale (e.g. a changed trigger description, or the
-    2026-09-14 SEO Primary-tier chain-load fix) and previously stayed invisible to both
-    `update`/`update consumers` because presence alone was treated as proof of currency."""
+    None (a private, toolkit_private skill). "Already adopted" means adopted and current, not
+    just a folder with this name existing."""
     stub_path = project_root / '.claude' / 'skills' / name / 'SKILL.md'
     if not stub_path.exists():
         return False
@@ -188,15 +167,12 @@ def scan_skills(state, project_root, cfg):
 
 
 def scan_private(cfg, state, project_root):
-    """Same shape as scan_hooks/scan_skills combined, pointed at
-    toolkit_private\\ instead of toolkit\\. Silently yields nothing if toolkit_private\\ doesn't
-    exist yet on this machine (no private tools built yet, or a fresh clone).
+    """Same shape as scan_hooks/scan_skills combined, pointed at toolkit_private\\ instead of
+    toolkit\\. Yields nothing if toolkit_private\\ doesn't exist on this machine.
 
-    The "Category subscription" mechanism: each scanned skill
-    item also carries its own `category:` frontmatter (None if absent) and a `subscribed` flag -
-    True when that category is in this project's own `private_categories:` registry list - so a
-    subscribed item is structurally called out rather than just another anonymous number in the
-    listing (see print_items() below)."""
+    Each scanned skill item also carries its own `category:` frontmatter (None if absent) and a
+    `subscribed` flag - True when that category is in this project's own `private_categories:`
+    registry list."""
     items = []
     subscribed_categories = find_private_categories(cfg, project_root)
     have_hooks = state['settings'].get('hooks') if isinstance(state['settings'], dict) else None
@@ -252,10 +228,9 @@ def scan_pieces(state):
 
 
 def scan_permissions(state):
-    """The consumer-scope Bash/PowerShell allowlist in
-    templates\\bash_allowlist.json - one aggregate item (like a hook's whole event block) if
-    ANY pattern in it is still missing from this project's own settings.json, never one item per
-    pattern."""
+    """The consumer-scope Bash/PowerShell allowlist in templates\\bash_allowlist.json - one
+    aggregate item if any pattern in it is still missing from this project's own settings.json,
+    never one item per pattern."""
     allowlist_path = TEMPLATES_DIR / 'bash_allowlist.json'
     if not allowlist_path.is_file():
         return []
@@ -298,9 +273,8 @@ def print_items(items):
         if it['category'] != current_cat:
             current_cat = it['category']
             print(f"-- {labels[current_cat]} --")
-        # "Category subscription": call out a
-        # private skill matching one of this project's own private_categories: subscriptions,
-        # rather than leaving it just another anonymous number the operator must recognize by name.
+        # Call out a private skill matching one of this project's own private_categories:
+        # subscriptions.
         tags = []
         if it.get('subscribed'):
             tags.append(f"{it['skill_category']} — subscribed")
@@ -366,9 +340,8 @@ def apply_skill(project_root, cfg, item):
 
 
 def apply_private(project_root, cfg, item):
-    """Dispatches to the same hook-merge / skill-copy shape as
-    apply_hook/apply_skill, pointed at toolkit_private\\. Private skills are copy-only (no
-    {{IMPORT_BASE}} substitution - see apply_skill's public case for the contrast)."""
+    """Dispatches to the same hook-merge / skill-copy shape as apply_hook/apply_skill, pointed at
+    toolkit_private\\. Private skills are copy-only (no {{IMPORT_BASE}} substitution)."""
     name = item['name']
     if item['kind'] == 'hook':
         expanded = get_dispatch_optin(PRIVATE_OPTINS_DIR / f'{name}.json', name, cfg)

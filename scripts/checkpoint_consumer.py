@@ -1,32 +1,13 @@
 #!/usr/bin/env python3
 """
-checkpoint_consumer.py - the consumer-side "checkpoint" skill's git mechanics: ports
-scripts\\checkpoint_git.py's untracked-file-safety mechanic from the hub's own two-repo checkpoint
-to a single connected project's own repo.
+checkpoint_consumer.py - consumer-side "checkpoint" git mechanics for a single connected
+project's own repo.
 
-Ported deliberately narrower than the hub original, following the same hub/consumer command-parity
-discipline applied elsewhere:
-  - Untracked-file safety carries over unchanged: `git add -u` stages tracked modifications
-    automatically (always safe, no prompt); a genuinely untracked file blocks with an
-    `[UNTRACKED]` report until resolved via --include/--include-all/--skip-untracked, exactly
-    like the hub script - the same "a stray temp file looks identical to a real new file, from
-    git's point of view" problem applies equally to a consumer project's own repo.
-  - No leak-scan gate and no Standing-Constraints guardrail port over - both are hub-specific
-    (scrubbing outgoing content against toolkit\\'s own public remote; AGENTS.md's own governance
-    section). Neither has a consumer-side analogue to guard.
-  - No-remote handling is SOFT here, unlike the hub script's hard `[ABORT]`:
-    `config_lib.py`'s own `_commit_scoped()` already treats a consumer project's missing 'origin'
-    as a normal, everyday 'committed-no-remote' outcome (commit locally, skip the push, no error)
-    - a local-only consumer project is common, not an anomaly, unlike the hub's own two repos,
-    which are always expected to have one. Copying the hub script's abort-on-no-remote behavior
-    here would regress every local-only consumer project from "commits fine today" to "refuses to
-    save work."
-  - No `.last_reviewed_sha` self-heal - that mechanic is specific to the hub's own `toolkit\\` push
-    advancing its own trust anchor; a consumer project has no such file.
-  - No internal verify-clean loop: same "re-running is always safe" idempotence the hub script
-    settled on when B2 replaced its own former prose verify-clean loop - if a further edit lands
-    dirty after this script runs (e.g. correcting the same Work Log entry once more), just run it
-    again rather than looping internally.
+Untracked-file safety: `git add -u` stages tracked modifications automatically (no prompt); a
+genuinely untracked file blocks with an `[UNTRACKED]` report until resolved via
+--include/--include-all/--skip-untracked.
+
+No 'origin' remote is a soft, normal outcome here: commits locally and skips the push, no error.
 
 Usage:
   python checkpoint_consumer.py --project-root "<this project's absolute root>"
@@ -37,9 +18,7 @@ Exit codes: 0 = committed+pushed, committed-with-no-remote-configured, or nothin
 files need resolving first - nothing was touched, safe to just re-run with the right flag once
 decided.
 
-Run from anywhere; operates on --project-root, not this script's own location (unlike
-checkpoint_git.py, which always targets its own two fixed hub repos - this script targets whatever
-connected project's session invokes it, so the target repo must be told, not assumed).
+Run from anywhere; operates on --project-root, not this script's own location.
 """
 
 import argparse
