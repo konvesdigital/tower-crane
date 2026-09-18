@@ -101,7 +101,7 @@ bottom of the ticket
 **Multi-user attribution:** with more than one committer, name the acting person alongside the project in each line (e.g. `fix applied by <name> (commit <sha>)…`). A single-owner hub keeps the terser project-only form above.
 
 ### Scanning at session start (including on `resume` — see `AGENTS.md`) or when asked to process requests
-Run `python scripts\ticket_scan.py --apply` from inside `toolkit\` first — it categorizes every
+Run `python toolkit/scripts/ticket_scan.py --apply` first — it categorizes every
 `Status: OPEN` ticket in `change_requests\`, mechanically flips any `verified_pass`/
 `operator_override` ticket to `DONE` itself (its own log line, its own scoped commit+push — no
 separate git step, and nothing to hand-read first: those two categories need no judgment), then
@@ -129,7 +129,7 @@ If `--apply`'s own summary reports a commit/push error for the bookkeeping it ju
 treat that like any other blocked git action — surface it and let the operator decide, don't
 retry by hand.
 
-Round-trip lines an unattended `scripts\run_automation.py` run writes are prefixed `automation:` to
+Round-trip lines an unattended `scripts/run_automation.py` run writes are prefixed `automation:` to
 distinguish them from live-session lines. It never flips `Status` to DONE itself except via
 `ticket_scan.py`'s already-verified-PASS handling, and never merges a PR — a human always does.
 
@@ -141,13 +141,13 @@ action it before flipping DONE; "no round-trip" doesn't mean "nothing to do."** 
 append a short documentary note to the existing `consumers\<slug>.md` entry (same pattern as its
 prior such notes) recording what was adopted and when — `check_tower_crane.py` won't catch a
 skipped note, this convention isn't mechanically checked. Then run
-`scripts\check_tower_crane.py --consumer <slug>` (confirms no unrelated drift), flip `Status` to
+`toolkit/scripts/check_tower_crane.py --consumer <slug>` (confirms no unrelated drift), flip `Status` to
 **DONE**, log it in `project_progress.md`, and commit via
-`python scripts\checkpoint_git.py --message "<summary>"` — never raw git directly.
+`python toolkit/scripts/checkpoint_git.py --message "<summary>"` — never raw git directly.
 
 (A *new* project joining the platform no longer files a ticket here at all — retired 2026-08-12
 alongside `templates\register.md`; `"connect project"` now writes `consumers\<slug>.md` directly
-in the same hub session via `scripts\new_consumer.py`'s adoption branch. See
+in the same hub session via `scripts/new_consumer.py`'s adoption branch. See
 `agents_consumers.md`.)
 
 ### Applying a fix (this agent's turn)
@@ -155,7 +155,7 @@ in the same hub session via `scripts\new_consumer.py`'s adoption branch. See
 2. **Mandatory pre-apply validation:** enumerate *every* consumer in the registry (`consumers\`,
    the source of truth) and reason about impact on each, not just the filer. Consumers float on
    this repo's HEAD, so a fix reaches all of them the moment they next run.
-3. Apply the fix (or a better one). Run **`scripts\check_tower_crane.py`**: its golden suite
+3. Apply the fix (or a better one). Run **`toolkit/scripts/check_tower_crane.py`**: its golden suite
    (`tests\<tool>\`) catches a behavior regression, its reference scan confirms no consumer's
    wiring/imports broke. Also run the ticket's Suggested test plus your own. Add/extend a golden
    fixture when the fix is behavior-changing.
@@ -164,7 +164,7 @@ in the same hub session via `scripts\new_consumer.py`'s adoption branch. See
    explicitly per "What a ticket actually is" above — name the replacement Suggested test if the
    original no longer applies, and name the other ticket if verification is now shared with it.
    Leave `Status: OPEN`. Log it in `project_progress.md`, naming affected consumers there too.
-   Commit via `python scripts\checkpoint_git.py --message "<summary>"` — never raw `git commit`/
+   Commit via `python toolkit/scripts/checkpoint_git.py --message "<summary>"` — never raw `git commit`/
    `push` directly (fragile, and skips the leak-scan-first gate this script already runs). It
    covers both the fix itself (`toolkit\`) and the ticket/progress-doc edit (outer repo) in one
    call. The ticket closes only when the consumer verifies.

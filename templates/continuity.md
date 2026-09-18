@@ -54,7 +54,7 @@ this mechanism works and how it relates to other mechanisms.
      the user runs "archive".
 2. Git mechanics — mechanized:
    ```
-   <python_launcher> "<hub root>\toolkit\scripts\checkpoint_consumer.py" --project-root "<this
+   <python_launcher> "<hub root>/toolkit/scripts/checkpoint_consumer.py" --project-root "<this
    project's absolute root>" --message "<summary>"
    ```
    (`<hub root>`/`<python_launcher>` resolved the same way `templates\update.md`'s Step 1

@@ -94,7 +94,7 @@ the actual switch; everything before this step was inert setup.
 
 ## Step 4 — First live tick
 
-Run `python toolkit\scripts\run_automation.py --dry-run` once by hand and confirm the mechanical
+Run `python toolkit/scripts/run_automation.py --dry-run` once by hand and confirm the mechanical
 scan/bookkeeping output looks sane (no crash, sensible ticket categorization) before letting the
 real scheduled task fire with `--dry-run` off. If there's a genuinely fix-worthy ticket queued, the
 next real tick (scheduled, or run by hand without `--dry-run`) will apply it directly — confirm the

@@ -55,7 +55,7 @@ reached) read whatever is present.
 2. `git pull` (this project's own repo).
 3. Check the shared tower_crane hub — both steps read-only, no gate needed, chained into one call
    (the consumer-side re-run of the hub's own resume audit):
-   `python "<hub root>\toolkit\scripts\consumer_resume_check.py"` (same `toolkit\` folder this
+   `python "<hub root>/toolkit/scripts/consumer_resume_check.py"` (same `toolkit\` folder this
    file itself resolved through). Runs, in order, what used to be two separately prose-sequenced
    calls:
    - `update_toolkit.py --notify --consumer` (fetch + compare against the hub's last-reviewed

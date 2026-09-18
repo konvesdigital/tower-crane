@@ -9,7 +9,7 @@ Read this file when any of those fire — it is not preloaded.
 **local to this machine only, or available to all connected machines?** — the answer is never
 assumed and never depends on how many machines the hub already has. Either path, the consumer ends
 up in the registry (`consumers\<slug>.md`) and floats on this repo's HEAD.
-1. **New project from scratch** — `scripts\new_consumer.py --target-path <abs path> --project-name
+1. **New project from scratch** — `toolkit/scripts/new_consumer.py --target-path <abs path> --project-name
    "<Full Title>" --scope local|multi_machine` (per the question above; default `local`). Writes ALL
    consumer files (`.claude\settings.json`, `CLAUDE.md` with `@import` lines, skeleton
    `project_progress.md`, `FIRST_RUN.md`) plus the registry entry. Defaults: opts into
@@ -20,7 +20,7 @@ up in the registry (`consumers\<slug>.md`) and floats on this repo's HEAD.
    protocol piece, `--force` to overwrite an existing `CLAUDE.md`/`project_progress.md`/
    `FIRST_RUN.md`. Does NOT run git — the new project's first session does that via its
    `FIRST_RUN.md`.
-2. **Existing (hand-copied) project, never Tower-Crane-shaped** — same `scripts\new_consumer.py`
+2. **Existing (hand-copied) project, never Tower-Crane-shaped** — same `toolkit/scripts/new_consumer.py`
    invocation as #1, pointed at the project's existing local folder, run directly from this hub
    session (register.md's old courier-and-ticket detour is retired — this used to require copying
    that file into the target project and filing a ticket back here from a separate session).
@@ -93,12 +93,12 @@ a never-connected project someone already `git init`'d and pushed to GitHub by h
 checklist with almost nothing left to do; a reconnecting project with git removed for some reason
 gets told to reinitialize it, same as a brand-new one would.
 
-Either path: run `scripts\check_tower_crane.py` to confirm the consumer validates clean.
+Either path: run `toolkit/scripts/check_tower_crane.py` to confirm the consumer validates clean.
 
 ## Disconnecting a consumer
 **Trigger: "disconnect project"** — reciprocal with `"connect project"`. Runs
-`scripts\disconnect_consumer.py --slug <slug> --mode this-only|all-but-this|all` from inside
-`toolkit\`: it drops the target host(s)' `hosts.<id>` entries from the registry, and — for this
+`toolkit/scripts/disconnect_consumer.py --slug <slug> --mode this-only|all-but-this|all`:
+it drops the target host(s)' `hosts.<id>` entries from the registry, and — for this
 machine's own connection specifically — strips `CLAUDE.md`'s `@import` lines,
 `.claude\settings.json`'s hook entries + the `Read` permission rule, and every
 `.claude\skills\<name>\` directory from the local copy, then prints a close-out summary of exactly
@@ -141,8 +141,8 @@ go-ahead** — same discipline as above; also mention that both repos' `origin` 
 `setup_machine.md` run again on this machine (re-attaching `origin`), then reconnecting whichever
 consumers are wanted via `"connect project"` — a rebuild, not a restore.
 
-Then run `scripts\remove_hub.py` (no args — operates on this machine via its own
-`config.local.json`) from inside `toolkit\`.
+Then run `toolkit/scripts/remove_hub.py` (no args — operates on this machine via its own
+`config.local.json`).
 
 ## Migrating an already-connected host to reference-indirection
 **Trigger: "migrate consumer to reference-indirection"** — a one-time, explicit action, distinct
@@ -159,6 +159,6 @@ pointer-indirection wording. All of that is shared, tracked content — every OT
 connected to this consumer picks it up automatically on its own next `relocate.py`/`resume` pass,
 no separate action needed there.
 
-Then run `scripts\migrate_consumer_indirection.py --slug <slug>` from inside `toolkit\`. No-ops
+Then run `toolkit/scripts/migrate_consumer_indirection.py --slug <slug>`. No-ops
 cleanly (prints a message, changes nothing) if this host is already on pointer form. Run
-`scripts\check_tower_crane.py` afterward to confirm the consumer still validates clean.
+`toolkit/scripts/check_tower_crane.py` afterward to confirm the consumer still validates clean.

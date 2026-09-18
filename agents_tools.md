@@ -58,7 +58,7 @@ public version works; "keep both" is a per-tool choice, not the default.
 
 ## Self-use (dogfooding)
 **Trigger: "self hooks".**
-This repo is not a registered consumer of itself. `scripts\self_hooks.py` turns a tool on for THIS
+This repo is not a registered consumer of itself. `scripts/self_hooks.py` turns a tool on for THIS
 repo/machine only: `--list` (default), `--enable <tool>`, `--disable <tool>`. State lives in
 gitignored `.claude\settings.local.json`; a mirror auto-regenerates at
 `.claude\self_hooks_status.md` (open directly to check state). Every tool self-enables the moment

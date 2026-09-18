@@ -44,7 +44,7 @@ actually invoked.
    - Do NOT prune or move older entries automatically — only "archive" does that.
 2. Git mechanics for both repos — mechanized (mechanical
    steps live in the script, same split as `update_toolkit.py` keeps below):
-   `python scripts\checkpoint_git.py --message "<summary>"` from inside `toolkit\`. Handles, for
+   `python toolkit/scripts/checkpoint_git.py --message "<summary>"`. Handles, for
    both the outer project repo and the inner `toolkit\` repo in one call: staging, the
    leak-scan-first gate, the Standing Constraints disclosure guardrail, commit, push, and (after a
    successful `toolkit\` push) the `last_reviewed_sha` self-heal.
@@ -103,7 +103,7 @@ actually invoked.
 **"update"** — pulls `toolkit\`'s `origin` remote under a diff-review trust gate. User-initiated
 only; mechanical steps live in `scripts\update_toolkit.py`, diff review/assessment below is manual
 judgment.
-1. Run `python scripts\update_toolkit.py` (`--check`) from inside `toolkit\`.
+1. Run `python toolkit/scripts/update_toolkit.py` (`--check`).
 2. "Already up to date": nothing else to do.
 3. `[ABORT]` (remote-identity mismatch — `origin`'s URL no longer matches upstream): stop, report
    verbatim, get explicit confirmation before anything else. Never assume it's benign.
@@ -116,7 +116,7 @@ judgment.
    destructive/obfuscated/exfiltration-shaped/inconsistent with the file's stated purpose? **Show
    both the literal diff and your assessment together, always** (`trust_and_values_draft.md` Part 1
    §4) — quoted verbatim in your own chat-visible response, never tool output alone.
-6. Ask whether to approve. Everything shown: `python scripts\update_toolkit.py --approve` (also
+6. Ask whether to approve. Everything shown: `python toolkit/scripts/update_toolkit.py --approve` (also
    runs a post-merge `check_tower_crane.py`, auto-rolling back on failure before
    `last_reviewed_sha` advances). Only the leading items: `--approve --through <n>` (`<n>` = last
    approved item's 1-based index) — the rest stay queued. On no: `--reject` — a fully supported,
@@ -138,10 +138,10 @@ authoring-assistant behavior described below.
       `git remote add fork https://github.com/<username>/tower-crane.git`.
 2. Branch off `main`: `git checkout -b <descriptive-branch-name>`.
 2a. **If this change touches `AGENTS.md`** — run before committing (skipping risks rework at
-   Checkpoint 2, `scripts\check_agents_pr_gate.py`):
+   Checkpoint 2, `scripts/check_agents_pr_gate.py`):
    a. **Silently auto-fix the frontmatter** (`scope`/`capabilities`/`human_review_required`) to
       match the new content. Never touch Standing Constraints wording here — governed by (b).
-   b. Run `python scripts\check_standing_constraints.py` (verbatim compare against `main`).
+   b. Run `python toolkit/scripts/check_standing_constraints.py` (verbatim compare against `main`).
       `[UNCHANGED]`: continue silently. `[CHANGED]`: a standing-constraint edit — surface the
       before/after text as a warning and get explicit confirmation this is deliberate.
       **Overridable warning, not a hard block.**
@@ -157,18 +157,18 @@ authoring-assistant behavior described below.
 6. On approval: `gh pr create --repo konvesdigital/tower-crane --head <username>:<branch-name>
    --title "<title>" --body "<body>"`.
 7. Nothing further here — the PR runs the "AGENTS.md Fix 3 gate" GitHub Actions check
-   (`scripts\check_agents_pr_gate.py`, via `.github\CODEOWNERS`). Ordinary GitHub PR review, not
+   (`scripts/check_agents_pr_gate.py`, via `.github\CODEOWNERS`). Ordinary GitHub PR review, not
    the `change_requests\` ticket system — don't file a ticket.
 
 **"curate shared resources"** — occasional bulk distribution of `shared_resources\` entries to
-every (or one) registered consumer, via `scripts\broadcast_guidance.py --broadcast`. Lands one
+every (or one) registered consumer, via `scripts/broadcast_guidance.py --broadcast`. Lands one
 pointer-only notice in a consumer's `COMPLIANCE_GUIDANCE.md` `## Broadcast` section — never the
 full entry content. User-initiated only, never triggered by `checkpoint`.
 1. **Curate** — list `shared_resources\CATALOG.md` (skip anything `Archived`). Ask the user which
    entries are worth pushing right now.
 2. **Author a pointer-only file** — one line per selected entry (e.g. `<Name> — <one-line hook>,
    say "shared resources" to review`). Never the full entry content.
-3. **Push**: `python scripts\broadcast_guidance.py --broadcast <file.md>` (all consumers, or
+3. **Push**: `python toolkit/scripts/broadcast_guidance.py --broadcast <file.md>` (all consumers, or
    `--consumer <slug>` for one). Confirm the drafted file with the user first.
 4. **Land** — nothing further here; the resume-time compliance check surfaces it on its own.
 
@@ -176,7 +176,7 @@ full entry content. User-initiated only, never triggered by `checkpoint`.
 from, instead of waiting for `check_shared_resource_refs.py`'s per-adoption `[HOST-GAP]` check to
 catch each one separately, one already-adopting consumer project at a time. User-initiated, any
 time — also run automatically as `setup_machine.md` Step 8a on a newly connected machine.
-1. Run `python scripts\check_shared_resource_hosts.py` from inside `toolkit\` — notify-only,
+1. Run `python toolkit/scripts/check_shared_resource_hosts.py` — notify-only,
    catalog-wide, exit 0 always. Buckets every non-`Archived`, non-`insight` catalog row as `[OK]`
    (already registered here — skip silently), `[UNREGISTERED]` (has a `Hosts:` block, this host
    isn't in it), or `[NO-HOSTS-BLOCK]` (no `Hosts:` block at all — ambiguous).
@@ -199,8 +199,8 @@ time — also run automatically as `setup_machine.md` Step 8a on a newly connect
 
 **"update consumers"** — push-side of `update`: same scope as a consumer's own pull-side `update`
 skill (hooks, Track-1 skills, mandatory pieces; never `shared_resources`). User-initiated only.
-1. `python scripts\update_consumers.py` (optionally `--consumer <slug>`) — indexed list across
+1. `python toolkit/scripts/update_consumers.py` (optionally `--consumer <slug>`) — indexed list across
    every locally-reachable consumer (Federate: other hosts skip silently); show it, ask what to apply.
-2. `python scripts\update_consumers.py --apply <numbers-or-'all'>` — writes each touched project
+2. `python toolkit/scripts/update_consumers.py --apply <numbers-or-'all'>` — writes each touched project
    plus its `consumers\<slug>.md` registry entry directly (no filing ticket needed), then run
-   `scripts\check_tower_crane.py` to confirm it validates clean.
+   `toolkit/scripts/check_tower_crane.py` to confirm it validates clean.

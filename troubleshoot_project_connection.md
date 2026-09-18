@@ -21,7 +21,7 @@ Both scripts' fatal-error paths now auto-invoke `check_tower_crane.py --diagnose
 its output ahead of the error. If you're
 reading this file because you saw one of those errors, the fact table already printed above it in
 the same output — scroll up before running anything else. To run it by hand (standalone-reachable,
-not only failure-triggered): `python scripts\check_tower_crane.py --diagnose --path <project path>
+not only failure-triggered): `python toolkit/scripts/check_tower_crane.py --diagnose --path <project path>
 --slug <registry slug>` (either flag alone is fine if you only know one).
 
 **The output is facts only — present/absent, no verdict, no fix.** Reasoning from those facts to a

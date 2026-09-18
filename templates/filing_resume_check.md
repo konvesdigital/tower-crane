@@ -27,7 +27,7 @@ tickets that need this project's attention. Run (the consumer-side port of the h
 same idea: don't re-derive a categorization a script already computes exactly):
 
 ```
-<python_launcher> "<hub root>\toolkit\scripts\ticket_scan.py" --project "<this project's full
+<python_launcher> "<hub root>/toolkit/scripts/ticket_scan.py" --project "<this project's full
 name>" "<this project's registry slug>" [--json]
 ```
 

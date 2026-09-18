@@ -163,7 +163,7 @@ ordinary case.
 3. Commit it via the hub's own hardened commit script, never raw `git add`/`commit`/`push` directly
    (fragile, and skips the leak-scan-first gate this script already runs):
    ```
-   <python_launcher> "<hub root>\toolkit\scripts\checkpoint_git.py" --message "File ticket: <slug>"
+   <python_launcher> "<hub root>/toolkit/scripts/checkpoint_git.py" --message "File ticket: <slug>"
    --include "change_requests\<filename>.md"
    ```
    (`--include` names your new ticket file explicitly — the script treats any other untracked file
@@ -207,7 +207,7 @@ test on your side:
 
 Either way, commit that edit the same way as filing (step 3 above) — never raw git directly:
 ```
-<python_launcher> "<hub root>\toolkit\scripts\checkpoint_git.py" --message "<slug>: verify/override"
+<python_launcher> "<hub root>/toolkit/scripts/checkpoint_git.py" --message "<slug>: verify/override"
 ```
 This ticket file is already tracked, so no `--include` is needed — an unpushed verify line never
 reaches the shared side otherwise.

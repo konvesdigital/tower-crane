@@ -35,7 +35,7 @@ relative to the same `toolkit\` you're inside right now.
 Run, from anywhere, substituting this project's own absolute root:
 
 ```
-<python_launcher> "<hub root>\toolkit\scripts\scan_consumer_update.py" --project-root "<this project's absolute root>"
+<python_launcher> "<hub root>/toolkit/scripts/scan_consumer_update.py" --project-root "<this project's absolute root>"
 ```
 
 This is a deterministic scan - no hub-side read dependency beyond files already on disk, no
@@ -70,7 +70,7 @@ For a chosen **hook**, **toolkit skill**, or **protocol piece** item, re-run the
 `--apply`:
 
 ```
-<python_launcher> "<hub root>\toolkit\scripts\scan_consumer_update.py" --project-root "<this project's absolute root>" --apply <numbers-or-'all'>
+<python_launcher> "<hub root>/toolkit/scripts/scan_consumer_update.py" --project-root "<this project's absolute root>" --apply <numbers-or-'all'>
 ```
 
 `<numbers>` are the printed item numbers (comma-separated), e.g. `--apply 1,3`, or `--apply all`

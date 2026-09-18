@@ -28,7 +28,7 @@ Run, chained into one call (the consumer-side sweep applying the same "stop reco
 two-call sequence from prose every time" fix already applied to `resume` step 3):
 
 ```
-python <hub root>\toolkit\scripts\shared_resource_resume_check.py --project-root <this project's
+python <hub root>/toolkit/scripts/shared_resource_resume_check.py --project-root <this project's
 root>
 ```
 

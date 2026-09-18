@@ -41,7 +41,7 @@ The hub is two nested git repos in one folder: an outer, private repo (holds `pr
 `consumers\`, `change_requests\` — the user's own continuity data) and an inner `toolkit\` repo
 (holds `hooks\`, `scripts\`, `templates\`, `AGENTS.md`, `config.example.json` — this file included).
 
-Mechanized as `scripts\setup_machine_preflight.py` — run it, don't reconstruct this sequence by
+Mechanized as `scripts/setup_machine_preflight.py` — run it, don't reconstruct this sequence by
 hand or improvise around whatever error comes up first.
 Step 2 below is what formally settles this machine's `python_launcher` — that hasn't happened yet
 here, so just try `python3` first and fall back to `python` (same order Step 2 uses) for every
@@ -66,8 +66,8 @@ got written, then the user remembered they have an existing remote), the fix is 
 discard or move the just-scaffolded files — not a separate procedure.
 
 **0b. Detect the current shape:** the script's own path depends on the shape you're trying to
-detect, so try both from cwd: `scripts\setup_machine_preflight.py --detect` (resolves if cwd is
-flat, or if cwd is `toolkit\` itself) first, then `toolkit\scripts\setup_machine_preflight.py
+detect, so try both from cwd: `scripts/setup_machine_preflight.py --detect` (resolves if cwd is
+flat, or if cwd is `toolkit\` itself) first, then `toolkit/scripts/setup_machine_preflight.py
 --detect` (resolves if cwd is an outer root with a `toolkit\` subfolder already) if the first path
 doesn't exist. If **neither** path exists at all, that's the ambiguous case below — nothing to run,
 go straight to asking. Whichever one resolves reports one of:
@@ -88,21 +88,21 @@ go straight to asking. Whichever one resolves reports one of:
 **0c. If flat: nest, then build or attach the outer layer.** Note the script's own path changes
 mid-sequence: before step 1 it's flat in cwd (`scripts\setup_machine_preflight.py`); from step 2
 onward `--nest` has already moved it down (`toolkit\scripts\setup_machine_preflight.py`).
-1. `python scripts\setup_machine_preflight.py --nest` — creates a `toolkit\` subfolder in cwd and
+1. `python scripts/setup_machine_preflight.py --nest` — creates a `toolkit\` subfolder in cwd and
    moves the flat content down into it (`.git\` included). cwd itself never moves, so this needs no
    session restart — the whole sequence below continues in the same session.
 2. Per step 0a's answer:
-   - **New hub, no existing remote yet:** `python toolkit\scripts\setup_machine_preflight.py
+   - **New hub, no existing remote yet:** `python toolkit/scripts/setup_machine_preflight.py
      --new-outer` (add `--git-remote-url <url>` if the user already has one — see the "if they want a
      private GitHub repo" note below for creating one first). Scaffolds `CLAUDE.md`, `.gitignore`,
      `consumers\`/`change_requests\`/`design\`, and a skeleton `project_progress.md`. Writes files
      and runs `git init` only — nothing is committed or pushed yet.
-   - **Reconnect to an existing remote:** `python toolkit\scripts\setup_machine_preflight.py
+   - **Reconnect to an existing remote:** `python toolkit/scripts/setup_machine_preflight.py
      --attach-existing --git-remote-url <url>` — runs `git init` / `remote add origin` / `fetch` /
      `checkout -b main --track origin/main` (C2's workaround for `git clone` refusing a non-empty
      target directory, which cwd now is thanks to the just-created `toolkit\` subfolder).
 3. If you scaffolded a new outer (not attached an existing one), commit and push it now through the
-   ordinary checkpoint flow: `toolkit\scripts\checkpoint_git.py --message "Initial hub scaffold"
+   ordinary checkpoint flow: `toolkit/scripts/checkpoint_git.py --message "Initial hub scaffold"
    --include-all`.
 4. **If the user wants a private GitHub repo backing a brand-new outer hub** (recommended, for
    backup/continuity) and doesn't have one yet: this is the one moment `gh` might be needed (C4 —
@@ -151,15 +151,15 @@ saying this folder isn't under the home directory, tell the user plainly and ask
 there (any subfolder, any name — just somewhere under `~`).
 
 If the folder is ever moved or renamed later, the next script run notices on its own and prints a
-`[NOTICE]` explaining what changed — at that point, offer to run `scripts\relocate.py` so
+`[NOTICE]` explaining what changed — at that point, offer to run `scripts/relocate.py` so
 already-onboarded consumers pick up the new location too. Nothing needs to be pre-empted here;
 just leave `config.local.json`'s `shared_root` field as `""` in Step 7 and let Step 8 fill it in.
 
 ## Step 5 — host_id
 Get this machine's hostname (`$env:COMPUTERNAME` on Windows / `hostname` on macOS/Linux — or ask the
 user if you can't run shell commands directly). Don't just propose it and wait for a yes — the raw
-hostname alone gives no frame of reference for what a `host_id` actually looks like (C6): from
-inside `toolkit\`, run `scripts\setup_machine_preflight.py --known-hosts` first (same
+hostname alone gives no frame of reference for what a `host_id` actually looks like (C6): run
+`toolkit/scripts/setup_machine_preflight.py --known-hosts` first (same
 launcher-agnostic `python`/`python3` fallback as Step 0) and offer whatever it lists (nicknames a
 prior machine's setup chose, e.g. something short and memorable rather than a raw system name)
 alongside the raw hostname, then ask directly whether this machine has connected to this hub before,
@@ -186,19 +186,19 @@ folder. Show the user the complete proposed `config.local.json` built from Steps
 explicit go-ahead before writing it.
 
 ## Step 7a — Write this machine's Bash permission allowlist
-`python toolkit\scripts\setup_machine_preflight.py --write-bash-allowlist` — merges the fixed set
+`python toolkit/scripts/setup_machine_preflight.py --write-bash-allowlist` — merges the fixed set
 of routine `resume`/`checkpoint`/`update` commands into this machine's own gitignored
 `.claude\settings.local.json`, so they never hit the ambient
 auto-mode permission classifier. Safe to re-run any time; nothing to confirm with the user first
 (purely additive, no behavior change).
 
 ## Step 8 — Regenerate and verify
-`toolkit\scripts\relocate.py` and `toolkit\scripts\check_tower_crane.py` are cross-platform Python —
+`toolkit/scripts/relocate.py` and `toolkit/scripts/check_tower_crane.py` are cross-platform Python —
 they run the same way on Windows, macOS, and Linux, using whichever launcher Step 2 found (`python3`
 or `python`).
 
-From inside `toolkit\`, run `scripts\relocate.py` (regenerates any registered consumers' hook
-commands for this machine), then `scripts\check_tower_crane.py` to confirm a clean bill of health.
+Run `toolkit/scripts/relocate.py` (regenerates any registered consumers' hook
+commands for this machine), then `toolkit/scripts/check_tower_crane.py` to confirm a clean bill of health.
 
 ## Step 8a — Register this host in shared_resources (if any exist)
 If `shared_resources\CATALOG.md` exists and has at least one non-`Archived`, non-`insight` row, run
