@@ -15,22 +15,13 @@ actually invoked.
      is a queue: work identified but not yet started, deferred until its time comes. An item
      graduates Next Up → Current Status the session someone actually starts it, and out of Current
      Status → Work Log the session it's done — never sideways.
-   - **Inclusion test, applied to every line in both headings**: would a session miss this fact by
-     re-deriving it itself (reading the code, running the action, reading a design doc), and would
-     missing it degrade this session's decisions? If Claude would learn it anyway by doing the thing
-     the fact describes, or it's inspectable in seconds (e.g. who's registered — read `consumers\`,
-     don't restate the roster), it doesn't belong here. Neither heading is a capability inventory —
-     a fully-built feature with no open caveat belongs in `README.md`; a settled call belongs in the
-     Decisions table. Point to the canonical source instead of duplicating it.
-   - Update Current Status and Next Up in two passes: (1) **fold in what changed** — edit the
-     existing text in place to match what's true right now, never append a new bullet narrating what
-     this session did (that's the Work Log entry's job). (2) **Re-read the WHOLE section** and
-     strike anything narrating a past event rather than present fact — a completion verb (built,
-     fixed, verified, confirmed, found, resolved, done), a date tied to an event, or "this session"
-     means it's history: delete it, or keep only its present-tense residue with no date/verb. A Next
-     Up item whose action is done gets deleted outright, never marked done in place. A session with
-     no present-tense change needs no edit here at all (Work Log entry still always gets added).
-     (Rationale: `README.md` "Why this exists".)
+   - **Fold in what changed this session** — edit the existing text in place to match what's true
+     right now, or add a line only for something this session discovered that doesn't already fit
+     an existing one. Never append a bullet narrating what this session did (that's the Work Log
+     entry's job). A session with no present-tense change needs no edit here at all (Work Log entry
+     still always gets added). Do not re-scan the whole section for calcified or misplaced content
+     here — that full audit (the Inclusion Test) is `"archive"`'s job below, not paid at every
+     checkpoint.
    - Move resolved Decisions rows from Open → Locked.
    - **A new or edited Decisions row's Notes column is a pointer, never prose.** Point to the
      `design\X.md` that's the real source if one exists; otherwise, if the decision is operative
@@ -91,14 +82,58 @@ actually invoked.
    holds many settled entries — a prompt only, never automatic.
 
 **"archive"** (user-initiated only — never automatic, never during "checkpoint")
+
+Two legs, run together every time: Work Log relocation (1-5) and Current Status/Next Up triage
+(6-10) — the latter is where the Inclusion Test actually gets enforced now that `"checkpoint"`
+only does a light fold-in. Only Work Log, Current Status, and Next Up are ever touched — the
+Decisions table stays live state in `project_progress.md` always.
+
+Work Log leg:
 1. Determine which Work Log entries are both fully completed and not themselves a dependency for
    current or other work items.
 2. List current Work Log entries — date + one-line title only, newest first — marking with a
    checkmark those found fully complete and non-dependent in step 1.
-3. Ask the user where to draw the cutoff. Do not guess. Wait for an explicit answer.
-4. Move every entry at or before that cutoff into `project_progress_archive.md`, appended in
-   chronological order (oldest first). Create the archive file if it doesn't exist yet.
-5. Remove those entries from `project_progress.md`. Confirm what was archived.
+3. Default: archive every ✓-marked entry from step 2 — these need not be contiguous; an older
+   completed entry can be archived while a newer one stays live, and vice versa. Present the marked
+   list as the plan and proceed on it without waiting for confirmation, unless a specific
+   completion/dependency call is genuinely ambiguous — then ask about that entry specifically,
+   never "where's the cutoff."
+4. Move every ✓-marked entry into `project_progress_archive.md`, appended in chronological order
+   (oldest first) regardless of which entries were skipped in between. Create the file if it
+   doesn't exist yet.
+5. Remove those entries from `project_progress.md`.
+
+Current Status / Next Up triage leg:
+6. **Inclusion test**, applied to every remaining line in both headings: would a session miss this
+   fact by re-deriving it itself (reading the code, running the action, reading a design doc), and
+   would missing it degrade this session's decisions? If Claude would learn it anyway by doing the
+   thing the fact describes, or it's inspectable in seconds (e.g. who's registered — read
+   `consumers\`, don't restate the roster), it doesn't belong here. Neither heading is a capability
+   inventory — a fully-built feature with no open caveat belongs in `README.md`; a settled call
+   belongs in the Decisions table.
+7. Classify every line — trimming a mixed line to its residue first, since a real open fact is
+   often wrapped inside otherwise-historical narration — into exactly one of three buckets:
+   - **Calcified**: a completion verb (built, fixed, verified, confirmed, found, resolved, done,
+     live-tested, audited) tied to a date, with no open caveat left once that narration is
+     stripped — or the same fact/date already has a matching `Locked`/`Locked and BUILT` row in the
+     Decisions table, making the line a redundant restatement.
+   - **Standing fact**: a real, non-re-derivable fact describing a settled or accepted state nobody
+     is actively pursuing (language like "deliberately," "not a bug," "accepted either way") —
+     worth keeping somewhere, but not active work.
+   - **In-progress**: everything else — an actively-worked task, or an unresolved defect/gap with
+     no acceptance language (a known standing defect with no plan yet still counts as in-progress
+     for this purpose).
+8. Present the classification to the user as a table before moving anything — this is judgment,
+   not a mechanical diff, and a standing fact's destination (step 9) needs a human call.
+9. Act per bucket:
+   - **Calcified** → delete from Current Status/Next Up, append to `project_progress_archive.md`
+     (same append-only, chronological pattern as the Work Log leg).
+   - **Standing fact** → ask the user where it belongs: `project_progress_archive.md` by default,
+     `decisions_detail.md` when it's operative rationale with no other home, or another
+     project-specific log this project already maintains when one fits better. Don't default
+     silently.
+   - **In-progress** → stays in Current Status/Next Up, trimmed to its present-tense residue only.
+10. Confirm what was archived/relocated and what stayed, per bucket.
 
 **"update"** — pulls `toolkit\`'s `origin` remote under a diff-review trust gate. User-initiated
 only; mechanical steps live in `scripts\update_toolkit.py`, diff review/assessment below is manual

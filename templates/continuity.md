@@ -23,26 +23,15 @@ this mechanism works and how it relates to other mechanisms.
 ### "checkpoint"
 
 1. Update `project_progress.md`:
-   - Update **Current Status** (base) and/or **Current Focus** (expanded) and **Next Up** in two
-     passes, every checkpoint:
-     1. **Fold in what changed** — edit the existing text in place (update or delete a stale fact)
-        to match what's true right now. Never append a new bullet narrating what this session did;
-        that's the dated Work Log entry's job, even for something still true right now.
-     2. **Then re-read the WHOLE section, line by line** — not just what you just touched — and
-        strike anything narrating a past event instead of stating present fact. Concrete test: a
-        sentence with a completion verb (built, fixed, verified, confirmed, found, discovered,
-        logged, resolved, done, landed) or a date tied to an event, or the phrase "this session", is
-        narrating history, not describing the present — delete it (its detail already lives in a
-        Work Log entry) or keep only its present-tense residue with no date/verb ("the hub runs on
-        two machines", not "multi-machine support was built and verified on 2026-08-10"). A Next Up
-        item whose action is now complete gets **deleted outright**, never marked done in place —
-        Next Up holds only items not yet done.
-     A session that changed nothing about present-tense reality needs no edit to these sections at
-     all (a Work Log entry still always gets added). These sections load into context every session,
-     so restating finished work is a recurring token cost, and it defeats archiving (moving Work Log
-     entries out can't shrink the file while the same done-detail is duplicated up top). Done work
-     has one home: its dated Work Log entry. (Ticking a **Phases** checkbox is terse status, not a
-     recap — that stays.)
+   - **Fold in what changed this session** — edit the existing text of **Current Status** (base)
+     and/or **Current Focus** (expanded) and **Next Up** in place (update or delete a stale fact) to
+     match what's true right now, or add a line only for something this session discovered that
+     doesn't already fit an existing one. Never append a bullet narrating what this session did;
+     that's the dated Work Log entry's job, even for something still true right now. A session that
+     changed nothing about present-tense reality needs no edit to these sections at all (a Work Log
+     entry still always gets added). Do not re-scan the whole section for calcified or misplaced
+     content here — that full audit (the Inclusion Test) is `"archive"`'s job below, not paid at
+     every checkpoint. (Ticking a **Phases** checkbox is terse status, not a recap — that stays.)
    - If the project uses **Phases**: update the phase checklist — tick completed stages, mark
      which phase is now active.
    - Move any settled decisions from Open → Locked: flip the status column (base) **or** move the
@@ -88,11 +77,50 @@ this mechanism works and how it relates to other mechanisms.
 
 ### "archive" (user-initiated only — never automatic, never during "checkpoint")
 
-1. Determine which work log entries are both fully completed and are not themselves a dependency for current or other work items. 
-2. List current Work Log entries — date + one-line title only, newest first, and indicate with a checkmark those which are fully complete and not dependencies of others based on the check in step 1.
-3. Ask the user where to draw the cutoff. Do not guess. Wait for an explicit answer.
-4. Move every entry at or before that cutoff into `project_progress_archive.md`, appended in
-   chronological order (oldest first). Create the archive file if it doesn't exist yet.
-5. Remove those entries from `project_progress.md`. Confirm what was archived. Only the **Work
-   Log** is archived — Current Status/Focus, Next Up, Decisions, Phases, and To Reconcile are
-   live state and stay in `project_progress.md`.
+Two legs, run together every time: Work Log relocation (1-5) and Current Status/Focus + Next Up
+triage (6-10) — the latter is where the Inclusion Test actually gets enforced now that
+`"checkpoint"` only does a light fold-in. Decisions, Phases, and To Reconcile stay live state in
+`project_progress.md` always — only Work Log, Current Status/Focus, and Next Up are ever archived.
+
+Work Log leg:
+1. Determine which Work Log entries are both fully completed and not themselves a dependency for
+   current or other work items.
+2. List current Work Log entries — date + one-line title only, newest first — marking with a
+   checkmark those found fully complete and non-dependent in step 1.
+3. Default: archive every ✓-marked entry from step 2 — these need not be contiguous; an older
+   completed entry can be archived while a newer one stays live, and vice versa. Present the marked
+   list as the plan and proceed on it without waiting for confirmation, unless a specific
+   completion/dependency call is genuinely ambiguous — then ask about that entry specifically,
+   never "where's the cutoff."
+4. Move every ✓-marked entry into `project_progress_archive.md`, appended in chronological order
+   (oldest first) regardless of which entries were skipped in between. Create the file if it
+   doesn't exist yet.
+5. Remove those entries from `project_progress.md`.
+
+Current Status/Focus + Next Up triage leg:
+6. **Inclusion test**, applied to every remaining line in both headings: would a session miss this
+   fact by re-deriving it itself (reading the code, running the action, reading a design doc), and
+   would missing it degrade this session's decisions? If Claude would learn it anyway by doing the
+   thing the fact describes, or it's inspectable in seconds, it doesn't belong here. Neither
+   heading is a capability inventory.
+7. Classify every line — trimming a mixed line to its residue first, since a real open fact is
+   often wrapped inside otherwise-historical narration — into exactly one of three buckets:
+   - **Calcified**: a completion verb (built, fixed, verified, confirmed, found, discovered,
+     logged, resolved, done, landed) tied to a date, with no open caveat left once that narration
+     is stripped — or the same fact/date is already captured in a Decisions row, making the line a
+     redundant restatement.
+   - **Standing fact**: a real, non-re-derivable fact describing a settled or accepted state nobody
+     is actively pursuing (language like "deliberately," "not a bug," "accepted either way") —
+     worth keeping somewhere, but not active work.
+   - **In-progress**: everything else — an actively-worked task, or an unresolved defect/gap with
+     no acceptance language.
+8. Present the classification to the user as a table before moving anything — this is judgment,
+   not a mechanical diff, and a standing fact's destination (step 9) needs a human call.
+9. Act per bucket:
+   - **Calcified** → delete from Current Status/Focus/Next Up, append to
+     `project_progress_archive.md` (same append-only, chronological pattern as the Work Log leg).
+   - **Standing fact** → ask the user where it belongs: `project_progress_archive.md` by default,
+     or a more specific log this project already maintains (a decisions-detail file, a domain log
+     such as an SEO page log, etc.) when one fits better. Don't default silently.
+   - **In-progress** → stays, trimmed to its present-tense residue only.
+10. Confirm what was archived/relocated and what stayed, per bucket.
