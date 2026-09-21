@@ -75,7 +75,10 @@ actually invoked.
      in the first place (step 2 is about to resolve it in the same invocation, or fails and the
      branch above documents the correction); it belongs only for a state that's actually still
      open when the entry is written, e.g. a run genuinely blocked on untracked files/leak-scan/
-     standing constraints and left to resume later.
+     standing constraints and left to resume later. The same closing applies to a `change_requests\`
+     ticket's own `## Round-trip log` line left reading `commit: pending checkpoint` by "Applying a
+     fix"/"Registration tickets" (`agents_change_requests.md`) earlier this session — fold in the
+     real commit SHA there too, same as any other pending-checkpoint text this step closes.
 3. Confirm to the user: saved and pushed, **both repos' working trees clean** (note whether
    `toolkit\` push happened, was skipped clean, or failed).
 4. **Suggest archiving** if the file has grown past roughly **400 lines (~40 KB)**, or the Work Log

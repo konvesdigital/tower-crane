@@ -37,7 +37,9 @@ itself is the catch-all for anything broader than one named command; don't add a
 3. Place it in `hooks\`, `agents\`, or `scripts\`.
 4. Add a row to `MENU.md` (name, file, what it does, trigger if a hook) and write the exact opt-in
    snippet a consuming project needs (literal absolute path, matching MENU.md's existing style).
-5. Checkpoint (`agents_continuity.md`): commit and push.
+5. Leave it uncommitted — building a tool is ordinary user-requested work, not correctness-critical
+   state, so it waits for the user to say `"checkpoint"` like
+   any other task. Do not call `checkpoint_git.py` or commit/push here.
 
 **Private branch** (`toolkit_private\`, outer repo, sibling of `toolkit\`):
 1. Build and test it the same way.
@@ -49,8 +51,8 @@ itself is the catch-all for anything broader than one named command; don't add a
    `toolkit_private\templates\optins\<name>.json` (`{{PRIVATE_ROOT}}` in place of
    `{{SHARED_ROOT}}`). A consumer opts in via `update`/`update consumers`, never by hand-editing
    its own `.claude\settings.json`.
-5. Checkpoint (`agents_continuity.md`): the ordinary outer-repo commit+push already covers it — no
-   leak-scan gate.
+5. Leave it uncommitted, same as the public branch — waits for `"checkpoint"`. (When it does run,
+   the ordinary outer-repo commit+push already covers this — no leak-scan gate.)
 
 **Migrating private → public:** re-run the public branch with the content copied over (same
 generalize pass any new public tool needs). Default: delete the `toolkit_private\` copy once the

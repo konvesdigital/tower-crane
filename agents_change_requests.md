@@ -142,8 +142,10 @@ append a short documentary note to the existing `consumers\<slug>.md` entry (sam
 prior such notes) recording what was adopted and when — `check_tower_crane.py` won't catch a
 skipped note, this convention isn't mechanically checked. Then run
 `toolkit/scripts/check_tower_crane.py --consumer <slug>` (confirms no unrelated drift), flip `Status` to
-**DONE**, log it in `project_progress.md`, and commit via
-`python toolkit/scripts/checkpoint_git.py --message "<summary>"` — never raw git directly.
+**DONE**, and log it in `project_progress.md`. **Leave the note/ticket/progress-doc edits
+uncommitted** — actioning a registration ticket is user-requested work product, not
+correctness-critical state, so it waits for the next explicit
+`"checkpoint"`; do not call `checkpoint_git.py` or any raw git command here.
 
 (A *new* project joining the platform no longer files a ticket here at all — retired 2026-08-12
 alongside `templates\register.md`; `"connect project"` now writes `consumers\<slug>.md` directly
@@ -159,15 +161,18 @@ in the same hub session via `scripts/new_consumer.py`'s adoption branch. See
    (`tests\<tool>\`) catches a behavior regression, its reference scan confirms no consumer's
    wiring/imports broke. Also run the ticket's Suggested test plus your own. Add/extend a golden
    fixture when the fix is behavior-changing.
-4. Append a `## Round-trip log` line recording the **commit SHA** and affected consumers. If what
-   shipped diverges from the Proposed fix/content, or converges with another open ticket, say so
-   explicitly per "What a ticket actually is" above — name the replacement Suggested test if the
-   original no longer applies, and name the other ticket if verification is now shared with it.
-   Leave `Status: OPEN`. Log it in `project_progress.md`, naming affected consumers there too.
-   Commit via `python toolkit/scripts/checkpoint_git.py --message "<summary>"` — never raw `git commit`/
-   `push` directly (fragile, and skips the leak-scan-first gate this script already runs). It
-   covers both the fix itself (`toolkit\`) and the ticket/progress-doc edit (outer repo) in one
-   call. The ticket closes only when the consumer verifies.
+4. Append a `## Round-trip log` line recording affected consumers and, in place of a commit SHA not
+   yet known, the literal text `commit: pending checkpoint`. If what shipped diverges from the
+   Proposed fix/content, or converges with another open ticket, say so explicitly per "What a ticket
+   actually is" above — name the replacement Suggested test if the original no longer applies, and
+   name the other ticket if verification is now shared with it. Leave `Status: OPEN`. Log it in
+   `project_progress.md`, naming affected consumers there too. **Leave both the fix (`toolkit\`) and
+   the ticket/progress-doc edit (outer repo) uncommitted** — applying a fix is user-requested work
+   product, not correctness-critical state, so it waits for the
+   next explicit `"checkpoint"` like any other build/fix task; do not call `checkpoint_git.py` or any
+   raw `git commit`/`push` here. `"checkpoint"`'s own step 1 already closes the loop on "pending"
+   git-state language and fills in the real SHA once it commits. The ticket closes only when the
+   consumer verifies.
 
 ### Cross-consumer verify tickets (only when 2+ consumers exist)
 When a behavior-changing fix ships and the registry (`consumers\`) lists consumers *other* than the
