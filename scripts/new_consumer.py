@@ -24,6 +24,9 @@ at all (adoption - appends the live sections to whatever's already there).
 What's still left for the user on this machine is reported by readiness.py at the end of the run
 (and again at every `resume`) - no static checklist file is written.
 
+--dry-run still writes every <target> file above, but writes nothing in the hub (the registry
+entry is printed, not written) and runs no git clone/pull/commit/push in either repo.
+
 Generated files (settings.json, CLAUDE.md, README.md, project_progress.md, registry entry) use LF line endings universally.
 """
 
@@ -158,7 +161,7 @@ _COMMIT_RESULT_LABELS = {
 
 def print_close_out_summary(project_name, target_path, existing_consumer, already_connected_here,
                              is_reconnect, is_adoption, consumer_commit_result,
-                             progress_commit_result, registry_commit_result):
+                             progress_commit_result, registry_commit_result, dry_run=False):
     """One block, printed once at the end of the run, from the classification/commit-result
     variables main() already computed. "Left uncommitted" re-checks git directly rather than
     being sourced from an already-known variable."""
@@ -201,6 +204,8 @@ def print_close_out_summary(project_name, target_path, existing_consumer, alread
         print(f"Registered in the hub's own registry: {label}.")
     elif existing_consumer is not None and already_connected_here:
         print("Registered in the hub's own registry: unchanged (already had this host).")
+    elif dry_run:
+        print("Registered in the hub's own registry: no (dry run - readiness below reports it missing).")
 
     remaining = readiness.format_lines(readiness.check(target_path), indent='  ')
     if remaining:
@@ -244,6 +249,10 @@ def main():
                          help="When connecting an already-registered consumer to "
                               "an empty target folder and its registry has a remote: on record, the default is "
                               "to `git clone` it before scaffolding. Pass this to scaffold a blank folder instead.")
+    parser.add_argument('--dry-run', action='store_true',
+                         help="Scaffold the target folder's files as normal, but write nothing in the hub "
+                              "(registry entry printed, not written) and run no git clone/pull/commit/push "
+                              "in either repo. The target folder IS written - point it at a scratch folder.")
     args = parser.parse_args()
 
     target_path = Path(args.target_path)
@@ -314,7 +323,9 @@ def main():
     if existing_consumer is not None and not already_connected_here and not args.no_clone:
         remote = existing_consumer.get('remote')
         folder_empty = not target_path.exists() or (target_path.is_dir() and not any(target_path.iterdir()))
-        if remote and folder_empty:
+        if remote and folder_empty and args.dry_run:
+            print(f"  [dry-run] would git clone {remote} {target_path} - scaffolding the empty folder instead")
+        elif remote and folder_empty:
             print(f"Target folder is empty and '{project_name}' has a remote on record: {remote}")
             print(f"  cloning before scaffolding: git clone {remote} {target_path}")
             target_path.mkdir(parents=True, exist_ok=True)
@@ -329,7 +340,7 @@ def main():
 
     # Pull target_path's own repo current before any of the read-and-patch-in-place steps below.
     # No-op for a brand-new scaffold (no .git yet) or a folder just cloned above.
-    if target_path.exists():
+    if target_path.exists() and not args.dry_run:
         sync_consumer_repo(target_path, log=print)
 
     # protocol pieces: filing + compliance + shared_resources mandatory; continuity default-on
@@ -761,7 +772,11 @@ def main():
                     new_raw, remote_added = registry_lib.set_remote_if_absent(new_raw, captured_remote)
                     if remote_added:
                         print(f"  note   backfilled remote: {captured_remote}")
-            write_utf8(registry_path, new_raw)
+            if args.dry_run:
+                print(f"  [dry-run] would write {registry_path}:")
+                print(new_raw)
+            else:
+                write_utf8(registry_path, new_raw)
             floor_note = ", scope -> multi_machine (2-host floor)" if host_count >= 2 else ""
             print(f"  wrote  {registry_path} (added hosts.{config['host_id']}, now {host_count} host(s){floor_note})")
     else:
@@ -786,15 +801,21 @@ Notes: scaffolded by `scripts/new_consumer.py` on {scaffold_date}. Registry form
 `consumers/<slug>.md` (the machine-readable block the scaffolder writes and
 `check_tower_crane.py` reads).
 """
-        write_utf8(registry_path, registry)
-        print(f"  wrote  {registry_path}")
+        if args.dry_run:
+            print(f"  [dry-run] would write {registry_path}:")
+            print(registry)
+        else:
+            write_utf8(registry_path, registry)
+            print(f"  wrote  {registry_path}")
 
     # --- 6b. commit the registry write into the outer hub repo itself, now, not left for a later
     # optional `checkpoint`: the registry is
     # functionality-critical state (check_tower_crane.py / every host's own resume reads it for a
     # correct answer), not user work-in-progress - skipped entirely when already_connected_here
     # left the registry file untouched above.
-    if not (existing_consumer is not None and already_connected_here):
+    if args.dry_run:
+        print("  [dry-run] skipped registry commit/push and consumer-repo commit(s)")
+    elif not (existing_consumer is not None and already_connected_here):
         registry_commit_msg = (
             f"Registry: connect '{slug}' (host: {config['host_id']})" if existing_consumer is None
             else f"Registry: add host '{config['host_id']}' to '{slug}'")
@@ -823,7 +844,7 @@ Notes: scaffolded by `scripts/new_consumer.py` on {scaffold_date}. Registry form
     # deletion commits cleanly. project_progress.md is NOT in that tuple (not wholly
     # hub-owned) and gets its own separate, narrower commit further down, gated additionally on
     # progress_pre_clean.
-    if is_new_connection:
+    if is_new_connection and not args.dry_run:
         has_git_now = (target_path / '.git').exists()
         if existing_consumer is not None:
             needs_overview_now = readme_written
@@ -887,7 +908,8 @@ Notes: scaffolded by `scripts/new_consumer.py` on {scaffold_date}. Registry form
     # --- 8. close-out summary ---------------------------------------------------------------
     print_close_out_summary(
         project_name, target_path, existing_consumer, already_connected_here, is_reconnect,
-        is_adoption, consumer_commit_result, progress_commit_result, registry_commit_result)
+        is_adoption, consumer_commit_result, progress_commit_result, registry_commit_result,
+        dry_run=args.dry_run)
 
 
 if __name__ == '__main__':
