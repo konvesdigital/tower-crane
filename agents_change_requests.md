@@ -101,13 +101,14 @@ bottom of the ticket
 **Multi-user attribution:** with more than one committer, name the acting person alongside the project in each line (e.g. `fix applied by <name> (commit <sha>)…`). A single-owner hub keeps the terser project-only form above.
 
 ### Scanning at session start (including on `resume` — see `AGENTS.md`) or when asked to process requests
-Run `python toolkit/scripts/ticket_scan.py --apply` first — it categorizes every
-`Status: OPEN` ticket in `change_requests\`, mechanically flips any `verified_pass`/
-`operator_override` ticket to `DONE` itself (its own log line, its own scoped commit+push — no
-separate git step, and nothing to hand-read first: those two categories need no judgment), then
-prints the categorized list of whatever's still `OPEN` afterward. Don't re-derive the categorization
-by hand, and don't hand-apply a DONE flip yourself for either of those two categories — by the time
-you see the output, the script already did. A `register` ticket (`Type: registration`) is handled by
+Run `python toolkit/scripts/ticket_scan.py --mark-done` first — it categorizes every
+`Status: OPEN` ticket in `change_requests\`, flips any `verified_pass`/`operator_override` ticket
+to `DONE` in the local ticket file (its own log line; nothing to hand-read first: those two
+categories need no judgment), then prints the categorized list of whatever's still `OPEN`
+afterward. It never runs git — the flipped files ride along with the next `"checkpoint"`, like any
+other unsaved local work. Don't re-derive the categorization by hand, and don't hand-apply a DONE
+flip yourself for either of those two categories — by the time you see the output, the script
+already did. A `register` ticket (`Type: registration`) is handled by
 "Registration tickets" below instead. For a normal fix ticket, this is the rule for whatever the
 script's "remaining OPEN" list still shows, reading the **last** `## Round-trip log` line:
 - No round-trip activity yet → this agent's turn: fix it (Applying a fix, below).
@@ -124,10 +125,6 @@ script's "remaining OPEN" list still shows, reading the **last** `## Round-trip 
   "done" — this is exactly the shape a diverged/converged-fix closing note takes (see "What a
   ticket actually is"), so don't treat the category itself as a problem to fix; read the actual
   log and act on what it says.
-
-If `--apply`'s own summary reports a commit/push error for the bookkeeping it just tried to do,
-treat that like any other blocked git action — surface it and let the operator decide, don't
-retry by hand.
 
 Round-trip lines an unattended `scripts/run_automation.py` run writes are prefixed `automation:` to
 distinguish them from live-session lines. It never flips `Status` to DONE itself except via

@@ -13,12 +13,9 @@ Two responsibilities, both importable (no `claude` subprocess calls live here):
     project (case-insensitive substring over each ticket's raw text), reached via `--project` on
     the CLI.
 
-  apply_mechanical_actions() - perform the one category that needs no judgment at all: flip a
-    consumer-verified ticket to DONE. Every write here touches only change_requests\\<file>.md -
-    `git add change_requests`, never `-A`. Runs against PROJECT_ROOT, not SHARED_ROOT -
-    change_requests\\ lives in the outer repo, a sibling of the inner toolkit\\ repo this module's
-    SHARED_ROOT points at. The CLI's `--apply` also prints the remaining OPEN tickets'
-    categorization right after applying.
+  mark_done() - flip consumer-verified / operator-overridden tickets to DONE. Local edits to
+    change_requests\\<file>.md only - never runs git. Returns the touched paths in its summary.
+    The CLI's `--mark-done` also prints the remaining OPEN tickets' categorization afterward.
 
   Attempt-tracking (load_state/record_attempt/is_backed_off) is separate from categorization so a
     ticket whose fix keeps failing check_tower_crane.py backs off after max_attempts instead of
@@ -29,7 +26,6 @@ Two responsibilities, both importable (no `claude` subprocess calls live here):
 import argparse
 import json
 import re
-import subprocess
 import sys
 from dataclasses import dataclass
 from datetime import date
@@ -158,7 +154,7 @@ def scan(change_requests_dir=CHANGE_REQUESTS_DIR):
 # --- append a dated round-trip/processing log line -----------------------------------------------
 def append_log_line(ticket_path, line):
     """Append one line (caller includes the leading '- ') to the ticket's log section. Used by
-    both apply_mechanical_actions() here and run_automation.py's own "fix proposed" line."""
+    both mark_done() here and run_automation.py's own "fix proposed" line."""
     text = ticket_path.read_text(encoding='utf-8')
     if not text.endswith('\n'):
         text += '\n'
@@ -210,22 +206,14 @@ def needs_fix_candidates(tickets, state, max_attempts=3):
             if t.category in FIX_WORTHY and not is_backed_off(state, t.slug, max_attempts)]
 
 
-# --- mechanical actions: no judgment required, safe to perform without an AI invocation -----------
-# change_requests\ lives in the outer (private) repo, PROJECT_ROOT, a sibling of the inner
-# toolkit\ repo SHARED_ROOT points at. Ticket bookkeeping git operations must target PROJECT_ROOT,
-# never SHARED_ROOT.
-def _run_git(args, cwd=PROJECT_ROOT):
-    return subprocess.run(['git', '-C', str(cwd)] + args, capture_output=True, text=True, check=True)
-
-
-def apply_mechanical_actions(tickets, dry_run=False):
-    """Handle VERIFIED_PASS and OPERATOR_OVERRIDE (flip DONE) - the only categories needing
-    mechanical action now that ticket fixes never open a PR. Mutates each affected Ticket's
-    .status in place so a status change is visible to needs_fix_candidates() in the same tick.
-    Returns a summary dict. One commit+push covering everything changed, not one per ticket."""
+# --- mechanical actions: local file edits only, never git ------------------------------------------
+def mark_done(tickets, dry_run=False):
+    """Flip VERIFIED_PASS and OPERATOR_OVERRIDE tickets to DONE in the local ticket files.
+    Mutates each affected Ticket's .status in place. Returns
+    {'done_flipped': [slug, ...], 'touched': [Path, ...]}."""
     today = date.today().isoformat()
     touched_files = []
-    summary = {'done_flipped': [], 'errors': []}
+    summary = {'done_flipped': [], 'touched': touched_files}
 
     for t in tickets:
         if t.category == Category.VERIFIED_PASS:
@@ -242,15 +230,6 @@ def apply_mechanical_actions(tickets, dry_run=False):
             t.status = 'DONE'
             touched_files.append(t.path)
             summary['done_flipped'].append(t.slug)
-
-    if touched_files and not dry_run:
-        rel = [str(p.relative_to(PROJECT_ROOT)) for p in touched_files]
-        try:
-            _run_git(['add'] + rel)
-            _run_git(['commit', '-m', f"automation: ticket bookkeeping ({len(rel)} file(s))"])
-            _run_git(['push', 'origin', 'main'])
-        except subprocess.CalledProcessError as e:
-            summary['errors'].append(f"git commit/push of ticket bookkeeping failed: {e.stderr}")
 
     return summary
 
@@ -274,8 +253,10 @@ def _cli_report(tickets):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Mechanical, zero-AI scan/bookkeeping of change_requests\\*.md.")
-    parser.add_argument('--apply', action='store_true', help="Perform mechanical bookkeeping (DONE flips). Without this flag, dry-run report only.")
+    parser = argparse.ArgumentParser(description="Mechanical, zero-AI local scan/bookkeeping of change_requests\\*.md. Never runs git.")
+    parser.add_argument('--mark-done', action='store_true',
+                         help="Flip verified/overridden tickets to DONE in the local ticket files (no git). "
+                              "Without this flag, read-only categorize report.")
     parser.add_argument('--json', action='store_true', help="Emit the categorized report as JSON instead of text.")
     parser.add_argument('--project', nargs='+', default=None,
                          help="Filter to tickets whose text mentions ANY of these project "
@@ -287,18 +268,17 @@ def main():
     tickets = scan()
     if args.project:
         tickets = filter_by_project(tickets, args.project)
-    if args.apply:
-        summary = apply_mechanical_actions(tickets)
+    if args.mark_done:
+        flipped = mark_done(tickets)['done_flipped']
         remaining = [t for t in tickets if t.status == 'OPEN']
         if args.json:
             print(json.dumps({
-                'summary': summary,
+                'done_flipped': flipped,
                 'remaining': [{'slug': t.slug, 'category': t.category} for t in remaining],
             }, indent=2))
         else:
-            print("=== ticket_scan.py --apply ===")
-            for k, v in summary.items():
-                print(f"  {k}: {v}")
+            print("=== ticket_scan.py --mark-done ===")
+            print(f"  done_flipped (local, uncommitted): {flipped}")
             print("--- remaining OPEN tickets (categorized) ---")
             _cli_report(remaining)
         return
@@ -308,7 +288,7 @@ def main():
             {'slug': t.slug, 'category': t.category} for t in tickets
         ], indent=2))
     else:
-        print("=== ticket_scan.py (dry-run report) ===")
+        print("=== ticket_scan.py (categorize report) ===")
         _cli_report(tickets)
 
 

@@ -7,8 +7,8 @@ No-op (exit 0) unless config.local.json's automation.enabled is true.
 
 Two separate repos, two separate git targets: a ticket's tool fix physically lives in `toolkit\\`
 (SHARED_ROOT) and commits there, LOCAL ONLY - never pushed. The ticket's own round-trip log
-line/bookkeeping commits and pushes to the outer (private) repo (PROJECT_ROOT), the same target
-`ticket_scan.py`'s bookkeeping uses.
+line/bookkeeping (including `ticket_scan.mark_done()`'s DONE flips) commits and pushes to the
+outer (private) repo (PROJECT_ROOT).
 
 Never runs `toolkit\\`'s own update/merge gate (`scripts\\update_toolkit.py --check`/`--approve`) -
 only `--notify`, a plain surfacing check with no state mutation.
@@ -221,8 +221,16 @@ def main():
     subprocess.run([cfg['python_launcher'], str(CHECK_SCRIPT), '--write-guidance'])
 
     tickets = ticket_scan.scan()
-    bookkeeping = ticket_scan.apply_mechanical_actions(tickets, dry_run=args.dry_run)
-    print(f"Mechanical bookkeeping: {bookkeeping}")
+    bookkeeping = ticket_scan.mark_done(tickets, dry_run=args.dry_run)
+    print(f"Mechanical bookkeeping: done_flipped={bookkeeping['done_flipped']}")
+    if bookkeeping['touched'] and not args.dry_run:
+        rel = [str(p.relative_to(PROJECT_ROOT)) for p in bookkeeping['touched']]
+        try:
+            _git(['add'] + rel, cwd=PROJECT_ROOT)
+            _git(['commit', '-m', f"automation: ticket bookkeeping ({len(rel)} file(s))"], cwd=PROJECT_ROOT)
+            _git(['push', 'origin', 'main'], cwd=PROJECT_ROOT)
+        except subprocess.CalledProcessError as e:
+            print(f"  [ERROR] ticket bookkeeping commit/push failed: {e.stderr}")
 
     state = ticket_scan.load_state()
     candidates = ticket_scan.needs_fix_candidates(tickets, state, max_attempts)[:max_tickets]
