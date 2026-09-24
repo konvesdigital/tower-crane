@@ -1,15 +1,15 @@
 {
   "hub": [
     "git pull:*",
-    "*scripts/resume_check.py:*",
-    "*scripts/progress_sections.py:*",
-    "*scripts/ticket_scan.py:*",
-    "*scripts/update_toolkit.py:*",
-    "*scripts/checkpoint_git.py:*"
+    "*resume_check.py:*",
+    "*progress_sections.py:*",
+    "*ticket_scan.py:*",
+    "*update_toolkit.py:*",
+    "*checkpoint_git.py:*"
   ],
   "consumer": [
     "git pull:*",
-    "*toolkit/scripts/consumer_resume_check.py*",
-    "*toolkit/scripts/checkpoint_consumer.py*"
+    "*consumer_resume_check.py*",
+    "*checkpoint_consumer.py*"
   ]
 }
