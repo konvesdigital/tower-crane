@@ -15,7 +15,8 @@ Two responsibilities, both importable (no `claude` subprocess calls live here):
 
   mark_done() - flip consumer-verified / operator-overridden tickets to DONE. Local edits to
     change_requests\\<file>.md only - never runs git. Returns the touched paths in its summary.
-    The CLI's `--mark-done` also prints the remaining OPEN tickets' categorization afterward.
+    The CLI's default report lists these as ready to flip; `--mark-done` performs the flip and
+    prints the remaining OPEN tickets' categorization afterward.
 
   Attempt-tracking (load_state/record_attempt/is_backed_off) is separate from categorization so a
     ticket whose fix keeps failing check_tower_crane.py backs off after max_attempts instead of
@@ -55,6 +56,7 @@ class Category:
 # Categories a candidate ticket must be in for run_automation.py to consider spending an AI
 # invocation on it.
 FIX_WORTHY = (Category.NO_ACTIVITY, Category.STILL_FAILS)
+DONE_READY = (Category.VERIFIED_PASS, Category.OPERATOR_OVERRIDE)
 
 STATUS_RE = re.compile(r'^Status:\s*(OPEN|DONE)\s*$', re.MULTILINE)
 TYPE_REGISTRATION_RE = re.compile(r'^Type:\s*registration\s*$', re.MULTILINE | re.IGNORECASE)
@@ -256,7 +258,7 @@ def main():
     parser = argparse.ArgumentParser(description="Mechanical, zero-AI local scan/bookkeeping of change_requests\\*.md. Never runs git.")
     parser.add_argument('--mark-done', action='store_true',
                          help="Flip verified/overridden tickets to DONE in the local ticket files (no git). "
-                              "Without this flag, read-only categorize report.")
+                              "Without this flag, read-only report listing which tickets are ready to flip.")
     parser.add_argument('--json', action='store_true', help="Emit the categorized report as JSON instead of text.")
     parser.add_argument('--project', nargs='+', default=None,
                          help="Filter to tickets whose text mentions ANY of these project "
@@ -288,8 +290,14 @@ def main():
             {'slug': t.slug, 'category': t.category} for t in tickets
         ], indent=2))
     else:
-        print("=== ticket_scan.py (categorize report) ===")
-        _cli_report(tickets)
+        ready = [t for t in tickets if t.category in DONE_READY]
+        rest = [t for t in tickets if t.category not in DONE_READY]
+        print("=== ticket_scan.py (categorize report, read-only) ===")
+        if ready:
+            print(f"--- ready to flip to DONE ({len(ready)}) - run: python toolkit/scripts/ticket_scan.py --mark-done ---")
+            _cli_report(ready)
+        print(f"--- other OPEN tickets ({len(rest)}) ---")
+        _cli_report(rest)
 
 
 if __name__ == '__main__':

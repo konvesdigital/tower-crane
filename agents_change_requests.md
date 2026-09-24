@@ -101,16 +101,17 @@ bottom of the ticket
 **Multi-user attribution:** with more than one committer, name the acting person alongside the project in each line (e.g. `fix applied by <name> (commit <sha>)…`). A single-owner hub keeps the terser project-only form above.
 
 ### Scanning at session start (including on `resume` — see `AGENTS.md`) or when asked to process requests
-Run `python toolkit/scripts/ticket_scan.py --mark-done` first — it categorizes every
-`Status: OPEN` ticket in `change_requests\`, flips any `verified_pass`/`operator_override` ticket
-to `DONE` in the local ticket file (its own log line; nothing to hand-read first: those two
-categories need no judgment), then prints the categorized list of whatever's still `OPEN`
-afterward. It never runs git — the flipped files ride along with the next `"checkpoint"`, like any
-other unsaved local work. Don't re-derive the categorization by hand, and don't hand-apply a DONE
-flip yourself for either of those two categories — by the time you see the output, the script
-already did. A `register` ticket (`Type: registration`) is handled by
-"Registration tickets" below instead. For a normal fix ticket, this is the rule for whatever the
-script's "remaining OPEN" list still shows, reading the **last** `## Round-trip log` line:
+Run `python toolkit/scripts/ticket_scan.py` (no flags) first — a read-only report that
+categorizes every `Status: OPEN` ticket in `change_requests\`, listing any
+`verified_pass`/`operator_override` ticket under "ready to flip to DONE" and everything else under
+"other OPEN tickets." It edits nothing and never runs git. Don't re-derive the categorization by
+hand. For the "ready to flip" group, tell the user which tickets are ready and that
+`python toolkit/scripts/ticket_scan.py --mark-done` flips them (a local edit plus its own log line
+per ticket; the flipped files ride along with the next `"checkpoint"`). Run `--mark-done` yourself
+only when the user asks for it; never hand-apply the flip. A `register` ticket
+(`Type: registration`) is handled by "Registration tickets" below instead. For a normal fix
+ticket, this is the rule for whatever the "other OPEN" list shows, reading the **last**
+`## Round-trip log` line:
 - No round-trip activity yet → this agent's turn: fix it (Applying a fix, below).
 - "awaiting <consumer> verify" → the next entry is expected from a consumer session; **skip**.
 - consumer "still fails: …" → this agent's turn again: re-fix.
