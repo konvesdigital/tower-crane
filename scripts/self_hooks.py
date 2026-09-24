@@ -14,6 +14,8 @@ written; a stub with no such placeholder is unaffected.
   --list              (default) show every available tool and whether it's currently on here.
   --enable <tool>     merge templates\\optins\\<tool>.json's hook(s) into .claude\\settings.local.json.
   --disable <tool>    remove them again.
+  --check-defaults    read-only; prints [SELF-USE-OFF] <tool> for each DEFAULT_SELF_USE tool that's off.
+  --enable-defaults   --enable every DEFAULT_SELF_USE tool.
 
 Every run also rewrites .claude\\self_hooks_status.md, a plain human-readable mirror of current
 on/off state.
@@ -40,6 +42,7 @@ CLAUDE_DIR = PROJECT_ROOT / '.claude'
 SETTINGS_PATH = CLAUDE_DIR / 'settings.local.json'
 STATUS_PATH = CLAUDE_DIR / 'self_hooks_status.md'
 SKILLS_INSTALL_DIR = CLAUDE_DIR / 'skills'
+DEFAULT_SELF_USE = ('hub_commands', 'capability_relationships')
 
 
 def write_utf8(path, content):
@@ -263,6 +266,19 @@ def cmd_disable(tool, config):
         print(f"'{tool}' was not enabled - no change.")
 
 
+def cmd_check_defaults(config):
+    settings = load_settings()
+    for t in DEFAULT_SELF_USE:
+        if tool_status(t, settings, config) != 'on':
+            print(f"[SELF-USE-OFF] '{t}' is a default hub self-use tool but is off on this machine "
+                  f"- run: python toolkit/scripts/self_hooks.py --enable-defaults")
+
+
+def cmd_enable_defaults(config):
+    for t in DEFAULT_SELF_USE:
+        cmd_enable(t, config)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Toggle tower_crane's own hooks on for this repo/machine (self-use, off by default)."
@@ -272,6 +288,10 @@ def main():
                         help="List available tools and current on/off state here. Default if no flag given.")
     group.add_argument('--enable', metavar='TOOL', help="Turn a tool on for this machine.")
     group.add_argument('--disable', metavar='TOOL', help="Turn a tool off for this machine.")
+    group.add_argument('--check-defaults', action='store_true',
+                        help="Report default self-use tools that are off here. Read-only.")
+    group.add_argument('--enable-defaults', action='store_true',
+                        help="Turn on every default self-use tool for this machine.")
     args = parser.parse_args()
 
     config = get_shared_config(SHARED_ROOT)
@@ -280,6 +300,10 @@ def main():
         cmd_enable(args.enable, config)
     elif args.disable:
         cmd_disable(args.disable, config)
+    elif args.check_defaults:
+        cmd_check_defaults(config)
+    elif args.enable_defaults:
+        cmd_enable_defaults(config)
     else:
         cmd_list(config)
 

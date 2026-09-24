@@ -9,12 +9,14 @@ Runs, in order:
   4. check_stale_paths.py                 (no args)
   5. check_shared_resource_catalog.py     (no args - resume-only, not run at `quick resume`)
   6. readiness.py --hub                   (every consumer registered on this host)
+  7. self_hooks.py --check-defaults       (default hub self-use tools off on this machine)
 
-All six are side-effect-free and always exit 0. This script does no pass/fail interpretation of
+All seven are side-effect-free and always exit 0. This script does no pass/fail interpretation of
 its own - it runs each in turn and prints its output verbatim under a numbered header, silent
 sub-sections included. Reporting tags per step: dirty/incoming/outgoing lines (step 1),
 [UNWIRED]/[BROKEN] (step 2), [NUDGE] (step 3), [STALE-PATH] (step 4), [FAIL]/[MISMATCH] (step 5),
-[TODO]/[NOTE]/[UNKNOWN]/[HUB-MISMATCH] (step 6).
+[TODO]/[NOTE]/[UNKNOWN]/[HUB-MISMATCH] (step 6),
+[SELF-USE-OFF] (step 7).
 
 Usage: python scripts\\resume_check.py [--project-root <path>]
 --project-root defaults to this toolkit\\ checkout's own parent (the outer repo root).
@@ -61,6 +63,7 @@ def main():
         ('check_stale_paths.py', 'check_stale_paths.py', []),
         ('check_shared_resource_catalog.py', 'check_shared_resource_catalog.py', []),
         ('readiness.py --hub', 'readiness.py', ['--hub']),
+        ('self_hooks.py --check-defaults', 'self_hooks.py', ['--check-defaults']),
     ]
 
     print("=== resume_check.py - consolidated resume checks ===")

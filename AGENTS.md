@@ -161,6 +161,9 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
      `[UNKNOWN]` → mention it as the user's to do in that project; `[HUB-MISMATCH]` (registered
      path missing, or no `hub_pointer.md`) → offer `"connect project"` or `"disconnect project"`.
      Silent → say nothing.
+   - `self_hooks.py --check-defaults` — any `[SELF-USE-OFF]` line names a default hub self-use tool
+     that's off on this machine; mention it and offer to run `self_hooks.py --enable-defaults`.
+     Silent → say nothing.
 4. Run `python toolkit/scripts/progress_sections.py` — prints `project_progress.md`'s Current Status, Next
    Up, Decisions table, and most recent Work Log entry in one call; read its output rather than
    grepping for headings and re-deriving section boundaries by hand.

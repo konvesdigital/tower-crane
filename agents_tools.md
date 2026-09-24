@@ -63,8 +63,12 @@ public version works; "keep both" is a per-tool choice, not the default.
 This repo is not a registered consumer of itself. `scripts/self_hooks.py` turns a tool on for THIS
 repo/machine only: `--list` (default), `--enable <tool>`, `--disable <tool>`. State lives in
 gitignored `.claude\settings.local.json`; a mirror auto-regenerates at
-`.claude\self_hooks_status.md` (open directly to check state). Every tool self-enables the moment
-its `templates\optins\<tool>.json` exists.
+`.claude\self_hooks_status.md` (open directly to check state). A `templates\optins\<tool>.json`
+only makes a tool *available* for self-use; nothing turns it on except `--enable`. Exception — the
+default self-use set (`self_hooks.py`'s `DEFAULT_SELF_USE`: `hub_commands`,
+`capability_relationships`) should be on for every hub machine: `setup_machine.md`'s Step 7b turns
+them on with `--enable-defaults`, and `resume` flags `[SELF-USE-OFF]` on any machine where one is
+off.
 
 ## Changing or removing an existing tool
 **Trigger: "modify tool".**

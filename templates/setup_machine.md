@@ -192,6 +192,12 @@ of routine `resume`/`checkpoint`/`update` commands into this machine's own gitig
 auto-mode permission classifier. Safe to re-run any time; nothing to confirm with the user first
 (purely additive, no behavior change).
 
+## Step 7b — Enable default hub self-use tools
+`python toolkit/scripts/self_hooks.py --enable-defaults` — turns on the default self-use set
+(`hub_commands`, `capability_relationships`) for this machine. Nothing to confirm first (local,
+gitignored, reversible with `--disable <tool>`). Then run `python toolkit/scripts/self_hooks.py
+--list` and offer the user whichever remaining tools show `[off]`, enabling only the ones they pick.
+
 ## Step 8 — Regenerate and verify
 `toolkit/scripts/relocate.py` and `toolkit/scripts/check_tower_crane.py` are cross-platform Python —
 they run the same way on Windows, macOS, and Linux, using whichever launcher Step 2 found (`python3`
