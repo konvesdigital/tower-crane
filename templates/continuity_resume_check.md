@@ -55,17 +55,22 @@ reached) read whatever is present.
 2. `git pull` (this project's own repo).
 3. Check the shared tower_crane hub — both steps read-only, no gate needed, chained into one call
    (the consumer-side re-run of the hub's own resume audit):
-   `python "<hub root>/toolkit/scripts/consumer_resume_check.py"` (same `toolkit\` folder this
-   file itself resolved through). Runs, in order, what used to be two separately prose-sequenced
-   calls:
+   `python "<hub root>/toolkit/scripts/consumer_resume_check.py" --project-root "<this project's
+   root>"` (same `toolkit\` folder this file itself resolved through). Runs, in order:
    - `update_toolkit.py --notify --consumer` (fetch + compare against the hub's last-reviewed
      baseline — never merges; `--consumer` rephrases every message as informational-only, since
      none of `--notify`'s hub-only fix verbs are reachable from this session — change_requests\
      2026-08-25_update_toolkit_notify-audience-mismatch.md). If it reports the hub falling behind
      its own upstream, mention it, but do **not** `git pull` `toolkit\` from this project's session
      — that's the gated `update` action, run only in a session opened directly in the hub.
-   - `check_tower_crane.py --write-guidance` (no `--consumer` flag — the hub's per-machine `host:`
-     scoping already limits it). Pure Python, no pull required.
+   - `check_tower_crane.py --write-guidance --consumer <this project's slug>` — checks and writes
+     `COMPLIANCE_GUIDANCE.md` for this project only (slug looked up from the hub registry by this
+     project's path on this machine; skipped if unregistered). Pure Python, no pull required.
+   - `readiness.py --project-root <root>` — what this project still needs on this machine (git,
+     uncommitted setup files, folder trust / import approval, unfilled overview placeholder, a
+     leftover `FIRST_RUN.md`). Silent when ready. A `[TODO]`/`[UNKNOWN]` line is the user's to act
+     on — report it, don't fix it unasked; `[HUB-MISMATCH]` means the hub's registry disagrees
+     with this machine — point the user at `"connect project"` in the hub.
    - This checks only whether the **hub's own toolkit source** has fallen behind its public
      upstream — separate from whether **this project** has adopted everything the hub already
      offers. That's this project's own on-demand `update` skill (if adopted): say "update" anytime
@@ -79,7 +84,8 @@ reached) read whatever is present.
 6. State status and next step in 1–3 lines, leading with the host identity from step 1 (when
    available — see that step's skip condition), **folding in anything step 3 surfaced** (the hub
    falling behind its own upstream, or a `check_tower_crane.py --write-guidance` finding) — a
-   step-3 finding is not satisfied by having run the check, only by this line actually saying so.
+   step-3 finding (including any readiness line) is not satisfied by having run the check, only by
+   this line actually saying so.
    Do not replay full history.
 
 ### "quick resume"

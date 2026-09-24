@@ -12,14 +12,13 @@ up in the registry (`consumers\<slug>.md`) and floats on this repo's HEAD.
 1. **New project from scratch** — `toolkit/scripts/new_consumer.py --target-path <abs path> --project-name
    "<Full Title>" --scope local|multi_machine` (per the question above; default `local`). Writes ALL
    consumer files (`.claude\settings.json`, `CLAUDE.md` with `@import` lines, skeleton
-   `project_progress.md`, `FIRST_RUN.md`) plus the registry entry. Defaults: opts into
+   `project_progress.md`) plus the registry entry. Defaults: opts into
    `consistency_check`, imports `filing` + `compliance` + `continuity`. Flags (real `argparse`
    form): `--tools` (space-separated list; pass with no values for a consumer with no hooks) for
    which shared tools to opt into, `--private-tools` (space-separated list) for which
    `toolkit_private\` hooks/skills to opt into, `--no-continuity` to skip the continuity
-   protocol piece, `--force` to overwrite an existing `CLAUDE.md`/`project_progress.md`/
-   `FIRST_RUN.md`. Does NOT run git — the new project's first session does that via its
-   `FIRST_RUN.md`.
+   protocol piece, `--force` to overwrite an existing `CLAUDE.md`/`project_progress.md`. Ends
+   with a readiness report (see "What's left after connecting," below).
 2. **Existing (hand-copied) project, never Tower-Crane-shaped** — same `toolkit/scripts/new_consumer.py`
    invocation as #1, pointed at the project's existing local folder, run directly from this hub
    session (register.md's old courier-and-ticket detour is retired — this used to require copying
@@ -71,10 +70,7 @@ up in the registry (`consumers\<slug>.md`) and floats on this repo's HEAD.
    (read from a surviving
    `TOWER_CRANE_DISCONNECT_NOTES.md`, else the oldest hub-git-log commit touching
    `consumers\<slug>.md`, else today as a last resort). The per-host `since:` date is still always
-   today, since that genuinely reflects when *this host* connected. `FIRST_RUN.md`'s checklist (see
-   below) only lists what a project in this position actually still needs — usually just
-   re-accepting the import-approval dialog, since git/a remote/the overview are almost always
-   already there.
+   today, since that genuinely reflects when *this host* connected.
 
 **Every file `new_consumer.py` touches decides its own fate from its own most-direct signal — a
 per-file model, not a shared classification tied to specific numbered items above:**
@@ -84,14 +80,19 @@ its own signal chain (does *this file* carry the disconnected marker, or does a 
 `TOWER_CRANE_DISCONNECT_NOTES.md` prove it was connected before); `project_progress.md` keys on
 its own presence alone (present → always preserved with a dated note, absent → skeleton built);
 `TOWER_CRANE_DISCONNECT_NOTES.md` is deleted unconditionally the moment a connection succeeds,
-regardless of which branch fired; `FIRST_RUN.md`'s overview-placeholder line asks whether
-`CLAUDE.md` itself existed before this run, not the reconnect/adoption classification. It also
-checks for an existing `.git\` and an existing `origin` remote at the target path before writing
-the checklist: a `git init` line is only included if `.git\` is genuinely missing, a remote-setup
-line is offered as optional only if none is configured. This covers every combination honestly —
-a never-connected project someone already `git init`'d and pushed to GitHub by hand gets a
-checklist with almost nothing left to do; a reconnecting project with git removed for some reason
-gets told to reinitialize it, same as a brand-new one would.
+regardless of which branch fired.
+
+**What's left after connecting** is never a static checklist: `new_consumer.py` no longer writes
+`FIRST_RUN.md`. Its close-out ends with `readiness.py`'s report for the target path — git present,
+`origin` set (optional), Tower Crane setup files committed, folder trust and CLAUDE.md
+import approval (read best-effort from `~/.claude.json`, an undocumented Claude Code file — a
+missing key reports `[UNKNOWN]`, never a guess), overview placeholder (`<!-- FIRST_RUN:` marker)
+filled in, and the registry agreeing with this machine. Only what's actually missing is listed, on
+every branch. The same check re-runs at every `resume`: the consumer's own
+(`consumer_resume_check.py`) and the hub's (`resume_check.py`, via `readiness.py --hub`, for every
+consumer registered on this host) — so a project that reached a half-set-up state any other way
+(hand-copied, cloned onto a new machine, old disconnect) is caught too. A legacy `FIRST_RUN.md`
+still on disk is reported for deletion.
 
 Either path: run `toolkit/scripts/check_tower_crane.py` to confirm the consumer validates clean.
 

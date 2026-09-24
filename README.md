@@ -254,8 +254,8 @@ this, and you can disconnect any time by removing the reference lines.
   scripts\new_consumer.py --target-path C:\Users\you\Documents\MyNewProject --project-name "My New Project"
   ```
   Creates every file the project needs in one shot — `.claude\settings.json`, `CLAUDE.md` with
-  `@import` lines, a skeleton `project_progress.md`, and a `FIRST_RUN.md` checklist — plus a
-  registry entry here.
+  `@import` lines, and a skeleton `project_progress.md` — plus a registry entry here, then
+  reports whatever's still left on this machine (`scripts\readiness.py`).
 - *Existing, hand-built project* → copy `toolkit\templates\register.md` into its root, open it in
   Claude Code, and say *"read register.md and follow it."* It swaps any pasted workflow prose for
   `@import` lines and files a registration request into the hub's ticket inbox — the migration path,

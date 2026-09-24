@@ -10,7 +10,6 @@ Creates ALL files a new consumer needs:
   <target>/.claude/skills/<name>/  - Track-1 skill stub(s) for toolkit-governed pieces in
                                      SKILL_PIECES plus every STANDALONE_SKILLS entry
   <target>/project_progress.md      - continuity skeleton (only when continuity is on)
-  <target>/FIRST_RUN.md             - one-time checklist the new project runs then deletes
   consumers/<slug>.md               - registry entry (this repo)
 
 consumers/<slug>.md is the ONLY place a project name is recorded - it lives in the outer, private
@@ -22,10 +21,10 @@ template" section below): a registered consumer connecting another host (host-me
 re-appends the live sections), and an unregistered hand-copied project with no Tower Crane content
 at all (adoption - appends the live sections to whatever's already there).
 
-This script does NOT run git - git init + first commit is a FIRST_RUN.md step in the new project.
+What's still left for the user on this machine is reported by readiness.py at the end of the run
+(and again at every `resume`) - no static checklist file is written.
 
-Generated files (settings.json, CLAUDE.md, README.md, project_progress.md, FIRST_RUN.md, registry
-entry) use LF line endings universally.
+Generated files (settings.json, CLAUDE.md, README.md, project_progress.md, registry entry) use LF line endings universally.
 """
 
 import argparse
@@ -37,11 +36,12 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import readiness
 from config_lib import (
     get_shared_config, get_expanded_optin, materialize_skill_stub,
     build_new_cmd_map, apply_hook_command_fixes, print_diagnose_inline,
     TC_IN_USE_HEADING, WORKFLOW_HEADING, DISCONNECTED_HEADING, DISCONNECT_NOTES_FILENAME,
-    FIRST_RUN_FILENAME, CONSUMER_OWNED_PATHS,
+    CONSUMER_OWNED_PATHS,
     HUB_POINTER_IMPORT_LINE, HUB_POINTER_RELPATH, HUB_DISPATCH_RELPATH, HUB_DISPATCH_TEMPLATE,
     get_dispatch_optin, build_hub_pointer_content, build_dispatch_cmd_map,
     write_new_connection_files, collapse_imports_to_pointer, fix_imports, commit_hub_changes,
@@ -116,13 +116,6 @@ def try_capture_remote(target_path):
     return result.stdout.strip() or None
 
 
-def detect_git_state(target_path):
-    """(has_git, remote) at target_path. Drives build_first_run_checklist() so the checklist only
-    ever lists what's actually still missing."""
-    has_git = (Path(target_path) / '.git').exists()
-    return has_git, (try_capture_remote(target_path) if has_git else None)
-
-
 def strip_disconnected_section(text):
     """Inverse of disconnect_consumer.py's replace_prose_sections(): removes the
     DISCONNECTED_HEADING section (that heading through the next '## ' heading, or EOF) instead of
@@ -153,27 +146,6 @@ def find_oldest_registry_commit_date(slug):
     return proc.stdout.strip().splitlines()[-1][:10]  # oldest is last (git log is newest-first)
 
 
-def build_first_run_checklist(has_git, remote, needs_overview):
-    """Only lists what's actually still needed, based on detected state."""
-    items = []
-    if not has_git:
-        items.append("- [ ] `git init` and make an initial commit. (The scaffolder does NOT run "
-                      "git - this is a one-time local step.)")
-    if not remote:
-        items.append("- [ ] Optional: add a git remote (e.g. on GitHub) if you want off-machine "
-                      "backup/sync - not required for Tower Crane itself.")
-    items.append("- [ ] On first launch, **accept the one-time CLAUDE.md import-approval dialog** "
-                 "if prompted. Declining disables `@import` permanently, so the shared protocol "
-                 "pieces (filing, compliance, shared_resources, continuity) won't load.")
-    if needs_overview:
-        items.append("- [ ] Fill in the project narrative placeholder in `README.md` (what this "
-                      "project is, who it's for, background).")
-        items.append("- [ ] Fill in the agent-directives placeholder near the top of `CLAUDE.md` "
-                      "(standing constraints, domain policies — imperative, not narrative).")
-    items.append("- [ ] Delete this file (`FIRST_RUN.md`) once the above are done.")
-    return items
-
-
 _COMMIT_RESULT_LABELS = {
     'noop': "nothing to commit",
     'committed-pushed': "committed and pushed",
@@ -186,7 +158,7 @@ _COMMIT_RESULT_LABELS = {
 
 def print_close_out_summary(project_name, target_path, existing_consumer, already_connected_here,
                              is_reconnect, is_adoption, consumer_commit_result,
-                             progress_commit_result, registry_commit_result, remaining_checklist):
+                             progress_commit_result, registry_commit_result):
     """One block, printed once at the end of the run, from the classification/commit-result
     variables main() already computed. "Left uncommitted" re-checks git directly rather than
     being sourced from an already-known variable."""
@@ -230,10 +202,13 @@ def print_close_out_summary(project_name, target_path, existing_consumer, alread
     elif existing_consumer is not None and already_connected_here:
         print("Registered in the hub's own registry: unchanged (already had this host).")
 
-    if remaining_checklist:
-        print("Remaining for the user (from FIRST_RUN.md, or the equivalent for this branch):")
-        for item in remaining_checklist:
-            print(f"  {item}")
+    remaining = readiness.format_lines(readiness.check(target_path), indent='  ')
+    if remaining:
+        print("Remaining on this machine (readiness.py - `resume` re-checks this every session):")
+        for line in remaining:
+            print(line)
+    else:
+        print("Readiness: nothing left to do on this machine.")
 
 
 def main():
@@ -261,7 +236,7 @@ def main():
                               "consumer's 2nd host always sets multi_machine automatically (the 2-host floor), "
                               "regardless of this flag.")
     parser.add_argument('--force', action='store_true',
-                         help="Overwrite an existing CLAUDE.md / project_progress.md / FIRST_RUN.md. Never "
+                         help="Overwrite an existing CLAUDE.md / project_progress.md. Never "
                               "applies to an already-registered consumer's registry file - a slug collision "
                               "there always routes into an additive host-merge (the locked "
                               "slug-collision routing), never a blind overwrite.")
@@ -278,7 +253,6 @@ def main():
     scaffold_date = args.date or date.today().isoformat()
 
     # Close-out summary state, threaded out here so step 8 can report it directly.
-    remaining_checklist = None
     consumer_commit_result = None
     progress_commit_result = None
     registry_commit_result = None
@@ -737,14 +711,14 @@ def main():
                               "lines. Registered in the shared consumer registry." if is_adoption else
                               "Project scaffolded from tower_crane (`scripts/new_consumer.py`): "
                               "`.claude/settings.json`, `CLAUDE.md` with protocol imports, this "
-                              "file, and `FIRST_RUN.md`. Registered in the shared consumer registry.")
+                              "file. Registered in the shared consumer registry.")
             progress = f"""# Project Progress
 
 ## Current Status
 {status_line}
 
 ## Next Up
-- [ ] Complete the `FIRST_RUN.md` checklist (git init, accept import dialog, fill overview).
+- [ ] Resolve anything `resume`'s readiness check reports ([TODO] lines: git, import approval, overview).
 
 ## Decisions
 | Item | Status | Notes |
@@ -756,65 +730,6 @@ def main():
 """
             write_utf8(progress_path, progress)
             print(f"  wrote  {progress_path}")
-
-    # --- 5. FIRST_RUN.md (brand-new + reconnect only; never for host-merge) --------------------
-    if existing_consumer is not None:
-        # An already-registered consumer connecting a host was never
-        # a "first run" - its checklist (git init, fill in the overview placeholder) doesn't apply
-        # to a project that already has real history and a real overview. A one-line reminder
-        # replaces the file; FIRST_RUN.md is never (re)written in this branch.
-        if not (target_path / '.git').exists():
-            print(f"  note   no .git\\ found at {target_path} - run `git init` (or finish cloning) "
-                  "before your first session here. Setup changes are waiting there uncommitted "
-                  "until then.")
-            remaining_checklist = ["- [ ] `git init` (or finish cloning), then commit the setup "
-                                    "changes this run made."]
-        if readme_written:
-            # This branch never writes FIRST_RUN.md (see above), so a freshly-created README.md
-            # placeholder (step 3e) - which also holds back step 6c's auto-commit, same as the
-            # brand-new/reconnect branches' own needs_overview gate - would otherwise have no
-            # user-facing signal at all telling them it's there or that it's uncommitted.
-            remaining_checklist = (remaining_checklist or []) + [
-                "- [ ] Fill in the project narrative placeholder in `README.md` (freshly created "
-                "by this run), then commit the setup changes this run made (no FIRST_RUN.md "
-                "checklist exists for a host-merge connection to track this)."]
-        remaining_checklist = (remaining_checklist or []) + [
-            "- [ ] Open the project in a fresh Claude Code session and accept the CLAUDE.md "
-            "import-approval dialog if prompted (this machine hasn't opened it before)."]
-    else:
-        # Checklist is built from actually-detected state, not assumed from scratch
-        # ("Reconnect-after-disconnect gap") - a reconnecting project (real
-        # history) or a never-connected one someone already set up by hand may already have git
-        # and/or a remote. needs_overview asks CLAUDE.md's own pre-run existence directly
-        # (claude_md_existed), not the is_reconnect/is_adoption flags alone (per-file principle
-        # reframe) - is_reconnect can be True purely from the notes
-        # file surviving even when CLAUDE.md itself is genuinely gone, in which case a real
-        # overview WAS lost and this checklist line must still appear.
-        has_git, remote = detect_git_state(target_path)
-        first_run_path = target_path / FIRST_RUN_FILENAME
-        if first_run_path.exists() and not args.force:
-            print("  skip   FIRST_RUN.md exists (use --force to overwrite)")
-            remaining_checklist = ["- [ ] (see the existing `FIRST_RUN.md` - not overwritten this run)"]
-        else:
-            # readme_written ORed in: a reconnect/adoption run can preserve real CLAUDE.md content
-            # (claude_md_existed True) while still writing a fresh README.md placeholder - the
-            # checklist item must still appear for that half even when CLAUDE.md's own is settled.
-            needs_overview = not (claude_md_existed and (is_reconnect or is_adoption)) or readme_written
-            checklist = build_first_run_checklist(has_git, remote, needs_overview)
-            remaining_checklist = checklist
-            if is_reconnect:
-                heading = "Reconnected via tower_crane on"
-            elif is_adoption:
-                heading = "Adopted onto tower_crane on"
-            else:
-                heading = "Scaffolded from tower_crane on"
-            first_run = (
-                f"# First Run - one-time setup for {project_name}\n\n"
-                f"{heading} {scaffold_date}. Do these once, then delete this file.\n\n"
-                + '\n'.join(checklist) + '\n'
-            )
-            write_utf8(first_run_path, first_run)
-            print(f"  wrote  {first_run_path}")
 
     # --- 6a. registry entry --------------------------------------------------------------------
     if not tools:
@@ -904,8 +819,8 @@ Notes: scaffolded by `scripts/new_consumer.py` on {scaffold_date}. Registry form
     # independently-100%-reliable checks, no branch-identity logic needed. Host-merge never
     # computes needs_overview at all (content is always real there by construction - the
     # consumer's own project already exists), so its effective gate is just has_git.
-    # CONSUMER_OWNED_PATHS (committed below) now includes FIRST_RUN_FILENAME - wholly hub-owned,
-    # same as everything else there. project_progress.md is NOT in that tuple (not wholly
+    # CONSUMER_OWNED_PATHS (committed below) still includes FIRST_RUN_FILENAME so a legacy file's
+    # deletion commits cleanly. project_progress.md is NOT in that tuple (not wholly
     # hub-owned) and gets its own separate, narrower commit further down, gated additionally on
     # progress_pre_clean.
     if is_new_connection:
@@ -956,47 +871,23 @@ Notes: scaffolded by `scripts/new_consumer.py` on {scaffold_date}. Registry form
         elif has_git_now and needs_overview_now:
             # Gate correctly withholds: real git history may exist, but the content this run
             # wrote (or the pre-existing CLAUDE.md itself) still carries an unfilled overview
-            # placeholder. Never framed as a warning - nothing is wrong, just deferred to the
-            # user's own next action in that project (FIRST_RUN.md's checklist already produces a
-            # covering commit as a side effect once completed - except the host-merge branch,
-            # which never writes FIRST_RUN.md at all, so it gets its own message instead of
-            # pointing at a file that branch doesn't create).
-            if existing_consumer is not None:
-                print(f"  note   {project_name}'s setup changes (including a fresh README.md "
-                      "placeholder) are uncommitted - fill it in, then commit them yourself (no "
-                      "FIRST_RUN.md checklist exists for a host-merge connection).")
-            else:
-                print(f"  note   {project_name}'s setup changes are uncommitted - completing "
-                      "FIRST_RUN.md there finishes that.")
+            # placeholder. Never framed as a warning - deferred to the user; readiness.py reports
+            # both the placeholder and the uncommitted files until they're done.
+            print(f"  note   {project_name}'s setup changes are uncommitted until the overview "
+                  "placeholder is filled in - see the readiness lines below.")
 
     # --- 7. next steps -------------------------------------------------------------------------
-    # Branched, not one-size-fits-all: the import-approval dialog is a Claude Code trust decision
-    # keyed per project-directory-per-machine, not something this script can guarantee will fire -
-    # every branch below hedges with "if prompted" rather than stating it as a flat requirement.
     print()
     if existing_consumer is not None and already_connected_here:
-        # No-op re-run against a host already connected: nothing changed, nothing to open.
         print("Done. Nothing new to do - this host was already connected.")
-    elif existing_consumer is not None:
-        # Host-merge (genuinely new host joining an already-registered consumer): FIRST_RUN.md is
-        # never written for this branch (step 5 above) - don't tell the user to complete a file
-        # that doesn't exist. This machine has never opened this project path before, so the
-        # dialog is the likely-but-not-guaranteed first-launch step here.
-        print("Done. Next steps:")
-        print(f"  1. Open {target_path} in a fresh Claude Code session and accept the")
-        print("     CLAUDE.md import-approval dialog if prompted (this machine hasn't opened")
-        print("     this project before).")
     else:
-        print("Done. Next steps:")
-        print(f"  1. Open {target_path} in a fresh Claude Code session and complete FIRST_RUN.md")
-        print("     (git init, accept the CLAUDE.md import-approval dialog if prompted, fill the")
-        print("     CLAUDE.md overview).")
+        print(f"Done. Next: open {target_path} in a fresh Claude Code session and say `resume` -")
+        print("its readiness check reports anything still left (also listed below).")
 
     # --- 8. close-out summary ---------------------------------------------------------------
     print_close_out_summary(
         project_name, target_path, existing_consumer, already_connected_here, is_reconnect,
-        is_adoption, consumer_commit_result, progress_commit_result, registry_commit_result,
-        remaining_checklist)
+        is_adoption, consumer_commit_result, progress_commit_result, registry_commit_result)
 
 
 if __name__ == '__main__':

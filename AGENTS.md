@@ -134,7 +134,7 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
 1. Read `host_id` from `toolkit\config.local.json`. Never infer machine identity any other way
    (path, `hostname`, prior context).
 2. Outer project repo: `git pull`.
-3. If `toolkit\` exists: `python toolkit/scripts/resume_check.py` — one call chaining the four
+3. If `toolkit\` exists: `python toolkit/scripts/resume_check.py` — one call chaining the
    notify-only checks below; never pulls/merges/pushes
    (`update`/`checkpoint` are separate) and never mutates. `toolkit\` missing: skip silently.
    Interpret its consolidated output per sub-check, exactly as each already reports on its own:
@@ -156,6 +156,11 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
      graph edge pointing at a name no `CATALOG.md` row resolves to; mention it and offer to fix the
      named file (a hand edit, not a script-driven repair — the check only detects, per its own
      docstring). Silent (the "no catalog/graph inconsistencies found" line) → say nothing.
+   - `readiness.py --hub` — for every consumer registered on this host, what it still needs here
+     (git, uncommitted setup, folder trust / import approval, unfilled overview). `[TODO]`/
+     `[UNKNOWN]` → mention it as the user's to do in that project; `[HUB-MISMATCH]` (registered
+     path missing, or no `hub_pointer.md`) → offer `"connect project"` or `"disconnect project"`.
+     Silent → say nothing.
 4. Run `python toolkit/scripts/progress_sections.py` — prints `project_progress.md`'s Current Status, Next
    Up, Decisions table, and most recent Work Log entry in one call; read its output rather than
    grepping for headings and re-deriving section boundaries by hand.
