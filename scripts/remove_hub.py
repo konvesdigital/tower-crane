@@ -8,9 +8,19 @@ from both the outer hub repo and toolkit\\.
 Never touches tracked file content or history in either repo, or .claude\\hooks\\ - only the
 'origin' remote entry, which is local-only and fully reversible (`git remote add origin <url>`
 reattaches). Never touches GitHub or any other machine's own clone. Does not delete the hub folder
-tree itself - runs a dirty/unpushed check and writes that verdict, plus what was removed, into a
-local-only, gitignored TOWER_CRANE_UNINSTALLED.md in the outer repo root. Never rm -rf's its own
-running directory.
+tree itself. Never rm -rf's its own running directory.
+
+Ordering is deliberately gate-then-commit: the registry edit(s) disconnect_host() makes are
+committed and pushed (while 'origin' is still attached) BEFORE anything irreversible - clearing
+this machine's per-machine state or removing 'origin' from either repo. A single dirty/unpushed
+check on both repos, taken right after that push, decides which branch runs: any blocker (the
+registry push failed, or unrelated pre-existing unsynced state) aborts with nothing touched at all
+- config.local.json and 'origin' both still intact, so a plain `checkpoint` then re-run of
+"uninstall" is always a clean, safe retry. No blocker -> per-machine state cleared, 'origin' removed
+from both repos, TOWER_CRANE_UNINSTALLED.md written (local-only, gitignored) recording what was
+removed. This guarantees no other machine is ever left depending on a host that just uninstalled -
+the registry disconnect either reaches 'origin' before this machine cuts its own connection to it,
+or the uninstall doesn't complete at all.
 """
 
 import datetime
@@ -20,7 +30,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from config_lib import get_shared_config
+from config_lib import get_shared_config, commit_hub_changes
 import registry_lib
 from disconnect_consumer import disconnect_host
 
@@ -137,10 +147,12 @@ def _remove_origin(repo_path):
 
 
 def _build_uninstall_note(this_host, host_results, per_machine_removed, outer_status, toolkit_status,
-                           outer_origin_removed, toolkit_origin_removed, blockers):
+                           outer_origin_removed, toolkit_origin_removed):
     """Builds TOWER_CRANE_UNINSTALLED.md's content from the same facts already computed for the
     console output above, reformatted for a file meant to be read later. Gitignored (see
-    .gitignore). Call after both repos' 'origin' has already been removed."""
+    .gitignore). Only ever called from the no-blockers path in main() - both repos' 'origin' has
+    already been removed and there is nothing left unsynced, so the note always reports a clean,
+    fully-disconnected machine."""
     lines = [
         f"# Tower Crane — uninstalled from this machine ({this_host})",
         "",
@@ -185,20 +197,13 @@ def _build_uninstall_note(this_host, host_results, per_machine_removed, outer_st
             lines.append(f"- {label}: already had no 'origin' remote")
 
     lines += ["", "## B. What's left, and whether it's safe to delete", ""]
-    if blockers:
-        lines.append("NOT safe to delete yet:")
-        lines += [f"- {b}" for b in blockers]
-        lines.append("")
-        lines.append("Run `checkpoint` (commits and pushes) to clear these, then re-run "
-                      "\"uninstall\" to confirm, before deleting anything.")
-    else:
-        lines.append(
-            "This machine is fully disconnected from Tower Crane: no consumers connected here, no "
-            "per-machine state left, both repos' 'origin' remote removed. Nothing here depends on "
-            "GitHub or any other machine anymore — these files are safe to delete whenever you "
-            "want. That's a manual step you do yourself. (Deleting the actual GitHub repos, if you "
-            "ever want that too, is a separate decision — not something \"uninstall\" touches.)"
-        )
+    lines.append(
+        "This machine is fully disconnected from Tower Crane: no consumers connected here, no "
+        "per-machine state left, both repos' 'origin' remote removed. Nothing here depends on "
+        "GitHub or any other machine anymore — these files are safe to delete whenever you "
+        "want. That's a manual step you do yourself. (Deleting the actual GitHub repos, if you "
+        "ever want that too, is a separate decision — not something \"uninstall\" touches.)"
+    )
 
     lines += ["", "---", "This file is local-only — delete it along with everything else whenever "
               "you're done reading it. A later `setup_machine.md` run also deletes it automatically "
@@ -250,6 +255,52 @@ def main():
         print("No consumers are connected on this machine.")
     print()
 
+    # Mirrors disconnect_consumer.py's own main(): disconnect_host() only edits consumers/<slug>.md
+    # in memory/on disk - committing (and pushing, while 'origin' is still attached) that edit into
+    # the outer repo is this call's job. Must happen, and be confirmed clean below, before ANY
+    # irreversible step past this point (per-machine state clearing, 'origin' removal) - otherwise
+    # another machine relying on this registry never learns this host disconnected, and by the time
+    # that's discovered, config.local.json and 'origin' are both already gone with no way left here
+    # to fix it.
+    removed_slugs = [slug for slug, r in host_results if r['removed']]
+    if removed_slugs:
+        registry_commit_msg = (
+            f"Registry: uninstall this machine ({this_host}) - disconnect {', '.join(removed_slugs)}")
+        registry_commit_result = commit_hub_changes(
+            PROJECT_ROOT, [f"consumers/{slug}.md" for slug in removed_slugs], registry_commit_msg,
+            log=print)
+        label = _COMMIT_RESULT_LABELS.get(registry_commit_result, registry_commit_result)
+        print(f"  [git] registry change(s): {label}")
+
+    # Single dirty/unpushed check, with 'origin' still attached (ahead-count needs it) and
+    # reflecting the registry commit just made above - the one gate for everything irreversible
+    # below. Nothing has been removed yet, so a blocker here is always safely retryable.
+    outer_status = _repo_status(PROJECT_ROOT)
+    toolkit_status = _repo_status(SHARED_ROOT)
+
+    blockers = []
+    for label, status in (("outer hub repo", outer_status), ("toolkit\\", toolkit_status)):
+        if not status['is_repo']:
+            continue
+        if status['dirty']:
+            blockers.append(f"{label} has uncommitted changes")
+        if status['had_origin'] and status['ahead'] not in (None, '0'):
+            blockers.append(f"{label} has {status['ahead']} commit(s) that were never pushed")
+        elif status['had_origin'] and status['ahead'] is None:
+            blockers.append(f"{label}'s unpushed-commit status could not be verified (offline?)")
+
+    if blockers:
+        print()
+        print("NOT safe to uninstall yet - nothing has been removed or disconnected from GitHub:")
+        for b in blockers:
+            print(f"  - {b}")
+        print("Run `checkpoint` (commits and pushes) to clear these, then re-run \"uninstall\" - "
+              "safe to retry any number of times; nothing below this point has happened yet.")
+        print_close_out_summary(this_host, host_results, [])
+        return
+
+    # Past this point every step is safe: the registry (if touched) is confirmed pushed, and
+    # neither repo has any other uncommitted/unpushed state left to lose.
     removed = []
     config_local = SHARED_ROOT / 'config.local.json'
     if config_local.exists():
@@ -268,6 +319,7 @@ def main():
         shutil.rmtree(skills_dir)
         removed.append(str(skills_dir))
 
+    print()
     if removed:
         print("Cleared this machine's own per-machine state:")
         for r in removed:
@@ -275,9 +327,6 @@ def main():
     else:
         print("No per-machine state found to clear (already clean).")
 
-    # captured before removing origin so the ahead-count still has a remote to compare against
-    outer_status = _repo_status(PROJECT_ROOT)
-    toolkit_status = _repo_status(SHARED_ROOT)
     outer_origin_removed = _remove_origin(PROJECT_ROOT)
     toolkit_origin_removed = _remove_origin(SHARED_ROOT)
 
@@ -295,36 +344,18 @@ def main():
         elif not status['had_origin']:
             print(f"  {label}: already had no 'origin' remote")
 
-    blockers = []
-    for label, status in (("outer hub repo", outer_status), ("toolkit\\", toolkit_status)):
-        if not status['is_repo']:
-            continue
-        if status['dirty']:
-            blockers.append(f"{label} has uncommitted changes")
-        if status['had_origin'] and status['ahead'] not in (None, '0'):
-            blockers.append(f"{label} has {status['ahead']} commit(s) that were never pushed")
-        elif status['had_origin'] and status['ahead'] is None:
-            blockers.append(f"{label}'s unpushed-commit status could not be verified (offline?)")
-
     print()
-    if blockers:
-        print("NOT safe to delete this folder yet:")
-        for b in blockers:
-            print(f"  - {b}")
-        print("Run `checkpoint` (which commits and pushes) to clear these, then re-run "
-              "\"uninstall\" to confirm, before deleting anything.")
-    else:
-        print("This machine is now fully disconnected from Tower Crane: no consumers connected "
-              "here, no per-machine state left, and both repos' 'origin' remote removed. Nothing "
-              "here depends on GitHub or any other machine anymore - these files are safe to "
-              "delete whenever you want. That's a manual step you do yourself; this command "
-              "never deletes anything on its own. (.claude\\hooks\\ - tracked, personal content, "
-              "not Tower Crane's to begin with - is included in that, same as everything else "
-              "here. Deleting the actual GitHub repos, if you ever want that too, is a separate "
-              "decision this command has no part in.)")
+    print("This machine is now fully disconnected from Tower Crane: no consumers connected "
+          "here, no per-machine state left, and both repos' 'origin' remote removed. Nothing "
+          "here depends on GitHub or any other machine anymore - these files are safe to "
+          "delete whenever you want. That's a manual step you do yourself; this command "
+          "never deletes anything on its own. (.claude\\hooks\\ - tracked, personal content, "
+          "not Tower Crane's to begin with - is included in that, same as everything else "
+          "here. Deleting the actual GitHub repos, if you ever want that too, is a separate "
+          "decision this command has no part in.)")
 
     note_text = _build_uninstall_note(this_host, host_results, removed, outer_status, toolkit_status,
-                                       outer_origin_removed, toolkit_origin_removed, blockers)
+                                       outer_origin_removed, toolkit_origin_removed)
     note_path = PROJECT_ROOT / 'TOWER_CRANE_UNINSTALLED.md'
     note_path.write_text(note_text, encoding='utf-8', newline='\n')
     print()
