@@ -10,17 +10,18 @@ Never touches tracked file content or history in either repo, or .claude\\hooks\
 reattaches). Never touches GitHub or any other machine's own clone. Does not delete the hub folder
 tree itself. Never rm -rf's its own running directory.
 
-Ordering is deliberately gate-then-commit: the registry edit(s) disconnect_host() makes are
-committed and pushed (while 'origin' is still attached) BEFORE anything irreversible - clearing
-this machine's per-machine state or removing 'origin' from either repo. A single dirty/unpushed
-check on both repos, taken right after that push, decides which branch runs: any blocker (the
-registry push failed, or unrelated pre-existing unsynced state) aborts with nothing touched at all
-- config.local.json and 'origin' both still intact, so a plain `checkpoint` then re-run of
-"uninstall" is always a clean, safe retry. No blocker -> per-machine state cleared, 'origin' removed
-from both repos, TOWER_CRANE_UNINSTALLED.md written (local-only, gitignored) recording what was
-removed. This guarantees no other machine is ever left depending on a host that just uninstalled -
-the registry disconnect either reaches 'origin' before this machine cuts its own connection to it,
-or the uninstall doesn't complete at all.
+Ordering is commit-then-warn, not gate-then-abort: the registry edit(s) disconnect_host() makes are
+committed and pushed (while 'origin' is still attached) BEFORE anything irreversible, so the push
+has the best chance of landing. A dirty/unpushed check on both repos, taken right after that push,
+never blocks - it only decides whether to print a warning before continuing. Default is to proceed
+either way: per-machine state is cleared and 'origin' removed from both repos, and
+TOWER_CRANE_UNINSTALLED.md is written (local-only, gitignored) recording what was removed and, if
+applicable, what was abandoned unsaved. Someone running "uninstall" has almost always already
+decided to walk away from this machine's Tower Crane state entirely - refusing to finish over an
+uncommitted/unpushed diff would just be friction with nobody left to benefit from it. If the
+registry push itself failed, that's the same kind of leftover drift any other gone machine can
+leave behind - recoverable by hand later from a surviving hub using registry data already there,
+not something worth blocking a whole uninstall on.
 """
 
 import datetime
@@ -147,12 +148,11 @@ def _remove_origin(repo_path):
 
 
 def _build_uninstall_note(this_host, host_results, per_machine_removed, outer_status, toolkit_status,
-                           outer_origin_removed, toolkit_origin_removed):
+                           outer_origin_removed, toolkit_origin_removed, unsaved_changes):
     """Builds TOWER_CRANE_UNINSTALLED.md's content from the same facts already computed for the
     console output above, reformatted for a file meant to be read later. Gitignored (see
-    .gitignore). Only ever called from the no-blockers path in main() - both repos' 'origin' has
-    already been removed and there is nothing left unsynced, so the note always reports a clean,
-    fully-disconnected machine."""
+    .gitignore). Always called - unsaved_changes (main()'s warning list, possibly empty) records
+    anything abandoned rather than saved, since uninstall no longer blocks on it."""
     lines = [
         f"# Tower Crane — uninstalled from this machine ({this_host})",
         "",
@@ -196,7 +196,21 @@ def _build_uninstall_note(this_host, host_results, per_machine_removed, outer_st
         elif not status['had_origin']:
             lines.append(f"- {label}: already had no 'origin' remote")
 
-    lines += ["", "## B. What's left, and whether it's safe to delete", ""]
+    if unsaved_changes:
+        lines += ["", "## B. Unsaved changes abandoned here", ""]
+        lines.append(
+            "This machine had changes that weren't reflected anywhere else when \"uninstall\" ran. "
+            "Rather than blocking, uninstall proceeded and these are now gone from this machine's "
+            "perspective:"
+        )
+        lines += [f"- {w}" for w in unsaved_changes]
+        lines.append(
+            "If a registry push above was one of them, another machine's copy of the registry may "
+            "still list this host as connected — fix that by hand from a surviving hub using "
+            "registry data already there, not from here."
+        )
+
+    lines += ["", "## C. What's left, and whether it's safe to delete", ""]
     lines.append(
         "This machine is fully disconnected from Tower Crane: no consumers connected here, no "
         "per-machine state left, both repos' 'origin' remote removed. Nothing here depends on "
@@ -257,11 +271,10 @@ def main():
 
     # Mirrors disconnect_consumer.py's own main(): disconnect_host() only edits consumers/<slug>.md
     # in memory/on disk - committing (and pushing, while 'origin' is still attached) that edit into
-    # the outer repo is this call's job. Must happen, and be confirmed clean below, before ANY
-    # irreversible step past this point (per-machine state clearing, 'origin' removal) - otherwise
-    # another machine relying on this registry never learns this host disconnected, and by the time
-    # that's discovered, config.local.json and 'origin' are both already gone with no way left here
-    # to fix it.
+    # the outer repo is this call's job. Runs before any irreversible step past this point so the
+    # push has the best chance of succeeding; if it fails anyway, that shows up in the
+    # unsaved_changes warning below rather than blocking - same recoverable-by-hand pattern as any
+    # other leftover drift from a gone machine.
     removed_slugs = [slug for slug, r in host_results if r['removed']]
     if removed_slugs:
         registry_commit_msg = (
@@ -273,34 +286,32 @@ def main():
         print(f"  [git] registry change(s): {label}")
 
     # Single dirty/unpushed check, with 'origin' still attached (ahead-count needs it) and
-    # reflecting the registry commit just made above - the one gate for everything irreversible
-    # below. Nothing has been removed yet, so a blocker here is always safely retryable.
+    # reflecting the registry commit just made above. This never gates anything - it only decides
+    # whether to warn before continuing. See module docstring for why the default is to proceed
+    # rather than abort.
     outer_status = _repo_status(PROJECT_ROOT)
     toolkit_status = _repo_status(SHARED_ROOT)
 
-    blockers = []
+    unsaved_changes = []
     for label, status in (("outer hub repo", outer_status), ("toolkit\\", toolkit_status)):
         if not status['is_repo']:
             continue
         if status['dirty']:
-            blockers.append(f"{label} has uncommitted changes")
+            unsaved_changes.append(f"{label} has uncommitted changes")
         if status['had_origin'] and status['ahead'] not in (None, '0'):
-            blockers.append(f"{label} has {status['ahead']} commit(s) that were never pushed")
+            unsaved_changes.append(f"{label} has {status['ahead']} commit(s) that were never pushed")
         elif status['had_origin'] and status['ahead'] is None:
-            blockers.append(f"{label}'s unpushed-commit status could not be verified (offline?)")
+            unsaved_changes.append(f"{label}'s unpushed-commit status could not be verified (offline?)")
 
-    if blockers:
+    if unsaved_changes:
         print()
-        print("NOT safe to uninstall yet - nothing has been removed or disconnected from GitHub:")
-        for b in blockers:
-            print(f"  - {b}")
-        print("Run `checkpoint` (commits and pushes) to clear these, then re-run \"uninstall\" - "
-              "safe to retry any number of times; nothing below this point has happened yet.")
-        print_close_out_summary(this_host, host_results, [])
-        return
+        print("WARNING: this machine has changes that aren't reflected anywhere else. Continuing "
+              "will abandon them permanently:")
+        for w in unsaved_changes:
+            print(f"  - {w}")
+        print("To keep them instead, cancel now (Ctrl+C), run `checkpoint`, then re-run "
+              "\"uninstall\". Proceeding with uninstall...")
 
-    # Past this point every step is safe: the registry (if touched) is confirmed pushed, and
-    # neither repo has any other uncommitted/unpushed state left to lose.
     removed = []
     config_local = SHARED_ROOT / 'config.local.json'
     if config_local.exists():
@@ -355,7 +366,7 @@ def main():
           "decision this command has no part in.)")
 
     note_text = _build_uninstall_note(this_host, host_results, removed, outer_status, toolkit_status,
-                                       outer_origin_removed, toolkit_origin_removed)
+                                       outer_origin_removed, toolkit_origin_removed, unsaved_changes)
     note_path = PROJECT_ROOT / 'TOWER_CRANE_UNINSTALLED.md'
     note_path.write_text(note_text, encoding='utf-8', newline='\n')
     print()
