@@ -252,6 +252,59 @@ def filter_by_project(tickets, names):
     return [t for t in tickets if any(n in t.text.lower() for n in needles)]
 
 
+RE_RELATES_TO = re.compile(r'^Relates to:', re.MULTILINE)
+RE_VERIFY_REQUEST = re.compile(r'cross-consumer verify|verify-request', re.IGNORECASE)
+RE_FILED_BY_HUB = re.compile(r'^Filed by:.*\bhub\b', re.MULTILINE | re.IGNORECASE)
+RE_SUGGESTED_TEST = re.compile(r'^##\s*Suggested test\s*$', re.MULTILINE)
+
+
+def needs_project_attention(t):
+    """The three situations a connected project's resume must look at: a ticket awaiting a
+    consumer verify, an unclassifiable log, or a hub-filed verify-request (a `Relates to:` ticket
+    with no log yet, filed by the hub, that calls itself a cross-consumer verify / verify-request).
+    Returns the label to print, or None."""
+    if t.category == Category.AWAITING_CONSUMER:
+        return 'awaiting_consumer'
+    if t.category == Category.UNKNOWN_STATE:
+        return 'unknown_state'
+    if (t.category == Category.NO_ACTIVITY and RE_RELATES_TO.search(t.text)
+            and RE_FILED_BY_HUB.search(t.text) and RE_VERIFY_REQUEST.search(t.text)):
+        return 'verify_request'
+    return None
+
+
+def _last_line(t):
+    """First line of the ticket's last round-trip entry ('(no log entries yet)' if none), capped at
+    300 characters with a `[...]` marker."""
+    if not t.last_entry:
+        return '(no log entries yet)'
+    line = t.last_entry.splitlines()[0].strip()
+    return line if len(line) <= 300 else line[:300] + ' [...]'
+
+
+def _names_project(t, names):
+    """Whether the text that decides who acts next names one of `names`: the last log entry for a
+    ticket with log activity; for a verify-request with no log yet, its `## Suggested test` section
+    (that is where a verify-request says which project runs it)."""
+    haystack = t.last_entry
+    if t.category == Category.AWAITING_CONSUMER:
+        m = RE_AWAITING.search(haystack)
+        haystack = m.group(0) if m else haystack
+    if not haystack:
+        m = RE_SUGGESTED_TEST.search(t.text)
+        haystack = t.text[m.end():] if m else t.text
+    return any(n.lower() in haystack.lower() for n in names)
+
+
+def _attention_report(tickets, names):
+    flagged = [(label, t) for t in tickets if (label := needs_project_attention(t))]
+    print(f"--- needs this project's attention ({len(flagged)}) ---")
+    for label, t in flagged:
+        print(f"  [{label}] {t.path}")
+        print(f"    last log line: {_last_line(t)}")
+        print(f"    names this project: {'yes' if _names_project(t, names) else 'NO'}")
+
+
 def _cli_report(tickets):
     for t in tickets:
         print(f"  [{t.category}] {t.path.name}")
@@ -305,6 +358,8 @@ def main():
             _cli_report(ready)
         print(f"--- other OPEN tickets ({len(rest)}) ---")
         _cli_report(rest)
+        if args.project:
+            _attention_report(tickets, args.project)
 
 
 if __name__ == '__main__':

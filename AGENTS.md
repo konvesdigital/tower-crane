@@ -167,19 +167,29 @@ operator moves or modifies these files, the steps that read them break and repor
      Silent → say nothing.
    - `ticket_scan.py` (the scan step 5 acts on) — its "other OPEN tickets" list is the
      authoritative open set; report that list as the open tickets.
-4. Run `python toolkit/scripts/progress_sections.py` — prints `project_progress.md`'s Current Status, Next
-   Up, Decisions table, and most recent Work Log entry in one call; read its output rather than
-   grepping for headings and re-deriving section boundaries by hand.
-5. Act on step 3's `ticket_scan.py` output per `agents_change_requests.md`'s "Scanning at session
-   start" section — this is what surfaces an unattended-automation PR, if that's enabled on this hub.
-6. State status and next step in 1-3 lines, leading with the machine identity from step 1, folding
-   in anything steps 3/5 surfaced. Do not replay full history.
+4. Run `python toolkit/scripts/progress_sections.py` as one bare command — a capped, fixed-order
+   digest of `project_progress.md` (Current Status, Next Up, Decisions, newest Work Log entry; absent
+   sections stated; a `[truncated: …]` marker names the exact `Read` offset/limit for anything cut),
+   ending with a `STATUS:` and a `NEXT:` line. Read its output; do not open `project_progress.md`
+   during resume and do not grep it for headings.
+5. Read step 3's `ticket_scan.py` output per `agents_change_requests.md`'s "Scanning at session
+   start" section — this is what surfaces an unattended-automation PR, if that's enabled on this
+   hub. Resume only reports tickets; applying a fix or flipping a ticket happens when the operator
+   asks.
+6. Output exactly three lines, then stop:
+   - `Host: <host_id from step 1> | pull: <already up to date | pulled | failed: <reason>> | checks: <clean | N finding(s)>`
+   - `Needs you: nothing` — or a `;`-separated list, one entry per finding from steps 3 and 5, in the
+     order they printed (each ticket by file name and category; each sub-check finding by its
+     printed line and the offer its bullet above names).
+   - `Next: <the NEXT: line from step 4, copied as printed>`
+   Do not begin the `Next` item and do not replay history.
 
 **"quick resume"** — a thinner `resume`, for reopening seconds after a `checkpoint` mid-session
 (the only way to flush a long context window mid-session). Skips every sync check above entirely —
 a session opened moments after its own `checkpoint`'s push has nothing new to find. No staleness
 tag by design. Use plain `resume` for a day-start or any longer gap.
 1. Read `host_id` from `toolkit\config.local.json`.
-2. Run `python toolkit/scripts/progress_sections.py` (same call `resume` step 4 uses).
-3. State status and next step in 1-3 lines, leading with the machine identity from step 1. Do not
-   replay full history.
+2. Run `python toolkit/scripts/progress_sections.py` as one bare command (same call `resume` step 4
+   uses); read its output.
+3. Output exactly two lines, then stop: `Host: <host_id from step 1>` and
+   `Status: <the STATUS: line> | Next: <the NEXT: line>`, both copied as printed.

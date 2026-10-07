@@ -22,11 +22,10 @@ entry this session didn't write, most likely means the operator took a manual ac
 (or another session of this project) that this session simply has no visibility into — treat that
 as expected, not as something to flag or second-guess.
 
-At session start, and on every `resume`, scan the hub root's `change_requests\` folder for OPEN
-tickets that need this project's attention. On `resume`, step 4 of `consumer_resume_check.py`
-(name and slug taken from the registry) produces this scan; read its output. Outside `resume`, or
-for `--json`, run the command below (the consumer-side port of the hub's own scan fix: a script
-computes the categorization exactly):
+At session start, and on every `resume`, `consumer_resume_check.py` step 4 runs the scan of the hub
+root's `change_requests\` folder (name and slug taken from the registry); read its output. Never
+list, grep, or `cat` that folder by hand. Outside `resume`, or for `--json`, run the command below
+(the consumer-side port of the hub's own scan fix: a script computes the categorization exactly):
 
 ```
 <python_launcher> "<hub root>/toolkit/scripts/ticket_scan.py" --project "<this project's full
@@ -38,30 +37,30 @@ convention) and its registry slug at minimum, plus any abbreviation this project
 seen used in a ticket before (e.g. from a prior round-trip log entry) — a single form is not
 reliable on its own (real ticket text mixes all three). This prints every OPEN ticket that
 mentions any of those strings, each already categorized (`awaiting_consumer`, `no_activity`,
-`still_fails`, `verified_pass`, …) using the exact rule below, instead of hand-deriving that from
+`still_fails`, `verified_pass`, ...) using the exact rule below, instead of hand-deriving that from
 the raw `## Round-trip log` text.
 
-Three categories need this project's attention now:
+The scan then ends with a `needs this project's attention` list. Each entry in it is one of three
+kinds — `awaiting_consumer` (the ball may be in this project's court), `verify_request` (a
+hub-filed cross-consumer verify ticket), or `unknown_state` (the log has real activity the script
+couldn't classify; often a diverged-from-proposal or converged-with-another-ticket closing note,
+see the hub's `agents_change_requests.md` "What a ticket actually is", and it may name a
+*different* Suggested test than the ticket shipped with) — and prints, for each: the ticket's
+absolute path, its last log line verbatim, and `names this project: yes|NO`, which the script
+computes from the ticket's last log entry (or, for a verify-request with no log yet, its Suggested
+test section). `yes` means the ticket is waiting on this project; `NO` means it only mentions this
+project somewhere, so leave it alone. The coarse `--project` text match is why a hit can still say
+`NO`.
 
-- `awaiting_consumer` — the ball may be in this project's court. **Still open the ticket and
-  confirm its own last `## Round-trip log` line actually names this project** before acting — the
-  script's `--project` filter is a coarse text match (a ticket can legitimately mention more than
-  one consumer, e.g. a cross-consumer verify-request affecting several projects), so a hit means
-  "plausibly relevant," not "confirmed, act now." This is the one residual manual step the script
-  doesn't eliminate.
-- a **verify-request ticket that names this project** (`Relates to: <original>`) — same
-  confirm-before-acting step as above.
-- `unknown_state` — the log has real activity the script couldn't classify; it deliberately
-  declines to guess rather than mis-file it as "nothing to do." Open the ticket and read the actual
-  entry — it's often the shape a diverged-from-proposal or converged-with-another-ticket closing
-  note takes (the hub's `agents_change_requests.md`, "What a ticket actually is"), and may name a
-  *different* Suggested test than the one the ticket originally shipped with. Same
-  confirm-before-acting step as above.
+On `resume`, report every `yes` entry on the `Needs you` line (file name plus the last log line as
+printed) and stop there: running a ticket's Suggested test and appending the verify line happens
+only when the operator asks. To read a ticket in full, use the `Read` tool on the absolute path the
+scan printed.
 
 Every other category (`no_activity`, `still_fails`, `verified_pass`) on a filtered hit means the
 next move belongs to a hub session, or the ticket's already handled — skip.
 
-If the scan surfaces anything, use the `filing` skill's round-trip procedure to respond (re-run
+When the operator asks you to act on a `yes` entry, use the `filing` skill's round-trip procedure (re-run
 the Suggested test, append a verify/re-verify line, commit via `checkpoint_git.py` from the hub
 root — see the `filing` skill, never raw git directly).
 Don't flip a ticket's `Status` yourself on your own judgment — that default exists because this

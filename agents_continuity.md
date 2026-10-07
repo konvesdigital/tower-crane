@@ -34,7 +34,8 @@ actually invoked.
    - Do NOT prune or move older entries automatically — only "archive" does that.
 2. Git mechanics for both repos — mechanized (mechanical
    steps live in the script, same split as `update_toolkit.py` keeps below):
-   `python toolkit/scripts/checkpoint_git.py --message "<summary>"`. Handles, for
+   `python toolkit/scripts/checkpoint_git.py --message "<summary>"` (`<summary>` = the title of the Work
+   Log entry step 1 just prepended, copied verbatim). Handles, for
    both the outer project repo and the inner `toolkit\` repo in one call: staging, the
    leak-scan-first gate, the Standing Constraints disclosure guardrail, commit, push, and (after a
    successful `toolkit\` push) the `last_reviewed_sha` self-heal.
@@ -42,8 +43,9 @@ actually invoked.
      automatically (`git add -u`, always safe). A genuinely untracked file in either repo — a real
      new design doc/script this session wrote, or a stray temp/report file dropped in a repo root —
      looks identical to git either way, so nothing here guesses: an `[UNTRACKED]` report blocks
-     (exit 2, nothing touched) until each one is resolved. Decide per file from this session's own
-     context (ask the user if genuinely unclear), then re-run with `--include <path...>` (stage
+     (exit 2, nothing touched) until each one is resolved. Per file: if this session created or
+     edited it, include it; if this session did not touch it, ask the user before including it.
+     Then re-run with `--include <path...>` (stage
      specific ones, exactly as printed in the report), `--include-all` (stage everything listed),
      and/or `--skip-untracked` (leave everything else alone this round).
    - **Leak-scan FAIL** (check_file_surface.py, hard checks only): exit 1, `toolkit\` left
@@ -78,10 +80,10 @@ actually invoked.
      ticket's own `## Round-trip log` line left reading `commit: pending checkpoint` by "Applying a
      fix"/"Registration tickets" (`agents_change_requests.md`) earlier this session — fold in the
      real commit SHA there too, same as any other pending-checkpoint text this step closes.
-3. Confirm to the user: saved and pushed, **both repos' working trees clean** (note whether
-   `toolkit\` push happened, was skipped clean, or failed).
-4. **Suggest archiving** if the file has grown past roughly **400 lines (~40 KB)**, or the Work Log
-   holds many settled entries — a prompt only, never automatic.
+3. Confirm to the user in one line: `Checkpoint: outer <short sha> pushed | toolkit <short sha> pushed
+   / skipped clean / failed: <reason> | both working trees clean`.
+4. **Suggest archiving** (one extra line, a prompt only, never automatic) if `project_progress.md`
+   is past **400 lines** or its Work Log holds more than **10** entries.
 
 **"archive"** (user-initiated only — never automatic, never during "checkpoint")
 
@@ -140,7 +142,7 @@ Current Status / Next Up triage leg:
 **"update"** — pulls `toolkit\`'s `origin` remote under a diff-review trust gate. User-initiated
 only; mechanical steps live in `scripts\update_toolkit.py`, diff review/assessment below is manual
 judgment.
-1. Run `python toolkit/scripts/update_toolkit.py` (`--check`).
+1. Run `python toolkit/scripts/update_toolkit.py --check`.
 2. "Already up to date": nothing else to do.
 3. `[ABORT]` (remote-identity mismatch — `origin`'s URL no longer matches upstream): stop, report
    verbatim, get explicit confirmation before anything else. Never assume it's benign.

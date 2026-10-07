@@ -42,74 +42,73 @@ reached) read whatever is present.
 
 ### "resume"
 
-1. Host identity: read `shared_root:` from this project's own `.claude\hub_pointer.md`, then read
-   `host_id` from `{shared_root}\config.local.json` — the same value and the same file the hub's
-   own `resume` reads directly (`toolkit\AGENTS.md` step 1), just reached through one extra
-   indirection hop (mirrors how `_hub_dispatch.py` locates the hub for hook calls). Never infer
-   machine identity any other way (path, `hostname`, prior context). If `.claude\hub_pointer.md`
-   doesn't exist, Tower Crane connection is not active on this machine for this project — do not
-   attempt to determine which machine this is by any other means (path, hostname, prior context);
-   it doesn't matter, since nothing host-specific applies while disconnected. (A consumer that
-   predates pointer-indirection and never had this file also hits this branch — same skip, same
-   reasoning.)
-2. `git pull` (this project's own repo).
-3. Check the shared tower_crane hub — both steps read-only, no gate needed, chained into one call
-   (the consumer-side re-run of the hub's own resume audit):
-   `python "<hub root>/toolkit/scripts/consumer_resume_check.py" --project-root "<this project's
-   root>"` (same `toolkit\` folder this file itself resolved through). Runs, in order:
-   - `update_toolkit.py --notify --consumer` (fetch + compare against the hub's last-reviewed
-     baseline — never merges; `--consumer` rephrases every message as informational-only, since
-     none of `--notify`'s hub-only fix verbs are reachable from this session — change_requests\
-     2026-08-25_update_toolkit_notify-audience-mismatch.md). If it reports the hub falling behind
-     its own upstream, mention it, but do **not** `git pull` `toolkit\` from this project's session
-     — that's the gated `update` action, run only in a session opened directly in the hub.
-   - `check_tower_crane.py --write-guidance --consumer <this project's slug>` — checks and writes
-     `COMPLIANCE_GUIDANCE.md` for this project only (slug looked up from the hub registry by this
-     project's path on this machine; skipped if unregistered). Pure Python, no pull required.
-   - `readiness.py --project-root <root>` — what this project still needs on this machine (git,
-     uncommitted setup files, folder trust / import approval, unfilled overview placeholder, a
-     leftover `FIRST_RUN.md`). Silent when ready. A `[TODO]`/`[UNKNOWN]` line is the user's to act
-     on — report it, don't fix it unasked; `[HUB-MISMATCH]` means the hub's registry disagrees
-     with this machine — point the user at `"connect project"` in the hub.
-   - `ticket_scan.py --project <registry name> <registry slug>` — this project's open hub tickets;
-     name and slug come from the registry. Interpret per `filing_resume_check.md`'s categories.
-   - `shared_resource_resume_check.py` — adopted shared-resource references (broken/drifted);
-     interpret per `shared_resources_resume_check.md`.
-   - Invocation form:
-     1. Read `config.local.json` with Read and check for `COMPLIANCE_GUIDANCE.md` with Glob.
-     2. Run `git pull` as one bare command.
-     3. Run `consumer_resume_check.py` as one bare command, with an absolute forward-slash
-        `--project-root` (a relative one also resolves).
-     4. Send independent commands together as separate tool calls in one message.
-     5. On a classifier "no verdict" error, retry that one command once unchanged, continue with
-        the remaining steps, and name any step that didn't run in the status line.
-   - This checks only whether the **hub's own toolkit source** has fallen behind its public
-     upstream — separate from whether **this project** has adopted everything the hub already
-     offers. That's this project's own on-demand `update` skill (if adopted): say "update" anytime
-     to pull in a hook, toolkit skill, or mandatory/default-on piece not yet picked up. This step
-     never runs that scan.
-4. If `COMPLIANCE_GUIDANCE.md` exists in the project root, surface it now (see the compliance
-   protocol) — this is also where anything step 3's `--write-guidance` run just produced shows up.
-5. Read `project_progress.md` — only the live-state sections your project uses: **Current
-   Status**/**Current Focus**, **Next Up**, the **Decisions** (table or Locked/Open), the active
-   **Phase** if phased, and the **most recent Work Log entry** only.
-6. State status and next step in 1–3 lines, leading with the host identity from step 1 (when
-   available — see that step's skip condition), **folding in anything step 3 surfaced** (the hub
-   falling behind its own upstream, or a `check_tower_crane.py --write-guidance` finding) — a
-   step-3 finding (including any readiness line) is not satisfied by having run the check, only by
-   this line actually saying so.
-   Do not replay full history.
+**Run-sheet — applies to every command issued while executing `resume`.**
+- Make exactly these three tool calls, in this order, one at a time (each finishes before the next
+  starts): **A.** `Read` on `.claude\hub_pointer.md`. **B.** `git pull`, as one bare command.
+  **C.** `consumer_resume_check.py`, as one bare command (below). Every later file read uses the
+  `Read` tool on an absolute path.
+- The only Bash commands are B and C. Do not use `cd`, pipes, `cat`, `ls`, `grep`, `head`, `tail`,
+  or `;`/`&&` chaining. To find or open a file use `Read`, `Glob` or `Grep`; never list or grep the
+  hub's `change_requests\` folder (step 3's output already contains everything resume needs from it).
+- If the classifier returns "no verdict" for B or C, retry that one command once, unchanged. If it
+  still fails, continue and name the step that didn't run on the `Needs you` line.
+
+1. Call A: read `shared_root:` from this project's own `.claude\hub_pointer.md`. If that file
+   doesn't exist, Tower Crane connection is not active on this machine for this project — skip
+   steps 2-3, do not try to determine the machine by any other means (path, hostname, prior
+   context), and report `Host: not connected` on line 1 of step 5's block. (A consumer that predates
+   pointer-indirection and never had this file takes this same branch.)
+2. Call B: `git pull` (this project's own repo).
+3. Call C: `python "<shared_root>/scripts/consumer_resume_check.py" --project-root "<this project's
+   absolute root, forward slashes>"` (`<shared_root>` is the hub's `toolkit\` folder). It is
+   read-only, runs after the pull on purpose, and prints: a `Host:` line (the machine identity,
+   read from the hub's `config.local.json` — never infer it any other way), six numbered
+   sections, and a final `RESUME SUMMARY` block. Read all of it. The sections:
+   1. `update_toolkit.py --notify --consumer` — whether the hub's own toolkit source has fallen
+      behind its public upstream (never merges). If it reports that, mention it but do **not**
+      `git pull` `toolkit\` from this project's session — that's the gated `update` action, run
+      only in a session opened directly in the hub. This is separate from whether **this project**
+      has adopted everything the hub offers: that's this project's own on-demand `update` skill
+      (say "update" anytime); resume never runs that scan.
+   2. `check_tower_crane.py --write-guidance --consumer <slug>` — checks this project and writes
+      `COMPLIANCE_GUIDANCE.md` if there are findings.
+   3. `readiness.py` — what this project still needs on this machine. A `[TODO]`/`[UNKNOWN]` line
+      is the user's to act on: report it, don't fix it unasked. `[HUB-MISMATCH]` means the hub's
+      registry disagrees with this machine: point the user at `"connect project"` in the hub.
+   4. `ticket_scan.py --project <name> <slug>` — open hub tickets; the closing `needs this
+      project's attention` list is the one to act on, per `filing_resume_check.md`.
+   5. `shared_resource_resume_check.py` — adopted shared-resource references (broken/drifted);
+      interpret per `shared_resources_resume_check.md`.
+   6. `resume_digest.py` — `project_progress.md`'s live-state sections (Current Status, Current
+      Focus, Next Up, Decisions, Phases, newest Work Log entry), stating which sections are absent,
+      then a `STATUS:` and a `NEXT:` line.
+4. If the `RESUME SUMMARY` line `compliance guidance file` says PRESENT, `Read` the path it gives
+   and surface it now (see the compliance protocol). That summary line is the only existence
+   check; do not `Glob` for the file.
+5. Output exactly three lines, then stop:
+   - `Host: <Host line from step 3> | git: <already up to date | pulled | failed: <reason>> | checks: <clean | N area(s) flagged>`
+   - `Needs you: nothing` — or, if any `RESUME SUMMARY` line is not clean, a `;`-separated list with
+     one entry per flagged line: the area, then what it needs in a few words (a ticket by file
+     name plus its `last log line` text; a `[TODO]` line; a hub-behind-upstream notice; guidance
+     file present; a step that didn't run).
+   - `Next: <the NEXT: line from section 6, copied as printed>`
+   Resume reports and stops: do not begin the `Next` item, do not open `project_progress.md`
+   (section 6 is the read of it; a `[truncated: …]` marker names the exact `Read` offset/limit to
+   use only if the operator asks for that section), do not run any ticket's Suggested test, and do
+   not replay history.
 
 ### "quick resume"
 
 A thinner `resume`, for reopening a terminal seconds after closing one — the only way to actually
-flush a long context window mid-session, typically right after a `checkpoint`. Skips step 2
-(`git pull`) and steps 3–4 (the shared-hub update/compliance checks) entirely: a session reopened
-moments after its own `checkpoint`'s push has nothing new to find. No tag or disclaimer noting
-what was skipped. Use plain `resume` instead at the start of a day or after any gap long enough
-that something could actually have changed.
+flush a long context window mid-session, typically right after a `checkpoint`. Skips `git pull` and
+the whole `consumer_resume_check.py` chain except the digest: a session reopened moments after its
+own `checkpoint`'s push has nothing new to find. No tag or disclaimer noting what was skipped. Use
+plain `resume` instead at the start of a day or after any gap long enough that something could
+actually have changed. The run-sheet above applies, with these two calls in this order:
 
-1. Host identity: same read as `resume` step 1 above.
-2. Read `project_progress.md` — same scope as `resume` step 5 above.
-3. State status and next step in 1–3 lines, leading with the host identity from step 1 (when
-   available).
+1. `Read` on `.claude\hub_pointer.md` (no file → output the one line `Host: not connected` and
+   stop).
+2. `python "<shared_root>/scripts/resume_digest.py" --project-root "<this project's absolute root,
+   forward slashes>"` as one bare command; read all of it.
+3. Output exactly two lines, then stop: `Host: <the digest's Host line>` and
+   `Status: <the STATUS: line> | Next: <the NEXT: line>`, both copied as printed.

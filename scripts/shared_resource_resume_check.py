@@ -40,12 +40,26 @@ def _run(python_launcher, script_name, project_root):
     return output if output else '(nothing to report)'
 
 
+def _collapse_not_applicable(output):
+    """Replace the per-stub '[N/A] ...' lines (a stub with no index-sha256 in its marker - expected
+    on every resume, never a gap) with one count line; every other line passes through."""
+    kept = [line for line in output.splitlines() if not line.startswith('[N/A] ')]
+    n = len(output.splitlines()) - len(kept)
+    if n:
+        kept.insert(1 if kept else 0,
+                    f"[N/A] {n} adopted stub(s) out of drift-check scope (no index-sha256 in the "
+                    "marker) - not a gap; rerun with --verbose to list them.")
+    return '\n'.join(kept)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Chains shared_resources_resume_check.md's notify-only checks into one "
                      "consolidated report."
     )
     parser.add_argument('--project-root', required=True, help="This project's absolute root.")
+    parser.add_argument('--verbose', action='store_true',
+                        help="List every '[N/A]' line instead of one count line.")
     args = parser.parse_args()
 
     cfg = get_shared_config(SHARED_ROOT)
@@ -56,7 +70,9 @@ def main():
     print("=== shared_resource_resume_check.py - consolidated shared_resources checks ===")
     for i, script_name in enumerate(checks, 1):
         print(f"\n--- {i}/{len(checks)}: {script_name} ---")
-        print(_run(launcher, script_name, args.project_root))
+        output = _run(launcher, script_name, args.project_root)
+        collapse = not args.verbose and script_name == 'check_shared_resource_drift.py'
+        print(_collapse_not_applicable(output) if collapse else output)
     print("\n=== end shared_resources checks ===")
 
 

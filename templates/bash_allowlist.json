@@ -10,6 +10,7 @@
   "consumer": [
     "git pull:*",
     "*consumer_resume_check.py*",
+    "*resume_digest.py*",
     "*checkpoint_consumer.py*"
   ]
 }

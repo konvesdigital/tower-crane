@@ -57,7 +57,8 @@ root>
   overwriting, then re-run the underlying script (not the chained wrapper — see its own
   `--project-root` usage) so the marker's hash reflects the new content. `[N/A]` (no
   `index-sha256` in the marker - an `insight` adoption, a pre-existing stub, or a free-text `tool`
-  adoption) is not a gap.
+  adoption) is not a gap, and the consolidated call prints it as one count line (`--verbose` lists
+  each stub).
 
 Both checks are guaranteed side-effect-free and always exit 0 (notify-only), so this consolidated
 call does no pass/fail interpretation of its own — read each check's own output per the rules

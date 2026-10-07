@@ -46,6 +46,7 @@ this mechanism works and how it relates to other mechanisms.
    <python_launcher> "<hub root>/toolkit/scripts/checkpoint_consumer.py" --project-root "<this
    project's absolute root>" --message "<summary>"
    ```
+   (`<summary>` = the title of the Work Log entry step 1 just prepended, copied verbatim.)
    (`<hub root>`/`<python_launcher>` resolved the same way `templates\update.md`'s Step 1
    describes — the `toolkit\` folder your skill stub's own path resolved through, one level below
    the hub root.) Handles staging and commit/push in one call:
@@ -53,8 +54,8 @@ this mechanism works and how it relates to other mechanisms.
      automatically (`git add -u`, always safe). A genuinely untracked file — a real new file this
      session wrote, or a stray temp/report file — looks identical to git either way, so nothing
      here guesses: an `[UNTRACKED]` report blocks (exit 2, nothing touched) until each one is
-     resolved. Decide per file from this session's own context (ask the user if genuinely
-     unclear), then re-run with `--include <path...>` (stage specific ones, exactly as printed),
+     resolved. Per file: if this session created or edited it, include it; if this session did
+     not touch it, ask the user before including it. Then re-run with `--include <path...>` (stage specific ones, exactly as printed),
      `--include-all` (stage everything listed), and/or `--skip-untracked` (leave everything else
      alone this round).
    - **No repo at all** (`[ABORT]`, no `.git\`): stop and ask the user whether to set one up now,
@@ -66,11 +67,12 @@ this mechanism works and how it relates to other mechanisms.
    - Exit 0 = committed/pushed cleanly (or nothing to do, or committed with no remote). Re-running
      is always safe if a further edit lands dirty afterward — e.g. correcting this same Work Log
      entry once more — no separate verify-clean loop to operationalize by hand; just run it again.
-3. Confirm to the user: saved and pushed.
+3. Confirm to the user in one line: `Checkpoint: <short sha> pushed` (or `committed, no remote` /
+   `failed: <reason>`).
 4. **Suggest archiving when the file has grown** (resource conservation): the whole of
    `project_progress.md` is read into context each session, so a long Work Log is a recurring
-   token cost for history you're no longer actively using. If the file has grown past roughly
-   **400 lines (~40 KB)**, or the Work Log holds many months of settled entries, *suggest* the
+   token cost for history you're no longer actively using. If the file is past
+   **400 lines** or its Work Log holds more than **10** entries, *suggest* the
    user run "archive" to move old, settled entries out. This is only a prompt — archiving is
    always the user's explicit call (see below), never automatic. The cost is linear, so there's
    no hard cliff; this threshold is just where a one-time cleanup starts paying for itself.
