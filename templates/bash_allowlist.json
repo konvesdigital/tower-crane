@@ -5,12 +5,14 @@
     "*progress_sections.py:*",
     "*ticket_scan.py:*",
     "*update_toolkit.py:*",
-    "*checkpoint_git.py:*"
+    "*checkpoint_git.py:*",
+    "*archive_candidates.py*"
   ],
   "consumer": [
     "git pull:*",
     "*consumer_resume_check.py*",
     "*resume_digest.py*",
-    "*checkpoint_consumer.py*"
+    "*checkpoint_consumer.py*",
+    "*archive_candidates.py*"
   ]
 }

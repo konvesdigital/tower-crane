@@ -92,17 +92,17 @@ Two legs, run together every time: Work Log relocation (1-5) and Current Status/
 only does a light fold-in. Only Work Log, Current Status, and Next Up are ever touched — the
 Decisions table stays live state in `project_progress.md` always.
 
+Run `python toolkit/scripts/archive_candidates.py --project-root "<absolute project root>"` as one
+bare command first; its output drives both legs.
+
 Work Log leg:
-1. Determine which Work Log entries are both fully completed and not themselves a dependency for
-   current or other work items.
-2. List current Work Log entries — date + one-line title only, newest first — marking with a
-   checkmark those found fully complete and non-dependent in step 1.
-3. Default: archive every ✓-marked entry from step 2 — these need not be contiguous; an older
-   completed entry can be archived while a newer one stays live, and vice versa. Present the marked
-   list as the plan and proceed on it without waiting for confirmation, unless a specific
-   completion/dependency call is genuinely ambiguous — then ask about that entry specifically,
-   never "where's the cutoff."
-4. Move every ✓-marked entry into `project_progress_archive.md`, appended in chronological order
+1-3. Read the script's `=== WORK LOG ===` list (one verdict per entry, newest first). `[ARCHIVE]` =
+   complete and nothing depends on it; `[KEEP]` = the newest entry, one cited by title in Current
+   Status/Next Up/Decisions, or one naming a non-DONE ticket; `[ASK]` = holds an open-work phrase or
+   sits beside a Work Log pointer. Archive every `[ARCHIVE]` entry without waiting, never moving a
+   `[KEEP]` one. For each `[ASK]` entry, read its text and ask the user about that entry by name
+   (never "where's the cutoff"); archive it only on a yes.
+4. Move every entry being archived into `project_progress_archive.md`, appended in chronological order
    (oldest first) regardless of which entries were skipped in between. Create the file if it
    doesn't exist yet.
 5. Remove those entries from `project_progress.md`.
@@ -115,18 +115,16 @@ Current Status / Next Up triage leg:
    `consumers\`, don't restate the roster), it doesn't belong here. Neither heading is a capability
    inventory — a fully-built feature with no open caveat belongs in `README.md`; a settled call
    belongs in the Decisions table.
-7. Classify every line — trimming a mixed line to its residue first, since a real open fact is
-   often wrapped inside otherwise-historical narration — into exactly one of three buckets:
-   - **Calcified**: a completion verb (built, fixed, verified, confirmed, found, resolved, done,
-     live-tested, audited) tied to a date, with no open caveat left once that narration is
-     stripped — or the same fact/date already has a matching `Locked`/`Locked and BUILT` row in the
-     Decisions table, making the line a redundant restatement.
-   - **Standing fact**: a real, non-re-derivable fact describing a settled or accepted state nobody
-     is actively pursuing (language like "deliberately," "not a bug," "accepted either way") —
-     worth keeping somewhere, but not active work.
-   - **In-progress**: everything else — an actively-worked task, or an unresolved defect/gap with
-     no acceptance language (a known standing defect with no plan yet still counts as in-progress
-     for this purpose).
+7. Classify every item with the script's `=== CURRENT STATUS / NEXT UP ===` table (it applies the
+   rules below in this order, first match wins), trimming a mixed item to its residue first, since a
+   real open fact is often wrapped inside otherwise-historical narration:
+   | Bucket | The item holds | Fixed word lists |
+   |---|---|---|
+   | **In-progress** | an open-caveat word, or no completion verb/acceptance phrase/date to place it elsewhere | not yet, still, unconfirmed, unproven, not started, unexercised, hasn't, has not, no design, not decided, not scoped, pending, todo, open, unfixed, no plan, unknown |
+   | **Standing fact** (non-re-derivable, settled or accepted, nobody pursuing it) | an acceptance phrase | deliberately, not a bug, accepted, either way, by design, intentionally, left as is |
+   | **Calcified** | a completion verb AND a `YYYY-MM-DD` date, with no open-caveat word | built, fixed, verified, confirmed, found, resolved, done, live-tested, audited |
+   An item that matches the Decisions table's `Locked`/`Locked and BUILT` row for the same fact and
+   date is Calcified too (a redundant restatement) — the script cannot see that; check it by eye.
 8. Present the classification to the user as a table before moving anything — this is judgment,
    not a mechanical diff, and a standing fact's destination (step 9) needs a human call.
 9. Act per bucket:
@@ -137,7 +135,8 @@ Current Status / Next Up triage leg:
      project-specific log this project already maintains when one fits better. Don't default
      silently.
    - **In-progress** → stays in Current Status/Next Up, trimmed to its present-tense residue only.
-10. Confirm what was archived/relocated and what stayed, per bucket.
+10. Confirm with exactly this line (counts only): `Archived: <n> Work Log entr(y/ies) | Calcified: <n>
+    archived | Standing: <n> relocated | In-progress: <n> kept`.
 
 **"update"** — pulls `toolkit\`'s `origin` remote under a diff-review trust gate. User-initiated
 only; mechanical steps live in `scripts\update_toolkit.py`, diff review/assessment below is manual
@@ -163,6 +162,8 @@ judgment.
    it records the `origin/main` it declined, and `resume`'s `--notify` stays silent about exactly
    that state, speaking again only once `origin/main` moves past it. Run `update` any time to
    review it after all.
+7. Close with exactly this line: `Update: <approved all | approved through <n> | rejected |
+   already up to date | blocked> | commits: <n applied> of <n pending> | last_reviewed_sha: <7-char sha>`.
 
 **"propose upstream"** — sends a hand-built local fix in `toolkit\` back to the public repo
 (`konvesdigital/tower-crane`) as a fork + PR. **For a clone
@@ -236,8 +237,7 @@ time — also run automatically as `setup_machine.md` Step 8a on a newly connect
 4. One combined propagation commit+push against the hub's own outer repo, scoped to
    `shared_resources\` (`templates\shared_resources.md`'s "Every write here ends with the same
    propagation step") — not one commit per entry.
-5. Report a short summary: how many entries newly registered, how many declined, how many resolved
-   as self-contained.
+5. Close with exactly this line: `Register host: <n> registered | <n> declined | <n> self-contained`.
 
 **"update consumers"** — push-side of `update`: same scope as a consumer's own pull-side `update`
 skill (hooks, Track-1 skills, mandatory pieces; never `shared_resources`). User-initiated only.
@@ -246,3 +246,4 @@ skill (hooks, Track-1 skills, mandatory pieces; never `shared_resources`). User-
 2. `python toolkit/scripts/update_consumers.py --apply <numbers-or-'all'>` — writes each touched project
    plus its `consumers\<slug>.md` registry entry directly (no filing ticket needed), then run
    `toolkit/scripts/check_tower_crane.py` to confirm it validates clean.
+3. Close with exactly this line: `Update consumers: <n> applied | <n> skipped | check_tower_crane: <pass|fail>`.

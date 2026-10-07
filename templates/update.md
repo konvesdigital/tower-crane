@@ -96,3 +96,7 @@ behavior-changing shared-tool edit. File a short registration-update ticket the 
 `templates\filing.md` describes (a lightweight ticket, not a bug report), naming what was added.
 **Not needed** for a flat `@import`-only protocol piece like `compliance` (a live reference,
 nothing copied to go stale — registry write-back only matters for content that's actually copied).
+
+### Step 5 — close
+
+Finish with exactly this line: `Update: <n> applied | <n> skipped | hub registry: <ticket filed | not needed>`.

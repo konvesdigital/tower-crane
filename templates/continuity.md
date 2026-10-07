@@ -84,17 +84,18 @@ triage (6-10) — the latter is where the Inclusion Test actually gets enforced 
 `"checkpoint"` only does a light fold-in. Decisions, Phases, and To Reconcile stay live state in
 `project_progress.md` always — only Work Log, Current Status/Focus, and Next Up are ever archived.
 
+Run `<python_launcher> "<hub root>/toolkit/scripts/archive_candidates.py" --project-root "<this
+project's absolute root>"` as one bare command first (placeholders resolved as in `templates\update.md`
+Step 1); its output drives both legs.
+
 Work Log leg:
-1. Determine which Work Log entries are both fully completed and not themselves a dependency for
-   current or other work items.
-2. List current Work Log entries — date + one-line title only, newest first — marking with a
-   checkmark those found fully complete and non-dependent in step 1.
-3. Default: archive every ✓-marked entry from step 2 — these need not be contiguous; an older
-   completed entry can be archived while a newer one stays live, and vice versa. Present the marked
-   list as the plan and proceed on it without waiting for confirmation, unless a specific
-   completion/dependency call is genuinely ambiguous — then ask about that entry specifically,
-   never "where's the cutoff."
-4. Move every ✓-marked entry into `project_progress_archive.md`, appended in chronological order
+1-3. Read the script's `=== WORK LOG ===` list (one verdict per entry, newest first). `[ARCHIVE]` =
+   complete and nothing depends on it; `[KEEP]` = the newest entry, one cited by title in Current
+   Status/Next Up/Decisions, or one naming a non-DONE ticket; `[ASK]` = holds an open-work phrase or
+   sits beside a Work Log pointer. Archive every `[ARCHIVE]` entry without waiting, never moving a
+   `[KEEP]` one. For each `[ASK]` entry, read its text and ask the user about that entry by name
+   (never "where's the cutoff"); archive it only on a yes.
+4. Move every entry being archived into `project_progress_archive.md`, appended in chronological order
    (oldest first) regardless of which entries were skipped in between. Create the file if it
    doesn't exist yet.
 5. Remove those entries from `project_progress.md`.
@@ -105,17 +106,16 @@ Current Status/Focus + Next Up triage leg:
    would missing it degrade this session's decisions? If Claude would learn it anyway by doing the
    thing the fact describes, or it's inspectable in seconds, it doesn't belong here. Neither
    heading is a capability inventory.
-7. Classify every line — trimming a mixed line to its residue first, since a real open fact is
-   often wrapped inside otherwise-historical narration — into exactly one of three buckets:
-   - **Calcified**: a completion verb (built, fixed, verified, confirmed, found, discovered,
-     logged, resolved, done, landed) tied to a date, with no open caveat left once that narration
-     is stripped — or the same fact/date is already captured in a Decisions row, making the line a
-     redundant restatement.
-   - **Standing fact**: a real, non-re-derivable fact describing a settled or accepted state nobody
-     is actively pursuing (language like "deliberately," "not a bug," "accepted either way") —
-     worth keeping somewhere, but not active work.
-   - **In-progress**: everything else — an actively-worked task, or an unresolved defect/gap with
-     no acceptance language.
+7. Classify every item with the script's `=== CURRENT STATUS / NEXT UP ===` table (it applies the
+   rules below in this order, first match wins), trimming a mixed item to its residue first, since a
+   real open fact is often wrapped inside otherwise-historical narration:
+   | Bucket | The item holds | Fixed word lists |
+   |---|---|---|
+   | **In-progress** | an open-caveat word, or no completion verb/acceptance phrase/date to place it elsewhere | not yet, still, unconfirmed, unproven, not started, unexercised, hasn't, has not, no design, not decided, not scoped, pending, todo, open, unfixed, no plan, unknown |
+   | **Standing fact** (non-re-derivable, settled or accepted, nobody pursuing it) | an acceptance phrase | deliberately, not a bug, accepted, either way, by design, intentionally, left as is |
+   | **Calcified** | a completion verb AND a `YYYY-MM-DD` date, with no open-caveat word | built, fixed, verified, confirmed, found, resolved, done, live-tested, audited |
+   An item already captured in a Decisions row for the same fact and date is Calcified too (a
+   redundant restatement) - the script cannot see that; check it by eye.
 8. Present the classification to the user as a table before moving anything — this is judgment,
    not a mechanical diff, and a standing fact's destination (step 9) needs a human call.
 9. Act per bucket:
@@ -125,4 +125,5 @@ Current Status/Focus + Next Up triage leg:
      or a more specific log this project already maintains (a decisions-detail file, a domain log
      such as an SEO page log, etc.) when one fits better. Don't default silently.
    - **In-progress** → stays, trimmed to its present-tense residue only.
-10. Confirm what was archived/relocated and what stayed, per bucket.
+10. Confirm with exactly this line (counts only): `Archived: <n> Work Log entr(y/ies) | Calcified: <n>
+    archived | Standing: <n> relocated | In-progress: <n> kept`.
