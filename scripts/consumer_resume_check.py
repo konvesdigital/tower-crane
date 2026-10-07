@@ -16,6 +16,10 @@ Runs, in order:
                                              (this project only - its registry slug on this host;
                                                skipped if unregistered, which step 3 reports)
   3. readiness.py --project-root <root>      (what this project still needs on this machine)
+  4. ticket_scan.py --project <name> <slug>  (open hub tickets mentioning this project; name and
+                                               slug come from the registry - skipped if unregistered)
+  5. shared_resource_resume_check.py --project-root <root>
+                                             (adopted shared-resource references: broken/drifted)
 
 All are guaranteed side-effect-free from this project's own perspective (none pulls/merges/
 pushes toolkit\\ - that's the gated `update` action, run only in a session opened directly in the
@@ -34,7 +38,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config_lib import get_shared_config
-from readiness import registry_slug_for
+from readiness import registry_slug_for, registry_entry_for
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent  # toolkit\
 
@@ -54,10 +58,16 @@ def main():
     parser.add_argument('--project-root', default=str(Path.cwd()),
                          help="This project's root. Defaults to the current directory.")
     args = parser.parse_args()
+    # Resolve once, before any use or forwarding to sub-scripts: a relative value ("." / "..\Foo")
+    # would otherwise read as "unregistered" instead of resolving.
+    args.project_root = str(Path(args.project_root).expanduser().resolve())
 
     cfg = get_shared_config(SHARED_ROOT)
     launcher = cfg['python_launcher']
     slug = registry_slug_for(args.project_root)
+    entry = registry_entry_for(args.project_root)
+    # Both forms a ticket's text uses (display name + slug), taken from the registry - never guessed.
+    ticket_args = ['--project', entry['name'], slug] if entry and entry.get('name') else None
 
     checks = [
         ('update_toolkit.py --notify --consumer', 'update_toolkit.py', ['--notify', '--consumer']),
@@ -65,9 +75,15 @@ def main():
          'check_tower_crane.py',
          ['--write-guidance', '--consumer', slug] if slug else None),
         ('readiness.py', 'readiness.py', ['--project-root', args.project_root]),
+        (f'ticket_scan.py --project {slug or "(unregistered)"}', 'ticket_scan.py', ticket_args),
+        ('shared_resource_resume_check.py', 'shared_resource_resume_check.py',
+         ['--project-root', args.project_root]),
     ]
 
     print("=== consumer_resume_check.py - consolidated consumer resume checks ===")
+    if not slug:
+        print(f"[UNREGISTERED] no consumers\\ entry lists this host at {args.project_root} - "
+              "steps that need the registry are skipped (check the path, or run `connect project`).")
     for i, (label, script_name, extra_args) in enumerate(checks, 1):
         print(f"\n--- {i}/{len(checks)}: {label} ---")
         if extra_args is None:

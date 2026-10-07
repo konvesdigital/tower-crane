@@ -71,6 +71,18 @@ reached) read whatever is present.
      leftover `FIRST_RUN.md`). Silent when ready. A `[TODO]`/`[UNKNOWN]` line is the user's to act
      on — report it, don't fix it unasked; `[HUB-MISMATCH]` means the hub's registry disagrees
      with this machine — point the user at `"connect project"` in the hub.
+   - `ticket_scan.py --project <registry name> <registry slug>` — this project's open hub tickets;
+     name and slug come from the registry. Interpret per `filing_resume_check.md`'s categories.
+   - `shared_resource_resume_check.py` — adopted shared-resource references (broken/drifted);
+     interpret per `shared_resources_resume_check.md`.
+   - Invocation form:
+     1. Read `config.local.json` with Read and check for `COMPLIANCE_GUIDANCE.md` with Glob.
+     2. Run `git pull` as one bare command.
+     3. Run `consumer_resume_check.py` as one bare command, with an absolute forward-slash
+        `--project-root` (a relative one also resolves).
+     4. Send independent commands together as separate tool calls in one message.
+     5. On a classifier "no verdict" error, retry that one command once unchanged, continue with
+        the remaining steps, and name any step that didn't run in the status line.
    - This checks only whether the **hub's own toolkit source** has fallen behind its public
      upstream — separate from whether **this project** has adopted everything the hub already
      offers. That's this project's own on-demand `update` skill (if adopted): say "update" anytime

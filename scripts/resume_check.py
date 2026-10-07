@@ -10,8 +10,9 @@ Runs, in order:
   5. check_shared_resource_catalog.py     (no args - resume-only, not run at `quick resume`)
   6. readiness.py --hub                   (every consumer registered on this host)
   7. self_hooks.py --check-defaults       (default hub self-use tools off on this machine)
+  8. ticket_scan.py                       (read-only categorization of change_requests\\ tickets)
 
-All seven are side-effect-free and always exit 0. This script does no pass/fail interpretation of
+All eight are side-effect-free and always exit 0. This script does no pass/fail interpretation of
 its own - it runs each in turn and prints its output verbatim under a numbered header, silent
 sub-sections included. Reporting tags per step: dirty/incoming/outgoing lines (step 1),
 [UNWIRED]/[BROKEN] (step 2), [NUDGE] (step 3), [STALE-PATH] (step 4), [FAIL]/[MISMATCH] (step 5),
@@ -64,6 +65,7 @@ def main():
         ('check_shared_resource_catalog.py', 'check_shared_resource_catalog.py', []),
         ('readiness.py --hub', 'readiness.py', ['--hub']),
         ('self_hooks.py --check-defaults', 'self_hooks.py', ['--check-defaults']),
+        ('ticket_scan.py', 'ticket_scan.py', []),
     ]
 
     print("=== resume_check.py - consolidated resume checks ===")

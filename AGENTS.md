@@ -122,7 +122,8 @@ none of these are resident in this file.
 Source of truth: `project_progress.md`. At session start read only Current Status, Next Up,
 Decisions, and the most recent Work Log entry. Do not re-derive facts already logged there.
 
-**Repo map** (fixed locations — consult instead of searching/inferring):
+**Repo map** (locations as scaffolded at setup — every procedure below relies on them; if the
+operator moves or modifies these files, the steps that read them break and report the missing file):
 | | Outer repo (this hub) | Inner `toolkit\` repo |
 |---|---|---|
 | Root | `tower_crane\` | `tower_crane\toolkit\` |
@@ -164,11 +165,13 @@ Decisions, and the most recent Work Log entry. Do not re-derive facts already lo
    - `self_hooks.py --check-defaults` — any `[SELF-USE-OFF]` line names a default hub self-use tool
      that's off on this machine; mention it and offer to run `self_hooks.py --enable-defaults`.
      Silent → say nothing.
+   - `ticket_scan.py` (the scan step 5 acts on) — its "other OPEN tickets" list is the
+     authoritative open set; report that list as the open tickets.
 4. Run `python toolkit/scripts/progress_sections.py` — prints `project_progress.md`'s Current Status, Next
    Up, Decisions table, and most recent Work Log entry in one call; read its output rather than
    grepping for headings and re-deriving section boundaries by hand.
-5. Scan `change_requests\` per `agents_change_requests.md`'s "Scanning at session start" section —
-   this is what surfaces an unattended-automation PR, if that's enabled on this hub.
+5. Act on step 3's `ticket_scan.py` output per `agents_change_requests.md`'s "Scanning at session
+   start" section — this is what surfaces an unattended-automation PR, if that's enabled on this hub.
 6. State status and next step in 1-3 lines, leading with the machine identity from step 1, folding
    in anything steps 3/5 surfaced. Do not replay full history.
 

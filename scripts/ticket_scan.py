@@ -33,6 +33,9 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from config_lib import missing_template_message
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
 # change_requests\ and .claude\ are private/per-machine hub state, not shipped toolkit content -
@@ -266,6 +269,10 @@ def main():
                               "form this project is known by (slug, full name, common "
                               "abbreviation).")
     args = parser.parse_args()
+
+    if not CHANGE_REQUESTS_DIR.is_dir():
+        print(missing_template_message(CHANGE_REQUESTS_DIR, "the ticket scan"))
+        sys.exit(1)
 
     tickets = scan()
     if args.project:

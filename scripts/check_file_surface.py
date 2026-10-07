@@ -609,10 +609,12 @@ def check_outer_repo_references(shared_root, files, base_sha, head_sha):
     for status, path in files:
         norm = path.replace('\\', '/')
         proc = git(shared_root, ['diff'] + _diff_target(base_sha, head_sha) + ['--', path])
-        for line in proc.stdout.splitlines():
-            if not line.startswith('+') or line.startswith('+++'):
-                continue
-            content = line[1:]
+        added = [line[1:] for line in proc.stdout.splitlines()
+                 if line.startswith('+') and not line.startswith('+++')]
+        # Rejoin adjacent string literals ("design\\" newline "name.md") and unescape doubled
+        # backslashes so a citation split across source lines is matched as one path.
+        text = re.sub(r'(["\'])[ \t]*\n[ \t]*[rbfRBF]?\1', '', '\n'.join(added)).replace('\\\\', '\\')
+        for content in text.splitlines():
             for m in DESIGN_DOC_RE.finditer(content):
                 hits.append((norm, '9a', m.group(0), content.strip()))
             for m in TICKET_FILENAME_RE.finditer(content):

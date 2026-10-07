@@ -19,7 +19,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from config_lib import (get_shared_config, parse_hub_pointer, scoped_status_paths,
-                        CONSUMER_OWNED_PATHS, FIRST_RUN_FILENAME)
+                        CONSUMER_OWNED_PATHS, FIRST_RUN_FILENAME, missing_template_message)
 from registry_lib import parse_registry
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
@@ -28,7 +28,8 @@ CLAUDE_STATE_PATH = Path(os.path.expanduser('~')) / '.claude.json'
 
 
 def _norm(p):
-    return os.path.normcase(os.path.normpath(os.path.expanduser(str(p))))
+    # abspath (not just normpath) so a relative --project-root like "." still matches the registry.
+    return os.path.normcase(os.path.abspath(os.path.expanduser(str(p))))
 
 
 def _claude_project_state(project_root):
@@ -53,6 +54,12 @@ def _registry_entry_for(consumers_dir, host_id, project_root):
         if h and h.get('path') and _norm(h['path']) == target:
             return c
     return None
+
+
+def registry_entry_for(project_root):
+    """Parsed consumers/<slug>.md registering project_root on this host, or None."""
+    host_id = get_shared_config(SHARED_ROOT).get('host_id')
+    return _registry_entry_for(SHARED_ROOT.parent / 'consumers', host_id, project_root)
 
 
 def registry_slug_for(project_root):
@@ -82,8 +89,12 @@ def check(project_root):
     out.append(('OK', 'hub pointer', str(shared_root)))
 
     host_id = get_shared_config(shared_root).get('host_id')
-    entry = _registry_entry_for(shared_root.parent / 'consumers', host_id, root)
-    if entry is None:
+    consumers_dir = shared_root.parent / 'consumers'
+    entry = _registry_entry_for(consumers_dir, host_id, root)
+    if not consumers_dir.is_dir():
+        out.append(('HUB-MISMATCH', 'registry',
+                    missing_template_message(consumers_dir, "the project registry")))
+    elif entry is None:
         out.append(('HUB-MISMATCH', 'registry',
                     f"no consumers/ entry lists host '{host_id}' at this path - run `connect "
                     "project` from the hub"))
@@ -158,6 +169,9 @@ def hub_check():
     cfg = get_shared_config(SHARED_ROOT)
     host_id = cfg.get('host_id')
     results = {}
+    if not (SHARED_ROOT.parent / 'consumers').is_dir():
+        print(missing_template_message(SHARED_ROOT.parent / 'consumers', "the hub readiness check"))
+        return results
     for f in sorted((SHARED_ROOT.parent / 'consumers').glob('*.md')):
         c = parse_registry(f)
         if not c or host_id not in c['hosts']:

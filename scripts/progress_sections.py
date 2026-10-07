@@ -18,6 +18,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from config_lib import missing_template_message
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 PROGRESS_PATH = PROJECT_ROOT / 'project_progress.md'
 
@@ -65,7 +68,7 @@ def main():
     sys.stderr.reconfigure(encoding='utf-8')
 
     if not PROGRESS_PATH.exists():
-        print(f"[ERROR] {PROGRESS_PATH} not found.", file=sys.stderr)
+        print(missing_template_message(PROGRESS_PATH, "the session-start status read"), file=sys.stderr)
         sys.exit(1)
 
     text = PROGRESS_PATH.read_text(encoding='utf-8')

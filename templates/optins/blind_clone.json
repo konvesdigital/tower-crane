@@ -1,0 +1,16 @@
+{
+  "audience": "Tower Crane architecture only - for people modifying Tower Crane itself; ordinary users have no use for it",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{PYTHON_LAUNCHER}} \"{{SHARED_ROOT}}/hooks/blind_clone_gate.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

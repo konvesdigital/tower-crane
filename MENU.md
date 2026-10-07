@@ -72,3 +72,12 @@ not something the base mechanism needs to function.
 
 ## Scripts
 *(none yet)*
+
+## Tower Crane architecture tools
+For people modifying Tower Crane itself. Ordinary users of Tower Crane have no use for these and
+never need to turn them on. Off by default; enable on a hub machine with
+`python toolkit/scripts/self_hooks.py --enable <name>`.
+
+| Name | File | What it does | Trigger |
+|---|---|---|---|
+| blind_clone | `hooks\blind_clone_gate.py` (runs `scripts\check_blind_clone.py`) | Copies `toolkit\` alone into a temp folder with no outer repo, confirms every script that reads an outer-repo file reports the missing file clearly, and confirms no design-doc or ticket citation exists anywhere in the toolkit. Blocks the checkpoint when any step fails. Opt-in snippet: `templates\optins\blind_clone.json`. | PreToolUse, on a Bash command that runs `checkpoint_git.py` |

@@ -31,6 +31,14 @@ import subprocess
 from pathlib import Path
 
 
+def missing_template_message(path, needed_for):
+    """The one message every script prints when an outer-repo file or folder that setup scaffolds
+    is absent. The outer repo is operator-owned, so a moved or removed file is an expected cause."""
+    return (f"[MISSING-TEMPLATE-FILE] {path} not found. Setup creates it as part of the outer-repo "
+            f"template, and it is needed for {needed_for}. If it was moved or removed, restore it "
+            "at that location.")
+
+
 def get_shared_config(shared_root=None):
     """Read config.local.json from the tower_crane repo root. Raises RuntimeError with a clear,
     actionable message if it is missing (the #1 first-run mistake) so a fresh clone gets told

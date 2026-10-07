@@ -23,11 +23,10 @@ actually invoked.
      here — that full audit (the Inclusion Test) is `"archive"`'s job below, not paid at every
      checkpoint.
    - Move resolved Decisions rows from Open → Locked.
-   - **A new or edited Decisions row's Notes column is a pointer, never prose.** Point to the
-     `design\X.md` that's the real source if one exists; otherwise, if the decision is operative
-     (should govern a future action), put the actual rule in whichever procedure/companion file
-     enforces that action and point there instead; anything left over (pure historical rationale
-     with no other home) goes in `decisions_detail.md`, one short section per row, pointed to from
+   - **A new or edited Decisions row's Notes column is a pointer.** If the decision is operative
+     (should govern a future action), write the actual rule in whichever procedure/companion file
+     enforces that action and point there; historical rationale with no other home goes in
+     `decisions_detail.md` (created on first use), one short section per row, pointed to from
      here. The Item + Status
      columns stay resident and readable at a glance; full detail is always one click away, never
      inline — same shape as a skill stub vs. its template.

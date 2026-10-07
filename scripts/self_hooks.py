@@ -120,6 +120,12 @@ def _skills_on(optin, config):
     return True
 
 
+def tool_audience(tool):
+    """The opt-in snippet's optional 'audience' note, or '' when it has none."""
+    optin = json.loads((OPTINS_DIR / f"{tool}.json").read_text(encoding='utf-8'))
+    return optin.get('audience', '')
+
+
 def tool_status(tool, settings, config):
     """Returns 'on' / 'off' / 'n/a' (n/a = the opt-in snippet has neither a 'hooks' nor a 'skills'
     key - nothing here to toggle yet). 'on' requires every declared hook AND every declared skill
@@ -155,7 +161,8 @@ def write_status(config, settings=None):
         lines.append("| _(none available yet)_ | |")
     else:
         for t in tools:
-            lines.append(f"| {t} | {tool_status(t, settings, config).upper()} |")
+            note = f" ({tool_audience(t)})" if tool_audience(t) else ""
+            lines.append(f"| {t} | {tool_status(t, settings, config).upper()}{note} |")
     lines += [
         "",
         "Toggle: `python scripts\\self_hooks.py --enable <tool>` / `--disable <tool>`. "
@@ -171,7 +178,8 @@ def cmd_list(config):
     if not tools:
         print("  (none - no templates\\optins\\*.json found)")
     for t in tools:
-        print(f"  [{tool_status(t, settings, config)}] {t}")
+        note = f"  - {tool_audience(t)}" if tool_audience(t) else ""
+        print(f"  [{tool_status(t, settings, config)}] {t}{note}")
     write_status(config, settings)
     print()
     print(f"Status mirror: {STATUS_PATH}")

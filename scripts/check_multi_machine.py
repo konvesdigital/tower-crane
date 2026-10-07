@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from config_lib import get_shared_config
+from config_lib import get_shared_config, missing_template_message
 from registry_lib import parse_registry, effective_scope
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
@@ -27,6 +27,7 @@ def main():
     this_host = str(config.get('host_id', ''))
 
     if not CONSUMERS_DIR.is_dir():
+        print(missing_template_message(CONSUMERS_DIR, "the multi-machine connection check"))
         return
 
     for f in sorted(CONSUMERS_DIR.glob('*.md')):

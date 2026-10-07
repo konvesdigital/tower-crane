@@ -24,8 +24,10 @@ maintenance, catching a broken or stale reference, never whether the agent knows
 
 ### At `resume`
 
-Run, chained into one call (the consumer-side sweep applying the same "stop reconstructing a fixed
-two-call sequence from prose every time" fix already applied to `resume` step 3):
+On `resume`, step 5 of `consumer_resume_check.py` runs this; read its output here. Outside that
+chain, run it as one call (the consumer-side sweep applying
+the same "stop reconstructing a fixed two-call sequence from prose every time" fix already applied
+to `resume` step 3):
 
 ```
 python <hub root>/toolkit/scripts/shared_resource_resume_check.py --project-root <this project's

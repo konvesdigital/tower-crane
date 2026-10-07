@@ -306,11 +306,9 @@ def find_matches(prompt_text, categories, entries, edges, catalog_text, in_play,
 def format_context(hits):
     lines = [
         "[shared_resources mechanical trigger] The submitted message matched authored concept "
-        "slot(s) for the following shared_resources\\ entries (design\\"
-        "shared_resources_mechanical_trigger.md Part 3). This is a candidate surfaced by string "
-        "match, not a judgment call already made - read the entry live per "
-        "templates\\shared_resources.md's Retrieval procedure before relying on it, rather than "
-        "trusting this description or any memory of the file's past content:",
+        "slot(s) for the following shared_resources\\ entries. This is a candidate surfaced by "
+        "string match. Read the entry live per templates\\shared_resources.md's Retrieval "
+        "procedure before relying on it:",
     ]
     for resource_stem, detail in hits:
         if detail.get('procedure'):

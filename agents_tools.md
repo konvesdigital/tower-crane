@@ -68,7 +68,8 @@ only makes a tool *available* for self-use; nothing turns it on except `--enable
 default self-use set (`self_hooks.py`'s `DEFAULT_SELF_USE`: `hub_commands`,
 `capability_relationships`) should be on for every hub machine: `setup_machine.md`'s Step 7b turns
 them on with `--enable-defaults`, and `resume` flags `[SELF-USE-OFF]` on any machine where one is
-off.
+off. An opt-in snippet with an `audience` key (today: `blind_clone`, for people modifying Tower
+Crane itself) shows that note in `--list` and the status mirror; it stays off until `--enable`.
 
 ## Changing or removing an existing tool
 **Trigger: "modify tool".**
