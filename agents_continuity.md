@@ -159,7 +159,10 @@ judgment.
    runs a post-merge `check_tower_crane.py`, auto-rolling back on failure before
    `last_reviewed_sha` advances). Only the leading items: `--approve --through <n>` (`<n>` = last
    approved item's 1-based index) — the rest stay queued. On no: `--reject` — a fully supported,
-   indefinite steady state ("tools go stale but stay safe"), not a holdout to re-nag about.
+   indefinite steady state ("tools go stale but stay safe"), not a holdout to re-nag about:
+   it records the `origin/main` it declined, and `resume`'s `--notify` stays silent about exactly
+   that state, speaking again only once `origin/main` moves past it. Run `update` any time to
+   review it after all.
 
 **"propose upstream"** — sends a hand-built local fix in `toolkit\` back to the public repo
 (`konvesdigital/tower-crane`) as a fork + PR. **For a clone

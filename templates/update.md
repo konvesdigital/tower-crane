@@ -32,7 +32,14 @@ relative to the same `toolkit\` you're inside right now.
 
 ### Step 1 — scan
 
-Run, from anywhere, substituting this project's own absolute root:
+Fill in the three placeholders used here and in Steps 3 and 4 (and in `continuity.md`'s
+`checkpoint` command, which points back to this step):
+- `<python_launcher>` = the `python_launcher:` value in this project's own `.claude\hub_pointer.md`
+  (`Read` that file; use the value exactly as written).
+- `<hub root>` = the folder one level above the `shared_root:` value in the same file (`shared_root:` is the `toolkit` folder itself).
+- `<this project's absolute root>` = the folder that contains this project's `CLAUDE.md`.
+
+Then run, as one bare command (no `cd`, no pipes):
 
 ```
 <python_launcher> "<hub root>/toolkit/scripts/scan_consumer_update.py" --project-root "<this project's absolute root>"

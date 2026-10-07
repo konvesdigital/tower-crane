@@ -72,7 +72,7 @@ Fleet operations:
   disconnect project — remove a consumer (this machine, every other machine, or everywhere)
   update consumers — bulk-push new hub functionality to every registered consumer
   curate shared resources — push an insight to every consumer
-  set up automation — wire up unattended ticket processing
+  read setup_automation.md and follow it — wire up unattended ticket processing
 ```
 
 ### Beginner tier - guided story

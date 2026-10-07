@@ -10,6 +10,10 @@
 # committed - transient per-machine state, not toolkit content.
 /.update_pending.json
 
+# update_toolkit.py: the origin/main a --reject declined, so --notify stays quiet about that exact
+# state. Never committed - per-machine.
+/.update_rejected_sha
+
 # OS / editor cruft
 Thumbs.db
 *.tmp

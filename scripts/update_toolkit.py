@@ -93,6 +93,7 @@ from config_lib import get_shared_config
 SHARED_ROOT = Path(__file__).resolve().parent.parent
 LAST_REVIEWED_PATH = SHARED_ROOT / '.last_reviewed_sha'
 PENDING_PATH = SHARED_ROOT / '.update_pending.json'
+REJECTED_PATH = SHARED_ROOT / '.update_rejected_sha'
 CONFIG_PATH = SHARED_ROOT / 'config.local.json'
 EMPTY_TREE_SHA = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'  # git's canonical empty-tree object
 
@@ -582,6 +583,12 @@ def cmd_notify(cfg, consumer=False):
         print("[update check] toolkit\\ is up to date - nothing to review.")
         return
 
+    # A `--reject` records the origin/main it declined; --notify stays silent about exactly that
+    # target (reject is a supported steady state, not something to re-nag about) and speaks again
+    # the moment origin/main moves past it.
+    if REJECTED_PATH.exists() and REJECTED_PATH.read_text(encoding='utf-8').strip() == target:
+        return
+
     count = _git(['rev-list', f'{base}..{target}', '--count']).stdout.strip()
     if consumer:
         print(f"[update check] toolkit\\'s public upstream has moved ahead of the hub's "
@@ -603,7 +610,10 @@ def cmd_reject():
         return
     print(f"Rejected. Trusted baseline stays at {pending['base'][:8]}; nothing was merged (the "
           "golden suite ran against a throwaway worktree during --check, never this clone's real "
-          "working tree). Tools go stale but stay safe - a fully supported, indefinite state.")
+          "working tree). Tools go stale but stay safe - a fully supported, indefinite state. "
+          "`resume` stays silent about this exact upstream state; it speaks again only when "
+          "origin/main moves past it.")
+    write_utf8(REJECTED_PATH, pending['target'] + '\n')
     clear_pending()
 
 
