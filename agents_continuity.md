@@ -30,7 +30,13 @@ actually invoked.
      here. The Item + Status
      columns stay resident and readable at a glance; full detail is always one click away, never
      inline — same shape as a skill stub vs. its template.
-   - Prepend one dated Work Log entry (what changed, what's next). Newest on top.
+   - Prepend **one** dated Work Log entry, newest on top, in this fixed shape: a header line
+      `**YYYY-MM-DD — <host_id> session (<topic>):**` followed on the same line by the first
+      sentence, then the rest in this order — what changed (name files/scripts, not process), what
+      was NOT run or verified (omit if everything was), and a final `Next:` sentence. Total cap:
+      10 lines including the header, wrapped at 100 columns. Then run
+      `python toolkit/scripts/work_log_entry_check.py --project-root "<this hub's absolute root>"`; on `[OVER-CAP]`/`[BAD-HEADER]`,
+      shorten or fix the entry and re-run until it prints `[OK]`.
    - Do NOT prune or move older entries automatically — only "archive" does that.
 2. Git mechanics for both repos — mechanized (mechanical
    steps live in the script, same split as `update_toolkit.py` keeps below):

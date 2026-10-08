@@ -38,7 +38,13 @@ this mechanism works and how it relates to other mechanisms.
      row from `Decisions (Open)` to `Decisions (Locked)` (expanded).
    - If the project uses **To Reconcile**: strike items that were folded in this session; add any
      new inputs that surfaced.
-   - Prepend **one** dated Work Log entry (what changed, what's next). Newest entry on top.
+   - Prepend **one** dated Work Log entry, newest on top, in this fixed shape: a header line
+      `**YYYY-MM-DD — <host_id> session (<topic>):**` followed on the same line by the first
+      sentence, then the rest in this order — what changed (name files/scripts, not process), what
+      was NOT run or verified (omit if everything was), and a final `Next:` sentence. Total cap:
+      10 lines including the header, wrapped at 100 columns. Then run
+      `python "<hub root>/toolkit/scripts/work_log_entry_check.py" --project-root "<this project's absolute root>"`; on `[OVER-CAP]`/`[BAD-HEADER]`,
+      shorten or fix the entry and re-run until it prints `[OK]`.
    - Do **not** prune or move older entries automatically — the Work Log stays complete until
      the user runs "archive".
 2. Git mechanics — mechanized:
