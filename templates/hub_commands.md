@@ -45,10 +45,10 @@ Both tiers draw from the same underlying capability set below - only the renderi
 One reply, grouped by track header, each line a bare command/phrase plus a one-line action. No
 follow-up turn required.
 
-**"Efficiency habits" is rendered live, not from a fixed list below:** read this hub's own
-`capability_catalog.yaml` (`toolkit\capability_catalog.yaml`). Filter `nodes` to `context: hub` or
-`both`, carrying the `efficiency-rationale` theme tag, and render one line per node using its
-`description`.
+**"Efficiency habits" is rendered live, not from a fixed list below:** run
+`<python_launcher> "<hub root>/toolkit/scripts/render_commands.py" --context hub --theme efficiency-rationale`
+as one bare command (`<python_launcher>` and `<hub root>` as in `templates\update.md` Step 1) and
+use its block as that track, one short one-line action per printed node.
 
 ```
 commands
@@ -77,9 +77,11 @@ Fleet operations:
 
 ### Beginner tier - guided story
 
-Narrated as a sequential walk through `capability_catalog.yaml`'s own `path` section, filtered to
-nodes where `context` is `hub` or `both`, in that order - answers "what's first," not "here's
-everything." Read the catalog fresh each time; don't render from the frozen example below. Note
+Narrated as a sequential walk through the catalog's `path` section, in that order - answers
+"what's first," not "here's everything." Run
+`<python_launcher> "<hub root>/toolkit/scripts/render_commands.py" --context hub --path` as one bare
+command; its numbered list is already filtered to hub steps. Don't render from the frozen example
+below. Note
 this reorders the hub-side beginner story from an earlier hand-authored draft: the Path puts
 `checkpoint`/`resume` immediately after `setup_machine`, ahead of `connect_project` (short, easy,
 low-risk - genuinely the first thing worth doing with any fresh hub state, before even hub-specific
@@ -102,11 +104,11 @@ You can say "commands" any time to see everything else.
 
 Per the reciprocal-tracks rule: when a query lands on one node, volunteer
 its nearest structural neighbor as the single next-best follow-up - don't wait to be asked. Not a
-fixed list below - read this hub's own `capability_catalog.yaml` fresh (`toolkit\capability_catalog.yaml`,
-same file the "Efficiency habits" track above and `capability_relationships` both resolve from).
-For the node the query actually landed on, check `edges` for every entry naming it as `a` or `b`
-(skip `name-collision` and `backs` - informational only, not real neighbors, same discipline
-`capability_relationships.md` step 4 uses): reciprocal/parallel → mention the other side plainly;
+fixed list below - run
+`<python_launcher> "<hub root>/toolkit/scripts/render_commands.py" --context hub --neighbors <node id>`
+for the node the query actually landed on (the script skips `name-collision` and `backs` -
+informational only, not real neighbors, same discipline `capability_relationships.md` step 4
+uses). Act on each printed edge type: reciprocal/parallel → mention the other side plainly;
 lifecycle-sibling → mention it, using the edge's own `note` if present; accelerant → mention the
 accelerated side as the thing that's already possible without this hub-side convenience.
 

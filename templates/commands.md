@@ -49,14 +49,12 @@ Both tiers draw from the same underlying capability set below - only the renderi
 One reply, grouped by track header, each line a bare command/phrase plus a one-line action. No
 follow-up turn required.
 
-**"Efficiency habits" and "Sharing outward" are rendered live, not from a fixed list below:** read
-this project's own `capability_catalog.yaml` (same `toolkit\` root `capability_relationships.md`
-resolves it from - see that file's own self-locating note). For each track, filter `nodes` to
-`context: consumer` or `both`, carrying the matching theme tag (`efficiency-rationale` for
-"Efficiency habits", `push-outward` for "Sharing outward"), and render one line per node using its
-`description` - except group nodes that share the same literal `trigger` prefix (e.g. every
-`shared resources "..."` node) into a single combined line, same as the worked example below, so
-the four shared_resources actions don't turn into four repetitive bullets.
+**"Efficiency habits" and "Sharing outward" are rendered live, not from a fixed list below:** run
+`<python_launcher> "<hub root>/toolkit/scripts/render_commands.py" --theme efficiency-rationale push-outward`
+as one bare command (placeholders resolved as in `templates\update.md` Step 1) and use its two
+blocks as those two tracks, one line per node, in the printed order. The script already filters to
+this session's nodes and collapses the `shared resources` nodes into one line; word each line as a
+short one-line action the way the worked example below does.
 
 ```
 commands
@@ -96,10 +94,11 @@ fully covered in the Reciprocal pairs table below either way.
 
 ### Beginner tier - guided story
 
-Narrated as a sequential walk through `capability_catalog.yaml`'s own `path` section, filtered to
-nodes where `context` is `consumer` or `both`, in that order (skipping hub-only steps like
-`setup_machine` - this project's own session can't run those anyway) - answers "what's first," not
-"here's everything." Read the catalog fresh each time; don't render from the frozen example below.
+Narrated as a sequential walk through the catalog's `path` section, in that order - answers
+"what's first," not "here's everything." Run
+`<python_launcher> "<hub root>/toolkit/scripts/render_commands.py" --path` as one bare command; its
+numbered list is already filtered to this session's steps (hub-only steps like `setup_machine` are
+dropped - this project's own session can't run those). Don't render from the frozen example below.
 
 ```
 I'm new here, what do I do?
@@ -125,11 +124,12 @@ You can say "commands" any time to see everything else.
 
 Per the reciprocal-tracks rule: when a query lands on one node, volunteer
 its nearest structural neighbor as the single next-best follow-up - don't wait to be asked. Not a
-fixed list below - read this project's own `capability_catalog.yaml` fresh (same file the tracks
-above and `capability_relationships` both resolve from the `toolkit\` root). For the node the
-query actually landed on, check `edges` for every entry naming it as `a` or `b` (skip
-`name-collision` and `backs` - informational only, not real neighbors, same discipline
-`capability_relationships.md` step 4 uses): reciprocal/parallel → mention the other side plainly;
+fixed list below - run
+`<python_launcher> "<hub root>/toolkit/scripts/render_commands.py" --neighbors <node id>` for the
+node the query actually landed on (the script skips `name-collision` and `backs` - informational
+only, not real neighbors, same discipline `capability_relationships.md` step 4 uses; its
+`[hub-only: ...]` tag marks a neighbor this session can't reach). Act on each printed edge type:
+reciprocal/parallel → mention the other side plainly;
 lifecycle-sibling → mention it, using the edge's own `note` if present (often a condition, e.g.
 archiving only worth mentioning once the Work Log has actually grown); accelerant → mention the
 accelerated side as the thing this project can already do on its own, the accelerant being a
@@ -146,7 +146,9 @@ update → also mention: update consumers, the hub-operator side of the same con
 
 ### Reaching the hub from here
 
-Rendered live from `capability_catalog.yaml`, not a fixed list - three tiers, always in this order:
+Rendered live, not a fixed list: run
+`<python_launcher> "<hub root>/toolkit/scripts/render_commands.py" --reach` as one bare command; it
+prints these three tiers in this order, and the text below says how to word each:
 
 1. **Fully reachable from here, no hub session ever needed** - every node with `context: consumer`.
    Lead with these regardless of what else the question touches on; they're unconditionally
