@@ -11,8 +11,9 @@ Output order (always):
   Current Status, Current Focus, Next Up, Decisions (every '## Decisions...' heading, in file
   order - covers the single-table form and the Locked/Open split), Phases, and ONLY the newest
   Work Log entry
-  STATUS: line - the first list item in Current Status (200 chars max)
-  NEXT: line - the first unchecked checkbox item in Next Up, else the first list item (200 max)
+  STATUS: line - the first list item in Current Status (wrapped lines joined; 400 chars max,
+  cut at a sentence/word boundary with a `…[truncated, full item at ... line N]` marker)
+  NEXT: line - the first unchecked checkbox item in Next Up, else the first list item (same rules)
 
 Section boundaries: a section is a '## ' heading whose text starts with the names above
 (case-insensitive); it runs to the next '## ' heading or end of file. A Work Log entry starts at a
@@ -110,19 +111,40 @@ def emit_capped(label, body, first_line_no, max_lines, max_chars):
 
 def next_item(body):
     """First unchecked-checkbox list item, else first list item that isn't a checked checkbox."""
-    items = []
-    for line in body:
+    items = []  # (text joined with its wrapped continuation lines, index of its first line in body)
+    for i, line in enumerate(body):
         m = LIST_ITEM_RE.match(line)
         if m:
-            items.append(m.group(1).strip())
-    for text in items:
+            parts = [m.group(1).strip()]
+            marker_indent = len(line) - len(line.lstrip())
+            for nxt in body[i + 1:]:
+                if (not nxt.strip() or LIST_ITEM_RE.match(nxt)
+                        or len(nxt) - len(nxt.lstrip()) <= marker_indent):
+                    break
+                parts.append(nxt.strip())
+            items.append((' '.join(parts), i))
+    for text, i in items:
         m = CHECKBOX_OPEN_RE.match(text)
         if m:
-            return m.group(1).strip()
-    for text in items:
+            return m.group(1).strip(), i
+    for text, i in items:
         if not CHECKBOX_DONE_RE.match(text):
-            return text
+            return text, i
     return None
+
+
+def trim_item(text, budget, line_no):
+    """Whole text if it fits; else cut at a sentence end (past 40% of budget) or the last word
+    boundary within budget, and say where the full item lives."""
+    if len(text) <= budget:
+        return text
+    head = text[:budget]
+    ends = [m.end() for m in re.finditer(r'[.!?](?=\s)', head)]
+    if ends and ends[-1] >= budget * 0.4:
+        head = head[:ends[-1]]
+    else:
+        head = head.rsplit(' ', 1)[0] if ' ' in head else head
+    return f"{head.rstrip()} …[truncated, full item at project_progress.md line {line_no}]"
 
 
 def main():
@@ -179,17 +201,22 @@ def main():
                 emit_capped(text, body, first_line_no, args.max_lines, args.max_chars)
 
     for key in ('status', 'next'):
-        item = None
+        item, item_line = None, 0
         for _text, start, end in found[key]:
             body = lines[start + 1:end]
-            item = next_item(body)
-            if not item and key == 'status':
+            hit = next_item(body)
+            if hit:
+                item, item_line = hit[0], start + 2 + hit[1]
+            else:
                 # prose-form Current Status: first non-blank line that isn't a '(...)' instruction note
-                item = next((l.strip() for l in body if l.strip() and not l.strip().startswith('(')), None)
+                idx = next((j for j, l in enumerate(body)
+                            if l.strip() and not l.strip().startswith('(')), None)
+                if idx is not None:
+                    item, item_line = body[idx].strip(), start + 2 + idx
             if item:
                 break
         missing = '(section absent)' if not found[key] else '(none found - the section has no text)'
-        print(f"{key.upper()}: {item[:200] if item else missing}")
+        print(f"{key.upper()}: {trim_item(item, 400, item_line) if item else missing}")
 
 
 if __name__ == '__main__':

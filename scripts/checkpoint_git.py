@@ -103,6 +103,15 @@ def porcelain_status(root):
     return tracked, untracked
 
 
+def normalize_include(entry):
+    """Git's own untracked listing is always forward-slash and repo-relative, so an --include
+    entry written with backslashes or a leading './' is rewritten to that form before matching."""
+    entry = entry.replace('\\', '/')
+    while entry.startswith('./'):
+        entry = entry[2:]
+    return entry
+
+
 def resolve_untracked(untracked, include, include_all, skip_untracked):
     """Splits `untracked` into (to_stage, unresolved) given this invocation's flags. Nothing here
     guesses - a path only becomes to_stage if it was explicitly named or --include-all/
@@ -296,6 +305,8 @@ def main():
     _toolkit_tracked, toolkit_untracked = (
         porcelain_status(TOOLKIT_ROOT) if TOOLKIT_ROOT.exists() and is_repo(TOOLKIT_ROOT) else ([], []))
 
+    args.include = [normalize_include(p) for p in args.include]
+
     outer_stage, outer_unresolved = resolve_untracked(
         outer_untracked, args.include, args.include_all, args.skip_untracked)
     toolkit_stage, toolkit_unresolved = resolve_untracked(
@@ -315,6 +326,11 @@ def main():
             print(f"  toolkit\\ ({TOOLKIT_ROOT}):")
             for p in toolkit_unresolved:
                 print(f"    {p}")
+        listed = set(outer_untracked) | set(toolkit_untracked)
+        for p in args.include:
+            if p not in listed:
+                print(f"[INCLUDE-NO-MATCH] '{p}' matched no untracked file (paths are compared "
+                      f"exactly, forward slashes, relative to the repo root).")
         sys.exit(2)
 
     cfg = get_shared_config(TOOLKIT_ROOT)

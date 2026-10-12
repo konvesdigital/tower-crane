@@ -1,11 +1,11 @@
 {
   "hub": [
     "git pull:*",
-    "*resume_check.py:*",
-    "*progress_sections.py:*",
-    "*ticket_scan.py:*",
-    "*update_toolkit.py:*",
-    "*checkpoint_git.py:*",
+    "*resume_check.py*",
+    "*progress_sections.py*",
+    "*ticket_scan.py*",
+    "*update_toolkit.py*",
+    "*checkpoint_git.py*",
     "*archive_candidates.py*",
     "*work_log_entry_check.py*",
     "*render_commands.py*"

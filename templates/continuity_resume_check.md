@@ -47,7 +47,7 @@ reached) read whatever is present.
   starts): **A.** `Read` on `.claude\hub_pointer.md`. **B.** `git pull`, as one bare command.
   **C.** `consumer_resume_check.py`, as one bare command (below). Every later file read uses the
   `Read` tool on an absolute path.
-- The only Bash commands are B and C. Do not use `cd`, pipes, `cat`, `ls`, `grep`, `head`, `tail`,
+- The only Bash commands are B and C. Do not use pipes, `cat`, `ls`, `grep`, `head`, `tail`,
   or `;`/`&&` chaining. To find or open a file use `Read`, `Glob` or `Grep`; never list or grep the
   hub's `change_requests\` folder (step 3's output already contains everything resume needs from it).
 - If the classifier returns "no verdict" for B or C, retry that one command once, unchanged. If it
@@ -81,7 +81,8 @@ reached) read whatever is present.
       interpret per `shared_resources_resume_check.md`.
    6. `resume_digest.py` — `project_progress.md`'s live-state sections (Current Status, Current
       Focus, Next Up, Decisions, Phases, newest Work Log entry), stating which sections are absent,
-      then a `STATUS:` and a `NEXT:` line.
+      then a `STATUS:` and a `NEXT:` line. A line ending in `…[truncated, full item at … line N]`
+      is partial on purpose: copy it as printed, marker included.
 4. If the `RESUME SUMMARY` line `compliance guidance file` says PRESENT, `Read` the path it gives
    and surface it now (see the compliance protocol). That summary line is the only existence
    check; do not `Glob` for the file.

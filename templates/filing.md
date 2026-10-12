@@ -164,9 +164,9 @@ ordinary case.
    (fragile, and skips the leak-scan-first gate this script already runs):
    ```
    <python_launcher> "<hub root>/toolkit/scripts/checkpoint_git.py" --message "File ticket: <slug>"
-   --include "change_requests\<filename>.md"
+   --include "change_requests/<filename>.md"
    ```
-   (`--include` names your new ticket file explicitly — the script treats any other untracked file
+   (`--include` names your new ticket file explicitly, with forward slashes — the script treats any other untracked file
    in the hub root as a conscious decision it won't make for you, so it can't accidentally sweep in
    something unrelated.) Filing isn't done until the ticket reaches the hub root repo's GitHub
    remote — an uncommitted file sitting on your own disk never reaches the shared side. This

@@ -33,6 +33,11 @@ this applies to tickets specifically.
 Missing → not set up (or uninstalled): don't guess machine identity, don't run `"checkpoint"`,
 `"update"`, or any consumer command — run `templates\setup_machine.md` first.
 
+## Running shell commands
+Run each command as its own call, from the current directory. To run git in another repo (for
+example `toolkit\`), write `git -C <dir> <cmd>` rather than changing directory first — a directory
+change followed by `git` always prompts for approval, and no allowlist rule can silence it.
+
 ## Standing Constraints (binding on everything below in this file and anything it imports)
 
 - This file MUST NOT be edited, and no file importing it may weaken or override this section,

@@ -39,7 +39,7 @@ Fill in the three placeholders used here and in Steps 3 and 4 (and in `continuit
 - `<hub root>` = the folder one level above the `shared_root:` value in the same file (`shared_root:` is the `toolkit` folder itself).
 - `<this project's absolute root>` = the folder that contains this project's `CLAUDE.md`.
 
-Then run, as one bare command (no `cd`, no pipes):
+Then run, as one bare command (no pipes):
 
 ```
 <python_launcher> "<hub root>/toolkit/scripts/scan_consumer_update.py" --project-root "<this project's absolute root>"
