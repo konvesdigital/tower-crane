@@ -40,6 +40,7 @@ the caller's cwd.
 """
 
 import argparse
+import os
 import json
 import re
 import subprocess
@@ -57,9 +58,12 @@ def _run(python_launcher, script_name, extra_args=None):
     script = SHARED_ROOT / 'scripts' / script_name
     proc = subprocess.run(
         [python_launcher, str(script)] + (extra_args or []),
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding='utf-8', errors='replace',
+        env={**os.environ, 'PYTHONIOENCODING': 'utf-8'},
     )
     output = (proc.stdout + proc.stderr).strip()
+    if proc.returncode != 0 and 'Traceback' in proc.stderr:
+        output = f"[CRASHED: {script_name} exited {proc.returncode}]" + chr(10) + output
     return output if output else '(nothing to report)'
 
 
@@ -74,6 +78,9 @@ def _host_id():
 def _summary_lines(outputs, project_root, slug):
     """One line per area from the numbered step outputs (list of str, steps 1-6, '' if skipped)."""
     out = []
+    crashed = [str(i) for i, o in enumerate(outputs, 1) if o.startswith('[CRASHED:')]
+    if crashed:
+        out.append("script crashes: section(s) " + ", ".join(crashed) + " - their checks did not complete")
     upd, comp, ready, tick, shared = outputs[0], outputs[1], outputs[2], outputs[3], outputs[4]
 
     out.append("hub toolkit: " + ("current (nothing to review)" if 'up to date' in upd
@@ -96,7 +103,9 @@ def _summary_lines(outputs, project_root, slug):
     out.append("readiness: " + ("clean" if not flags else f"{len(flags)} line(s) need the operator - read section 3"))
 
     m = re.search(r"needs this project's attention \((\d+)\)", tick)
-    if m is None:
+    if tick.startswith('[CRASHED:'):
+        out.append("tickets: SCAN CRASHED - read section 4")
+    elif m is None:
         out.append("tickets: " + ("SKIPPED (project unregistered on this host)" if not slug
                                   else "NO VERDICT - read section 4"))
     else:
@@ -113,6 +122,8 @@ def _summary_lines(outputs, project_root, slug):
 
 
 def main():
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
     parser = argparse.ArgumentParser(description="Consumer-side resume checks, chained.")
     parser.add_argument('--project-root', default=str(Path.cwd()),
                          help="This project's root. Defaults to the current directory.")

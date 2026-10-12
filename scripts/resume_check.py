@@ -24,6 +24,7 @@ Usage: python scripts\\resume_check.py [--project-root <path>]
 """
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -39,13 +40,18 @@ def _run(python_launcher, script_name, extra_args=None):
     script = SHARED_ROOT / 'scripts' / script_name
     proc = subprocess.run(
         [python_launcher, str(script)] + (extra_args or []),
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding='utf-8', errors='replace',
+        env={**os.environ, 'PYTHONIOENCODING': 'utf-8'},
     )
     output = (proc.stdout + proc.stderr).strip()
+    if proc.returncode != 0 and 'Traceback' in proc.stderr:
+        output = f"[CRASHED: {script_name} exited {proc.returncode}]" + chr(10) + output
     return output if output else '(nothing to report)'
 
 
 def main():
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
     parser = argparse.ArgumentParser(
         description="Chains resume's notify-only checks into one consolidated report."
     )

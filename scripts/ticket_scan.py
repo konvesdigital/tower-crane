@@ -311,6 +311,8 @@ def _cli_report(tickets):
 
 
 def main():
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
     parser = argparse.ArgumentParser(description="Mechanical, zero-AI local scan/bookkeeping of change_requests\\*.md. Never runs git.")
     parser.add_argument('--mark-done', action='store_true',
                          help="Flip verified/overridden tickets to DONE in the local ticket files (no git). "
