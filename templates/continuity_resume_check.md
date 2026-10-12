@@ -13,6 +13,12 @@ This file explains how to use the mechanism it covers. `capability_relationships
 this mechanism works and how it relates to other mechanisms.
 -->
 
+## Running shell commands
+
+Run each command as its own call, from the current directory. To run git in another repo (for
+example the shared `toolkit\`), write `git -C <dir> <cmd>` rather than changing directory first — a
+directory change followed by `git` always prompts for approval, and no allowlist rule can silence it.
+
 ## Session continuity
 
 Source of truth: **`project_progress.md`** in the project root — same filename in both tiers below.
