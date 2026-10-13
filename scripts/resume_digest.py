@@ -11,7 +11,8 @@ Output order (always):
   Current Status, Current Focus, Next Up, Decisions (every '## Decisions...' heading, in file
   order - covers the single-table form and the Locked/Open split), Phases, and ONLY the newest
   Work Log entry
-  STATUS: line - the first list item in Current Status (wrapped lines joined; 400 chars max,
+  STATUS: line - the first list item (or first paragraph) in Current Status, or in Current Focus
+  when there is no Current Status (wrapped lines joined; 400 chars max,
   cut at a sentence/word boundary with a `…[truncated, full item at ... line N]` marker)
   NEXT: line - the first unchecked checkbox item in Next Up, else the first list item (same rules)
 
@@ -202,9 +203,10 @@ def main():
 
     for key in ('status', 'next'):
         item, item_line = None, 0
-        for _text, start, end in found[key]:
+        sections = found[key] or (found['focus'] if key == 'status' else [])
+        for _text, start, end in sections:
             body = lines[start + 1:end]
-            hit = next_item(body)
+            hit = None if sections is found['focus'] else next_item(body)  # Current Focus is prose-led
             if hit:
                 item, item_line = hit[0], start + 2 + hit[1]
             else:
@@ -212,10 +214,15 @@ def main():
                 idx = next((j for j, l in enumerate(body)
                             if l.strip() and not l.strip().startswith('(')), None)
                 if idx is not None:
-                    item, item_line = body[idx].strip(), start + 2 + idx
+                    para = []
+                    for l in body[idx:]:
+                        if not l.strip():
+                            break
+                        para.append(l.strip())
+                    item, item_line = ' '.join(para), start + 2 + idx
             if item:
                 break
-        missing = '(section absent)' if not found[key] else '(none found - the section has no text)'
+        missing = '(section absent)' if not sections else '(none found - the section has no text)'
         print(f"{key.upper()}: {trim_item(item, 400, item_line) if item else missing}")
 
 
