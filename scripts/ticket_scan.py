@@ -83,13 +83,14 @@ class Ticket:
     text: str                # full raw ticket text - used by --project's substring filter below
 
 
-ENTRY_START_RE = re.compile(r'^(?:- |\*\*\d{4}-\d{2}-\d{2}\b)')
+ENTRY_START_RE = re.compile(r'^(?:- |\*{0,2}\d{4}-\d{2}-\d{2}\b)')
 
 
 def _log_entries(section_body):
     """Split a log section's body into bullet entries. An entry starts at a line beginning with
-    '- ' (no leading whitespace) OR at a line beginning with a bold dated header, e.g.
-    '**2026-09-01 — ...**'. Any following line matching neither start pattern is that entry's
+    '- ' (no leading whitespace) OR at a line beginning with a dated header, bold or plain, e.g.
+    '**2026-09-01 — ...**' or '2026-09-01 — <project> verified PASS' (the consumer-side form
+    documented in filing.md). Any following line matching neither start pattern is that entry's
     continuation."""
     entries = []
     current = []
