@@ -123,13 +123,17 @@ setup entirely: disconnects every consumer connected here (this-only, so any oth
 connection to the same consumer is untouched), clears this machine's own gitignored state
 (`config.local.json`, `.claude\settings.local.json`, `.claude\self_hooks_status.md`,
 `.claude\automation_state.json`, `.claude\skills\`), and removes the `origin` remote from **both**
-the outer hub repo and `toolkit\` — local-only and fully reversible (`git remote add origin <url>`
-reattaches), never touching GitHub or any other machine's own clone. Never touches `.claude\hooks\`
-(tracked personal content, not this hub's to delete) or any tracked file content in either repo.
+the outer hub repo and `toolkit\` — local-only and reversible (`git remote add origin <url>`
+reattaches, but the URLs are not recorded anywhere, so a reinstall needs the user to supply both
+remotes again), never touching GitHub or any other machine's own clone. Never touches
+`.claude\hooks\` (tracked personal content, not this hub's to delete) or any tracked file content in
+either repo, apart from removing this host from each disconnected consumer's registry file
+(`consumers\<slug>.md`), which it commits and pushes.
 
 This command works like "Safely Remove Hardware", not like a typical uninstaller: it makes the
-folders safe to delete but never deletes them — physically deleting stays a manual step the user does
-themselves. Nothing of the user's (project files, git history) is deleted; the only files removed are
+hub's folders (the outer hub and `toolkit\`) safe to delete but never deletes them — physically
+deleting stays a manual step the user does themselves. Connected consumer projects are separate
+folders: they stay in place, with their own repos, merely disconnected. Nothing of the user's (project files, git history) is deleted; the only files removed are
 this machine's own regenerable per-machine ones listed above. What changes is that this machine no
 longer has a backup path: anything not committed and pushed exists only on this disk. The script
 never checks for unsaved work and never stops partway, which is why the warning below comes first.
@@ -142,12 +146,13 @@ Tower Crane everywhere" already means.
 2. Both repos' `origin` will be removed (reversible).
 3. This warning, as a fixed message every time, whatever the repos' actual state: "**Uninstall
    doesn't delete your files.** It disconnects this machine from Tower Crane and from the remote, so
-   you can safely delete the folders yourself afterward, like 'Safely Remove Hardware' before you
-   unplug a drive. Anything not committed and pushed will exist only on this disk, with no backup
-   anywhere else. Reply `checkpoint` to save first, or `proceed`." (A `checkpoint` on already-clean
-   repos just reports nothing to commit.)
-4. The reversal path: `setup_machine.md` run again on this machine (re-attaching `origin`), then
-   reconnecting whichever consumers are wanted via `"connect project"` — a rebuild, not a restore.
+   you can safely delete the hub's folders yourself afterward, like 'Safely Remove Hardware' before
+   you unplug a drive. Anything not committed and pushed will exist only on this disk, with no
+   backup anywhere else. Reply `checkpoint` to save first, or `proceed`." (A `checkpoint` on
+   already-clean repos just reports nothing to commit.)
+4. The reversal path: `setup_machine.md` run again on this machine, where the user supplies both
+   remote URLs again to re-attach `origin`, then reconnecting whichever consumers are wanted via
+   `"connect project"` — a rebuild, not a restore.
 
 Then act on the reply. `checkpoint` → run it, then ask again. A question such as "do I have
 uncommitted changes?" → look (`git status` in both repos) and answer, then ask again. `proceed` →

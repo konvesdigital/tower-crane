@@ -5,9 +5,11 @@ on this machine (this-only mode; any other machine's connection to the same cons
 alone), clears this machine's own gitignored per-machine hub state, and removes the 'origin' remote
 from both the outer hub repo and toolkit\\.
 
-Never touches tracked file content or history in either repo, or .claude\\hooks\\ - only the
-'origin' remote entry, which is local-only and fully reversible (`git remote add origin <url>`
-reattaches). Never touches GitHub or any other machine's own clone. Does not delete the hub folder
+Never touches tracked file content or history in either repo, or .claude\\hooks\\ - apart from
+removing this host from each disconnected consumer's registry file (consumers\\<slug>.md), which it
+commits and pushes - only the 'origin' remote entry, which is local-only and reversible
+(`git remote add origin <url>` reattaches, but the URLs are not recorded anywhere, so a reinstall
+needs the user to supply both remotes again). Never touches GitHub or any other machine's own clone. Does not delete the hub folder
 tree itself. Never rm -rf's its own running directory.
 
 Ordering: the registry edit(s) disconnect_host() makes are committed and pushed (while 'origin' is
@@ -150,8 +152,8 @@ def _build_uninstall_note(this_host, host_results, per_machine_removed, outer_or
     for label, origin_removed in (("outer hub repo", outer_origin_removed),
                                    ("toolkit\\", toolkit_origin_removed)):
         if origin_removed:
-            lines.append(f"- {label}: 'origin' remote removed (reversible via `git remote add "
-                          "origin <url>`)")
+            lines.append(f"- {label}: 'origin' remote removed (the URL is not recorded here - "
+                          "reinstalling means supplying it again)")
         else:
             lines.append(f"- {label}: had no 'origin' remote to remove")
 
@@ -160,9 +162,11 @@ def _build_uninstall_note(this_host, host_results, per_machine_removed, outer_or
         "This machine is disconnected from Tower Crane and the remote: no consumers connected "
         "here, no per-machine state left, both repos' 'origin' remote removed. Nothing of yours "
         "was deleted. Anything that wasn't committed and pushed beforehand exists only on this "
-        "disk. When you're ready, delete the folders yourself. (Deleting the actual GitHub "
-        "repos, if you ever want that too, is a separate decision - not something "
-        "\"uninstall\" touches.)"
+        "disk. When you're ready, delete the hub's folders (the outer hub and toolkit\\) "
+        "yourself; any connected consumer projects are separate folders and stay where they are. "
+        "Reinstalling later means running setup_machine.md again and supplying both remote URLs "
+        "again. (Deleting the actual GitHub repos, if you ever want that too, is a separate "
+        "decision - not something \"uninstall\" touches.)"
     )
 
     lines += ["", "---", "This file is local-only — delete it along with everything else whenever "
@@ -265,8 +269,8 @@ def main():
     for label, origin_removed in (("outer hub repo", outer_origin_removed),
                                    ("toolkit\\", toolkit_origin_removed)):
         if origin_removed:
-            print(f"  {label}: 'origin' remote removed (reversible - `git remote add origin "
-                  "<url>` reattaches)")
+            print(f"  {label}: 'origin' remote removed (the URL is not recorded - reinstalling "
+                  "means supplying it again)")
         else:
             print(f"  {label}: had no 'origin' remote to remove")
 
@@ -274,10 +278,13 @@ def main():
     print("This machine is disconnected from Tower Crane and the remote: no consumers connected "
           "here, no per-machine state left, and both repos' 'origin' remote removed. Nothing of "
           "yours was deleted. Anything that wasn't committed and pushed beforehand exists only on "
-          "this disk. When you're ready, delete the folders yourself - this command never deletes "
-          "them. (.claude\\hooks\\ - tracked, personal content, not Tower Crane's to begin with - "
-          "is included in that, same as everything else here. Deleting the actual GitHub repos, if "
-          "you ever want that too, is a separate decision this command has no part in.)")
+          "this disk. When you're ready, delete the hub's folders (the outer hub and toolkit\\) "
+          "yourself - this command never deletes them. Connected consumer projects are separate "
+          "folders and stay where they are. (.claude\\hooks\\ - tracked, personal content, not "
+          "Tower Crane's to begin with - is included in that, same as everything else here. "
+          "Reinstalling later means running setup_machine.md again and supplying both remote URLs "
+          "again. Deleting the actual GitHub repos, if you ever want that too, is a separate "
+          "decision this command has no part in.)")
 
     note_text = _build_uninstall_note(this_host, host_results, removed, outer_origin_removed,
                                        toolkit_origin_removed)
