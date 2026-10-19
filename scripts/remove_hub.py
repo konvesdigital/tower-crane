@@ -10,18 +10,14 @@ Never touches tracked file content or history in either repo, or .claude\\hooks\
 reattaches). Never touches GitHub or any other machine's own clone. Does not delete the hub folder
 tree itself. Never rm -rf's its own running directory.
 
-Ordering is commit-then-warn, not gate-then-abort: the registry edit(s) disconnect_host() makes are
-committed and pushed (while 'origin' is still attached) BEFORE anything irreversible, so the push
-has the best chance of landing. A dirty/unpushed check on both repos, taken right after that push,
-never blocks - it only decides whether to print a warning before continuing. Default is to proceed
-either way: per-machine state is cleared and 'origin' removed from both repos, and
-TOWER_CRANE_UNINSTALLED.md is written (local-only, gitignored) recording what was removed and, if
-applicable, what was abandoned unsaved. Someone running "uninstall" has almost always already
-decided to walk away from this machine's Tower Crane state entirely - refusing to finish over an
-uncommitted/unpushed diff would just be friction with nobody left to benefit from it. If the
-registry push itself failed, that's the same kind of leftover drift any other gone machine can
-leave behind - recoverable by hand later from a surviving hub using registry data already there,
-not something worth blocking a whole uninstall on.
+Ordering: the registry edit(s) disconnect_host() makes are committed and pushed (while 'origin' is
+still attached) BEFORE anything irreversible, so the push has the best chance of landing. The script
+never inspects either repo for unsaved work and never pauses: the agent running it states, before
+launching, that anything not committed and pushed will exist only on this disk, and the user chooses "proceed" or
+"checkpoint" first (agents_consumers.md, "Removing this machine"). If the registry push itself fails,
+that's the same kind of leftover drift any other gone machine can leave behind - recoverable by hand
+later from a surviving hub using registry data already there. TOWER_CRANE_UNINSTALLED.md is written
+(local-only, gitignored) recording what was removed.
 """
 
 import datetime
@@ -100,38 +96,6 @@ def _print_consumer_summary(slug, host_result):
         print(f"  left uncommitted: {', '.join(local['left_uncommitted'])}")
 
 
-def _repo_status(repo_path):
-    """Snapshot of a repo's dirty/unpushed state. Never mutates anything. Fetches origin (if
-    present) so the ahead-count is accurate; call this before _remove_origin() removes it.
-
-    Returns {'is_repo': bool, 'dirty': bool, 'had_origin': bool, 'ahead': str|None} - 'ahead' is a
-    digit-string commit count, or None if unknown/unverifiable (no origin, unresolvable branch, or
-    the fetch failed - e.g. offline). The caller treats an unknown ahead-count as a blocker, same
-    as a nonzero one."""
-    repo_path = Path(repo_path)
-    result = {'is_repo': False, 'dirty': False, 'had_origin': False, 'ahead': None}
-    if not (repo_path / '.git').is_dir():
-        return result
-    result['is_repo'] = True
-
-    def _git(args):
-        return subprocess.run(['git', '-C', str(repo_path)] + args, capture_output=True, text=True)
-
-    result['dirty'] = bool(_git(['status', '--porcelain', '--untracked-files=no']).stdout.strip())
-    result['had_origin'] = 'origin' in _git(['remote']).stdout.split()
-    if not result['had_origin']:
-        return result
-
-    branch = _git(['rev-parse', '--abbrev-ref', 'HEAD']).stdout.strip()
-    if not branch or branch == 'HEAD':
-        return result
-    if _git(['fetch', 'origin']).returncode != 0:
-        return result  # offline/unreachable - ahead stays None (unverifiable)
-    counts = _git(['rev-list', f'origin/{branch}..HEAD', '--count']).stdout.strip()
-    result['ahead'] = counts if counts.isdigit() else None
-    return result
-
-
 def _remove_origin(repo_path):
     """Removes the 'origin' remote from repo_path if present - local-only, fully reversible
     (`git remote add origin <url>` reattaches), never touches GitHub or any other clone.
@@ -147,12 +111,11 @@ def _remove_origin(repo_path):
     return True
 
 
-def _build_uninstall_note(this_host, host_results, per_machine_removed, outer_status, toolkit_status,
-                           outer_origin_removed, toolkit_origin_removed, unsaved_changes):
+def _build_uninstall_note(this_host, host_results, per_machine_removed, outer_origin_removed,
+                           toolkit_origin_removed):
     """Builds TOWER_CRANE_UNINSTALLED.md's content from the same facts already computed for the
     console output above, reformatted for a file meant to be read later. Gitignored (see
-    .gitignore). Always called - unsaved_changes (main()'s warning list, possibly empty) records
-    anything abandoned rather than saved, since uninstall no longer blocks on it."""
+    .gitignore)."""
     lines = [
         f"# Tower Crane — uninstalled from this machine ({this_host})",
         "",
@@ -184,39 +147,22 @@ def _build_uninstall_note(this_host, host_results, per_machine_removed, outer_st
         lines.append("None found (already clean).")
 
     lines += ["", "### Git remotes"]
-    for label, status, origin_removed in (
-        ("outer hub repo", outer_status, outer_origin_removed),
-        ("toolkit\\", toolkit_status, toolkit_origin_removed),
-    ):
-        if not status['is_repo']:
-            lines.append(f"- {label}: not a git repo")
-        elif origin_removed:
+    for label, origin_removed in (("outer hub repo", outer_origin_removed),
+                                   ("toolkit\\", toolkit_origin_removed)):
+        if origin_removed:
             lines.append(f"- {label}: 'origin' remote removed (reversible via `git remote add "
                           "origin <url>`)")
-        elif not status['had_origin']:
-            lines.append(f"- {label}: already had no 'origin' remote")
+        else:
+            lines.append(f"- {label}: had no 'origin' remote to remove")
 
-    if unsaved_changes:
-        lines += ["", "## B. Unsaved changes abandoned here", ""]
-        lines.append(
-            "This machine had changes that weren't reflected anywhere else when \"uninstall\" ran. "
-            "Rather than blocking, uninstall proceeded and these are now gone from this machine's "
-            "perspective:"
-        )
-        lines += [f"- {w}" for w in unsaved_changes]
-        lines.append(
-            "If a registry push above was one of them, another machine's copy of the registry may "
-            "still list this host as connected — fix that by hand from a surviving hub using "
-            "registry data already there, not from here."
-        )
-
-    lines += ["", "## C. What's left, and whether it's safe to delete", ""]
+    lines += ["", "## B. What's left", ""]
     lines.append(
-        "This machine is fully disconnected from Tower Crane: no consumers connected here, no "
-        "per-machine state left, both repos' 'origin' remote removed. Nothing here depends on "
-        "GitHub or any other machine anymore — these files are safe to delete whenever you "
-        "want. That's a manual step you do yourself. (Deleting the actual GitHub repos, if you "
-        "ever want that too, is a separate decision — not something \"uninstall\" touches.)"
+        "This machine is disconnected from Tower Crane and the remote: no consumers connected "
+        "here, no per-machine state left, both repos' 'origin' remote removed. Nothing of yours "
+        "was deleted. Anything that wasn't committed and pushed beforehand exists only on this "
+        "disk. When you're ready, delete the folders yourself. (Deleting the actual GitHub "
+        "repos, if you ever want that too, is a separate decision - not something "
+        "\"uninstall\" touches.)"
     )
 
     lines += ["", "---", "This file is local-only — delete it along with everything else whenever "
@@ -272,9 +218,9 @@ def main():
     # Mirrors disconnect_consumer.py's own main(): disconnect_host() only edits consumers/<slug>.md
     # in memory/on disk - committing (and pushing, while 'origin' is still attached) that edit into
     # the outer repo is this call's job. Runs before any irreversible step past this point so the
-    # push has the best chance of succeeding; if it fails anyway, that shows up in the
-    # unsaved_changes warning below rather than blocking - same recoverable-by-hand pattern as any
-    # other leftover drift from a gone machine.
+    # push has the best chance of succeeding; if it fails anyway the commit-result label printed
+    # below says so - same recoverable-by-hand pattern as any other leftover drift from a gone
+    # machine.
     removed_slugs = [slug for slug, r in host_results if r['removed']]
     if removed_slugs:
         registry_commit_msg = (
@@ -284,33 +230,6 @@ def main():
             log=print)
         label = _COMMIT_RESULT_LABELS.get(registry_commit_result, registry_commit_result)
         print(f"  [git] registry change(s): {label}")
-
-    # Single dirty/unpushed check, with 'origin' still attached (ahead-count needs it) and
-    # reflecting the registry commit just made above. This never gates anything - it only decides
-    # whether to warn before continuing. See module docstring for why the default is to proceed
-    # rather than abort.
-    outer_status = _repo_status(PROJECT_ROOT)
-    toolkit_status = _repo_status(SHARED_ROOT)
-
-    unsaved_changes = []
-    for label, status in (("outer hub repo", outer_status), ("toolkit\\", toolkit_status)):
-        if not status['is_repo']:
-            continue
-        if status['dirty']:
-            unsaved_changes.append(f"{label} has uncommitted changes")
-        if status['had_origin'] and status['ahead'] not in (None, '0'):
-            unsaved_changes.append(f"{label} has {status['ahead']} commit(s) that were never pushed")
-        elif status['had_origin'] and status['ahead'] is None:
-            unsaved_changes.append(f"{label}'s unpushed-commit status could not be verified (offline?)")
-
-    if unsaved_changes:
-        print()
-        print("WARNING: this machine has changes that aren't reflected anywhere else. Continuing "
-              "will abandon them permanently:")
-        for w in unsaved_changes:
-            print(f"  - {w}")
-        print("To keep them instead, cancel now (Ctrl+C), run `checkpoint`, then re-run "
-              "\"uninstall\". Proceeding with uninstall...")
 
     removed = []
     config_local = SHARED_ROOT / 'config.local.json'
@@ -343,30 +262,25 @@ def main():
 
     print()
     print("Git remotes:")
-    for label, status, origin_removed in (
-        ("outer hub repo", outer_status, outer_origin_removed),
-        ("toolkit\\", toolkit_status, toolkit_origin_removed),
-    ):
-        if not status['is_repo']:
-            print(f"  {label}: not a git repo - nothing to disconnect")
-        elif origin_removed:
+    for label, origin_removed in (("outer hub repo", outer_origin_removed),
+                                   ("toolkit\\", toolkit_origin_removed)):
+        if origin_removed:
             print(f"  {label}: 'origin' remote removed (reversible - `git remote add origin "
                   "<url>` reattaches)")
-        elif not status['had_origin']:
-            print(f"  {label}: already had no 'origin' remote")
+        else:
+            print(f"  {label}: had no 'origin' remote to remove")
 
     print()
-    print("This machine is now fully disconnected from Tower Crane: no consumers connected "
-          "here, no per-machine state left, and both repos' 'origin' remote removed. Nothing "
-          "here depends on GitHub or any other machine anymore - these files are safe to "
-          "delete whenever you want. That's a manual step you do yourself; this command "
-          "never deletes anything on its own. (.claude\\hooks\\ - tracked, personal content, "
-          "not Tower Crane's to begin with - is included in that, same as everything else "
-          "here. Deleting the actual GitHub repos, if you ever want that too, is a separate "
-          "decision this command has no part in.)")
+    print("This machine is disconnected from Tower Crane and the remote: no consumers connected "
+          "here, no per-machine state left, and both repos' 'origin' remote removed. Nothing of "
+          "yours was deleted. Anything that wasn't committed and pushed beforehand exists only on "
+          "this disk. When you're ready, delete the folders yourself - this command never deletes "
+          "them. (.claude\\hooks\\ - tracked, personal content, not Tower Crane's to begin with - "
+          "is included in that, same as everything else here. Deleting the actual GitHub repos, if "
+          "you ever want that too, is a separate decision this command has no part in.)")
 
-    note_text = _build_uninstall_note(this_host, host_results, removed, outer_status, toolkit_status,
-                                       outer_origin_removed, toolkit_origin_removed, unsaved_changes)
+    note_text = _build_uninstall_note(this_host, host_results, removed, outer_origin_removed,
+                                       toolkit_origin_removed)
     note_path = PROJECT_ROOT / 'TOWER_CRANE_UNINSTALLED.md'
     note_path.write_text(note_text, encoding='utf-8', newline='\n')
     print()

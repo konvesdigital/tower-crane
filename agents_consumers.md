@@ -127,22 +127,31 @@ the outer hub repo and `toolkit\` — local-only and fully reversible (`git remo
 reattaches), never touching GitHub or any other machine's own clone. Never touches `.claude\hooks\`
 (tracked personal content, not this hub's to delete) or any tracked file content in either repo.
 
-The script itself reports, plainly, whether the folder is actually safe to delete yet: it checks
-both repos for uncommitted changes or commits never pushed to `origin` (captured before `origin` is
-removed) and lists them as blockers if found, telling you to run `checkpoint` first. If neither repo
-has anything unsaved, it states outright that this machine is now fully disconnected and these files
-are safe to delete — physically deleting the folder, if wanted, stays a manual step you do
-yourself; this command never deletes anything on its own. Deleting the actual GitHub repos, if ever
-wanted, is a separate decision outside this command's scope entirely — running `"uninstall"` on
-every machine that has this hub is what "stopped using Tower Crane everywhere" already means.
+This command works like "Safely Remove Hardware", not like a typical uninstaller: it makes the
+folders safe to delete but never deletes them — physically deleting stays a manual step the user does
+themselves. Nothing of the user's (project files, git history) is deleted; the only files removed are
+this machine's own regenerable per-machine ones listed above. What changes is that this machine no
+longer has a backup path: anything not committed and pushed exists only on this disk. The script
+never checks for unsaved work and never stops partway, which is why the warning below comes first.
+Deleting the actual GitHub repos, if ever wanted, is a separate decision outside this command's
+scope entirely — running `"uninstall"` on every machine that has this hub is what "stopped using
+Tower Crane everywhere" already means.
 
-**Before running: list every consumer that will be disconnected here, by name, and get explicit
-go-ahead** — same discipline as above; also mention that both repos' `origin` will be removed
-(reversible) unless the dirty/unpushed check blocks it. State the reversal path honestly too:
-`setup_machine.md` run again on this machine (re-attaching `origin`), then reconnecting whichever
-consumers are wanted via `"connect project"` — a rebuild, not a restore.
+**Before running:** say all of the following, then stop and wait for the user's reply.
+1. Every consumer that will be disconnected here, by name (or that none are connected).
+2. Both repos' `origin` will be removed (reversible).
+3. This warning, as a fixed message every time, whatever the repos' actual state: "**Uninstall
+   doesn't delete your files.** It disconnects this machine from Tower Crane and from the remote, so
+   you can safely delete the folders yourself afterward, like 'Safely Remove Hardware' before you
+   unplug a drive. Anything not committed and pushed will exist only on this disk, with no backup
+   anywhere else. Reply `checkpoint` to save first, or `proceed`." (A `checkpoint` on already-clean
+   repos just reports nothing to commit.)
+4. The reversal path: `setup_machine.md` run again on this machine (re-attaching `origin`), then
+   reconnecting whichever consumers are wanted via `"connect project"` — a rebuild, not a restore.
 
-Then run `toolkit/scripts/remove_hub.py` (no args — operates on this machine via its own
+Then act on the reply. `checkpoint` → run it, then ask again. A question such as "do I have
+uncommitted changes?" → look (`git status` in both repos) and answer, then ask again. `proceed` →
+run `toolkit/scripts/remove_hub.py` (no args — operates on this machine via its own
 `config.local.json`).
 
 ## Migrating an already-connected host to reference-indirection

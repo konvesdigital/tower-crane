@@ -131,8 +131,11 @@ nodes:
     context: hub
     description: >-
       Reverses setup_machine for this whole machine: disconnects every consumer connected here,
-      then clears this machine's own config.local.json/self-use state, so a later setup_machine
-      run here starts genuinely clean.
+      clears this machine's own config.local.json/self-use state, and removes the origin remote
+      from both repos, so a later setup_machine run here starts genuinely clean. Like "Safely
+      Remove Hardware": makes the folders safe to delete but never deletes them or any of your work.
+      Warns first that anything not committed and pushed will exist only on this disk, and waits
+      for "proceed" or "checkpoint".
     themes: []
 
   - id: process_ticket
