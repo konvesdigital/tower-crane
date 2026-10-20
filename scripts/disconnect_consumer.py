@@ -402,16 +402,21 @@ def strip_local_references(target_path, consumer, config, mode, log, is_last_hos
                 else:
                     del settings['hooks'][evt]
 
-        allow = settings.setdefault('permissions', {}).setdefault('allow', [])
+        if removed_hooks:
+            settings_path.write_text(json.dumps(settings, indent=2), encoding='utf-8', newline='\n')
+            log(f"  wrote  {settings_path} (removed {removed_hooks} hook entry/entries)")
+
+    # settings.local.json (gitignored, per-host): this host's Read(...) permission entry.
+    local_settings_path = target_path / '.claude' / 'settings.local.json'
+    if local_settings_path.exists():
+        local_settings = json.loads(local_settings_path.read_text(encoding='utf-8'))
+        allow = local_settings.get('permissions', {}).get('allow', [])
         read_rule = f"Read({import_base}/**)"
         had_read_rule = read_rule in allow
         if had_read_rule:
             allow.remove(read_rule)
-
-        if removed_hooks or had_read_rule:
-            settings_path.write_text(json.dumps(settings, indent=2), encoding='utf-8', newline='\n')
-            log(f"  wrote  {settings_path} (removed {removed_hooks} hook entry/entries"
-                f"{', removed Read permission rule' if had_read_rule else ''})")
+            local_settings_path.write_text(json.dumps(local_settings, indent=2), encoding='utf-8', newline='\n')
+            log(f"  wrote  {local_settings_path} (removed Read permission rule)")
 
     # .claude\hooks\_hub_dispatch.py - tracked, shared, host-invariant content (last host only).
     dispatch_removed = False

@@ -31,7 +31,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config_lib import (get_shared_config, build_new_cmd_map, build_dispatch_cmd_map,
                          apply_hook_command_fixes, fix_skill_stubs, fix_adopted_stub_paths,
                          commit_consumer_changes, fix_hub_pointer, fix_hub_dispatch_wrapper,
-                         fix_imports, sync_consumer_repo, HUB_POINTER_IMPORT_LINE)
+                         fix_imports, sync_consumer_repo, ensure_local_read_rule,
+                         HUB_POINTER_IMPORT_LINE)
 from registry_lib import parse_registry, host_path, reconcile_scope_floor
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
@@ -175,7 +176,10 @@ def main():
         # presence before touching anything, so an old-style consumer never gets these introduced).
         pointer_changed = fix_hub_pointer(this_path, config, c['imports'], args.dry_run, log=print)
         dispatch_changed = fix_hub_dispatch_wrapper(this_path, SHARED_ROOT, args.dry_run, log=print)
-        skills_changed = skills_changed or adopted_changed or pointer_changed or dispatch_changed
+        read_rule_changed = ensure_local_read_rule(this_path, config['import_base'], args.dry_run,
+                                                    log=print)
+        skills_changed = (skills_changed or adopted_changed or pointer_changed or dispatch_changed
+                          or read_rule_changed)
 
         all_tools = c['tools'] + c['private_tools']
         if not all_tools:

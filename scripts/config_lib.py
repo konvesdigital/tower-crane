@@ -256,6 +256,29 @@ def merge_bash_allowlist(settings, scope, cfg=None):
     return settings
 
 
+def ensure_local_read_rule(project_path, import_base, dry_run=False, log=print):
+    """Makes `.claude\\settings.local.json` (gitignored, per-host) carry exactly one hub-templates
+    Read rule, `Read(<import_base>/**)`, replacing any other rule of that shape left by a previous
+    hub location. Returns True if the file changed (or would, in a dry run).
+    """
+    settings_path = Path(project_path) / '.claude' / 'settings.local.json'
+    settings = json.loads(settings_path.read_text(encoding='utf-8')) if settings_path.exists() else {}
+    allow_list = settings.setdefault('permissions', {}).setdefault('allow', [])
+    read_rule = f"Read({import_base}/**)"
+    kept = [a for a in allow_list
+            if not (a.startswith('Read(') and a.endswith('/toolkit/templates/**)')) or a == read_rule]
+    if read_rule not in kept:
+        kept.append(read_rule)
+    if kept == allow_list:
+        return False
+    settings['permissions']['allow'] = kept
+    log(f"  {'would write' if dry_run else 'wrote'} {settings_path} (Read rule -> {read_rule})")
+    if not dry_run:
+        settings_path.parent.mkdir(parents=True, exist_ok=True)
+        settings_path.write_text(json.dumps(settings, indent=2), encoding='utf-8', newline='\n')
+    return True
+
+
 def get_dispatch_optin(optin_path, tool_name, config):
     """Same hooks event/matcher SHAPE as get_expanded_optin() (read from the same canonical
     templates\\optins\\<tool>.json), but every hook's command replaced with a fixed, fully

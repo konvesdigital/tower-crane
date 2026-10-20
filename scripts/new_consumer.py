@@ -47,7 +47,7 @@ from config_lib import (
     CONSUMER_OWNED_PATHS,
     HUB_POINTER_IMPORT_LINE, HUB_POINTER_RELPATH, HUB_DISPATCH_RELPATH, HUB_DISPATCH_TEMPLATE,
     get_dispatch_optin, build_hub_pointer_content, build_dispatch_cmd_map,
-    write_new_connection_files, collapse_imports_to_pointer, fix_imports, commit_hub_changes,
+    write_new_connection_files, collapse_imports_to_pointer, ensure_local_read_rule, fix_imports, commit_hub_changes,
     commit_consumer_changes, path_is_clean, commit_consumer_progress_note, scoped_status_paths,
     sync_consumer_repo, merge_bash_allowlist,
 )
@@ -432,11 +432,9 @@ def main():
 
     # Every consumer reads canonical Track-1 skill/resume-check content straight out of
     # toolkit\templates, which is outside the project root - without an allow rule every such
-    # read prompts.
-    allow_list = settings.setdefault('permissions', {}).setdefault('allow', [])
-    read_rule = f"Read({import_base}/**)"
-    if read_rule not in allow_list:
-        allow_list.append(read_rule)
+    # read prompts. The rule carries this host's absolute path, so it goes in the gitignored,
+    # per-host settings.local.json - never the tracked settings.json every host shares.
+    ensure_local_read_rule(target_path, import_base, log=print)
     merge_bash_allowlist(settings, 'consumer')
 
     for t in tools:

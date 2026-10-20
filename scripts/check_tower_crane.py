@@ -732,9 +732,11 @@ def diagnose_consumer_files(path):
                 print(f"    [present] hook entry/entries: {', '.join(sorted(hook_names))}")
             else:
                 print("    [absent]  no tower_crane hook entries")
-            allow = (settings.get('permissions') or {}).get('allow') or []
+            local_path = cpath / '.claude' / 'settings.local.json'
+            local_settings = json.loads(local_path.read_text(encoding='utf-8')) if local_path.exists() else {}
+            allow = (local_settings.get('permissions') or {}).get('allow') or []
             has_read_rule = any(a.startswith('Read(') and 'templates' in a for a in allow)
-            diagnose_fact(has_read_rule, "a Read(.../templates/**) permission rule", '    ')
+            diagnose_fact(has_read_rule, "a Read(.../templates/**) permission rule in settings.local.json", '    ')
         except json.JSONDecodeError:
             print("    [present] .claude/settings.json exists but is NOT valid JSON")
     else:
