@@ -15,6 +15,9 @@ Output order (always):
   when there is no Current Status (wrapped lines joined; 400 chars max,
   cut at a sentence/word boundary with a `…[truncated, full item at ... line N]` marker)
   NEXT: line - the first unchecked checkbox item in Next Up, else the first list item (same rules)
+  NEXT LIST block - only when Next Up has 2+ open top-level items: the open top-level items, tiered
+  by Next Up's `### ` sub-headings (up to 5 above the first heading, 3 from the first group, later
+  groups as a name and count); a flat list is its first 5 items. Each tier ends `+N more` when cut.
 
 Section boundaries: a section is a '## ' heading whose text starts with the names above
 (case-insensitive); it runs to the next '## ' heading or end of file. A Work Log entry starts at a
@@ -42,6 +45,12 @@ ENTRY_START_RE = re.compile(r'^(?:- |\*\*\d{4}-\d{2}-\d{2}\b|### )')
 LIST_ITEM_RE = re.compile(r'^\s{0,3}(?:[-*]|\d+[.)])\s+(.*)$')
 CHECKBOX_OPEN_RE = re.compile(r'^\[ \]\s*(.*)$')
 CHECKBOX_DONE_RE = re.compile(r'^\[[xX]\]')
+
+# NEXT LIST sizes: items listed above Next Up's first `### ` heading (or in a flat list), items
+# listed from its first `### ` group, and the per-item character budget.
+LISTED_UNGROUPED = 5
+LISTED_FIRST_GROUP = 3
+ITEM_BUDGET = 110
 
 # (key, display name, heading-prefix or None = the lowercased display name, required-in-every-tier)
 SECTIONS = [
@@ -110,9 +119,9 @@ def emit_capped(label, body, first_line_no, max_lines, max_chars):
     print()
 
 
-def next_item(body):
-    """First unchecked-checkbox list item, else first list item that isn't a checked checkbox."""
-    items = []  # (text joined with its wrapped continuation lines, index of its first line in body)
+def list_items(body):
+    """[(text joined with its wrapped continuation lines, index of its first line in body, indent)]"""
+    items = []
     for i, line in enumerate(body):
         m = LIST_ITEM_RE.match(line)
         if m:
@@ -123,7 +132,13 @@ def next_item(body):
                         or len(nxt) - len(nxt.lstrip()) <= marker_indent):
                     break
                 parts.append(nxt.strip())
-            items.append((' '.join(parts), i))
+            items.append((' '.join(parts), i, marker_indent))
+    return items
+
+
+def next_item(body):
+    """First unchecked-checkbox list item, else first list item that isn't a checked checkbox."""
+    items = [(text, i) for text, i, _indent in list_items(body)]
     for text, i in items:
         m = CHECKBOX_OPEN_RE.match(text)
         if m:
@@ -134,9 +149,9 @@ def next_item(body):
     return None
 
 
-def trim_item(text, budget, line_no):
+def trim_item(text, budget, line_no, short=False):
     """Whole text if it fits; else cut at a sentence end (past 40% of budget) or the last word
-    boundary within budget, and say where the full item lives."""
+    boundary within budget, and say where the full item lives (short=True: just `(line N)`)."""
     if len(text) <= budget:
         return text
     head = text[:budget]
@@ -145,7 +160,49 @@ def trim_item(text, budget, line_no):
         head = head[:ends[-1]]
     else:
         head = head.rsplit(' ', 1)[0] if ' ' in head else head
+    if short:
+        return f"{head.rstrip()} …(line {line_no})"
     return f"{head.rstrip()} …[truncated, full item at project_progress.md line {line_no}]"
+
+
+def next_list(body, first_line_no):
+    """The NEXT LIST block for `resume`: the open top-level items of Next Up, tiered by its `### `
+    sub-headings (items above the first heading, then the first group, then later groups as a count).
+    A flat list is just the first LISTED_UNGROUPED items plus a `+N more`. Items are numbered
+    continuously; `first_line_no` is the file line number of body[0]."""
+    heads = [i for i, l in enumerate(body) if l.startswith('### ')]
+    bounds = [(None, 0, heads[0] if heads else len(body))]
+    for n, i in enumerate(heads):
+        bounds.append((body[i][4:].strip(), i + 1, heads[n + 1] if n + 1 < len(heads) else len(body)))
+
+    tiers = []  # (heading or None, [(text, file line number)])
+    for name, start, end in bounds:
+        seg = body[start:end]
+        open_items = [(CHECKBOX_OPEN_RE.sub(r'\1', t) if CHECKBOX_OPEN_RE.match(t) else t,
+                       first_line_no + start + i)
+                      for t, i, indent in list_items(seg)
+                      if indent == 0 and not CHECKBOX_DONE_RE.match(t)]
+        if open_items:
+            tiers.append((name, open_items))
+    if not tiers:
+        return []
+
+    out, n, seen_group = [], 0, False
+    for name, items in tiers:
+        if name is None:
+            cap = LISTED_UNGROUPED
+        elif not seen_group:
+            cap, seen_group = LISTED_FIRST_GROUP, True
+            out.append(f"  {name}, {min(cap, len(items))} of {len(items)}:")
+        else:
+            out.append(f"  {name}: {len(items)} more, not listed")
+            continue
+        for text, line_no in items[:cap]:
+            n += 1
+            out.append(f"  {n}. {trim_item(text, ITEM_BUDGET, line_no, short=True)}")
+        if len(items) > cap:
+            out.append(f"     +{len(items) - cap} more")
+    return out
 
 
 def main():
@@ -224,6 +281,12 @@ def main():
                 break
         missing = '(section absent)' if not sections else '(none found - the section has no text)'
         print(f"{key.upper()}: {trim_item(item, 400, item_line) if item else missing}")
+
+    for _text, start, end in found['next'][:1]:
+        block = next_list(lines[start + 1:end], start + 2)
+        if len(block) > 1:
+            print("NEXT LIST (resume's Next; quick resume uses the NEXT: line above):")
+            print('\n'.join(block))
 
 
 if __name__ == '__main__':

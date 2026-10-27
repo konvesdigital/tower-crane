@@ -26,7 +26,9 @@ this mechanism works and how it relates to other mechanisms.
    - **Fold in what changed this session** — edit the existing text of **Current Status** (base)
      and/or **Current Focus** (expanded) and **Next Up** in place (update or delete a stale fact) to
      match what's true right now, or add a line only for something this session discovered that
-     doesn't already fit an existing one. Never append a bullet narrating what this session did;
+     doesn't already fit an existing one. When you add a Next Up item, put it where its priority
+     puts it: under the matching `###` heading if Next Up has them, or above the first heading if
+     it's a do-first item. Never append a bullet narrating what this session did;
      that's the dated Work Log entry's job, even for something still true right now. A session that
      changed nothing about present-tense reality needs no edit to these sections at all (a Work Log
      entry still always gets added). Do not re-scan the whole section for calcified or misplaced

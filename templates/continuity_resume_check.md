@@ -36,6 +36,11 @@ finished work, that's the Work Log), **Next Up** (the concrete next step(s)), **
 table, Open → Locked), **Work Log** (dated entries, newest on top — the single home for
 completed-work detail).
 
+When you split or group Next Up and the user hasn't specified a layout, use `###` sub-headings,
+highest priority first. Items above the first heading are the do-first items. Follow any layout the
+user specifies instead. `resume` lists the items above the first heading, a few from the first
+group, and a count for each later group.
+
 **Expanded (phased migration/build work).** Everything Base has, plus: **Current Focus** (why the
 next step is next and what it gates — distinct from Next Up's terse action), **Phases** (the
 ordered plan as a checklist, so partial progress is legible at a glance), **Decisions split into
@@ -87,18 +92,20 @@ reached) read whatever is present.
       interpret per `shared_resources_resume_check.md`.
    6. `resume_digest.py` — `project_progress.md`'s live-state sections (Current Status, Current
       Focus, Next Up, Decisions, Phases, newest Work Log entry), stating which sections are absent,
-      then a `STATUS:` and a `NEXT:` line. A line ending in `…[truncated, full item at … line N]`
-      is partial on purpose: copy it as printed, marker included.
+      then a `STATUS:` line, a `NEXT:` line, and (when Next Up has 2+ open items) a `NEXT LIST`
+      block. A line ending in `…[truncated, full item at … line N]` or `…(line N)` is partial on
+      purpose: copy it as printed, marker included.
 4. If the `RESUME SUMMARY` line `compliance guidance file` says PRESENT, `Read` the path it gives
    and surface it now (see the compliance protocol). That summary line is the only existence
    check; do not `Glob` for the file.
-5. Output exactly three lines, then stop:
+5. Output exactly these three entries, then stop (the third may span several lines):
    - `Host: <Host line from step 3> | git: <already up to date | pulled | failed: <reason>> | checks: <clean | N area(s) flagged>`
    - `Needs you: nothing` — or, if any `RESUME SUMMARY` line is not clean, a `;`-separated list with
      one entry per flagged line: the area, then what it needs in a few words (a ticket by file
      name plus its `last log line` text; a `[TODO]` line; a hub-behind-upstream notice; guidance
      file present; a step that didn't run).
-   - `Next: <the NEXT: line from section 6, copied as printed>`
+   - `Next:` followed by the `NEXT LIST` block from section 6, copied as printed; with no such
+     block, `Next: <the NEXT: line from section 6, copied as printed>`.
    Resume reports and stops: do not begin the `Next` item, do not open `project_progress.md`
    (section 6 is the read of it; a `[truncated: …]` marker names the exact `Read` offset/limit to
    use only if the operator asks for that section), do not run any ticket's Suggested test, and do

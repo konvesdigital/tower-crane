@@ -21,7 +21,7 @@ Runs, in order:
   5. shared_resource_resume_check.py --project-root <root>
                                              (adopted shared-resource references: broken/drifted)
   6. resume_digest.py --project-root <root>  (project_progress.md's live-state sections, capped,
-                                               absent sections stated, plus the NEXT: line)
+                                               absent sections stated, plus the NEXT: line and NEXT LIST block)
 
 Starts with a Host line (host_id from this hub's config.local.json), prints each step's output
 verbatim under a numbered header, and ends with a RESUME SUMMARY block: one line per area, each

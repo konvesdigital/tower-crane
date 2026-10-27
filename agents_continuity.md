@@ -17,7 +17,9 @@ actually invoked.
      Status → Work Log the session it's done — never sideways.
    - **Fold in what changed this session** — edit the existing text in place to match what's true
      right now, or add a line only for something this session discovered that doesn't already fit
-     an existing one. Never append a bullet narrating what this session did (that's the Work Log
+     an existing one. When you add a Next Up item, put it where its priority puts it: under the
+     matching `###` heading if Next Up has them, or above the first heading if it's a do-first
+     item. Never append a bullet narrating what this session did (that's the Work Log
      entry's job). A session with no present-tense change needs no edit here at all (Work Log entry
      still always gets added). Do not re-scan the whole section for calcified or misplaced content
      here — that full audit (the Inclusion Test) is `"archive"`'s job below, not paid at every

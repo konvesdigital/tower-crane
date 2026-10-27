@@ -175,18 +175,20 @@ operator moves or modifies these files, the steps that read them break and repor
 4. Run `python toolkit/scripts/progress_sections.py` as one bare command — a capped, fixed-order
    digest of `project_progress.md` (Current Status, Next Up, Decisions, newest Work Log entry; absent
    sections stated; a `[truncated: …]` marker names the exact `Read` offset/limit for anything cut),
-   ending with a `STATUS:` and a `NEXT:` line. Read its output; do not open `project_progress.md`
+   ending with a `STATUS:` line, a `NEXT:` line, and (when Next Up has 2+ open items) a `NEXT LIST`
+   block. Read its output; do not open `project_progress.md`
    during resume and do not grep it for headings.
 5. Read step 3's `ticket_scan.py` output per `agents_change_requests.md`'s "Scanning at session
    start" section — this is what surfaces an unattended-automation PR, if that's enabled on this
    hub. Resume only reports tickets; applying a fix or flipping a ticket happens when the operator
    asks.
-6. Output exactly three lines, then stop:
+6. Output exactly these three entries, then stop (the third may span several lines):
    - `Host: <host_id from step 1> | pull: <already up to date | pulled | failed: <reason>> | checks: <clean | N finding(s)>`
    - `Needs you: nothing` — or a `;`-separated list, one entry per finding from steps 3 and 5, in the
      order they printed (each ticket by file name and category; each sub-check finding by its
      printed line and the offer its bullet above names).
-   - `Next: <the NEXT: line from step 4, copied as printed>`
+   - `Next:` followed by the `NEXT LIST` block from step 4, copied as printed; with no such block,
+     `Next: <the NEXT: line from step 4, copied as printed>`.
    Do not begin the `Next` item and do not replay history.
 
 **"quick resume"** — a thinner `resume`, for reopening seconds after a `checkpoint` mid-session
