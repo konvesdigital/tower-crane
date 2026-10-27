@@ -22,6 +22,7 @@ Run from anywhere; operates on --project-root, not this script's own location.
 """
 
 import argparse
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -114,6 +115,7 @@ def main():
                          help="Leave every untracked file not named by --include alone this "
                               "round (commit only tracked changes).")
     args = parser.parse_args()
+    args.message = re.sub(r'^\s*(checkpoint:\s*)+', '', args.message, flags=re.I)
 
     root = Path(args.project_root).resolve()
 

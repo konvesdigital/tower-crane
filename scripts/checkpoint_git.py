@@ -38,6 +38,7 @@ caller's cwd.
 """
 
 import argparse
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -300,6 +301,7 @@ def main():
                          help="Required only if AGENTS.md's Standing Constraints section shows "
                               "[CHANGED] - one-line reason, lands as a commit trailer.")
     args = parser.parse_args()
+    args.message = re.sub(r'^\s*(checkpoint:\s*)+', '', args.message, flags=re.I)
 
     _outer_tracked, outer_untracked = porcelain_status(OUTER_ROOT) if is_repo(OUTER_ROOT) else ([], [])
     _toolkit_tracked, toolkit_untracked = (
