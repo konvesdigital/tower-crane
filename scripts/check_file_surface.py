@@ -63,7 +63,7 @@ Nine checks, seven hard-fail, two soft-flag:
                                                        doesn't match.
                                                   Not covered: bare mentions of `decisions_detail.md`,
                                                   `CATALOG.md`, `resource_relationships.yaml`,
-                                                  `trigger_index.yaml`, `project_progress_archive.md`,
+                                                  `project_progress_archive.md`,
                                                   or `toolkit_private\\` - these are toolkit-documented
                                                   mechanism names every hub eventually has.
 
