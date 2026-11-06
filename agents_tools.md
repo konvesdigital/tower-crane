@@ -79,3 +79,10 @@ Crane itself) shows that note in `--list` and the status mirror; it stays off un
    strictly-additive guardrail) propagates silently, logged in the Work Log only.
 3. Update `MENU.md`. If the opt-in snippet itself changed, say so clearly in the Work Log entry
    so it's obvious which consuming projects need to update their own `.claude\settings.json`.
+4. When the change deletes a tool's hook script, delete its `templates\optins\<tool>.json` in the
+   same change, then run `"update consumers"` and apply the `Retired hooks to remove` items so no
+   consumer keeps an entry for the deleted script. On this hub's own machine run
+   `python toolkit/scripts/self_hooks.py --remove-stale`. A machine that is not connected here
+   (another host) gets the same item the next time `update consumers` runs there, so name each
+   such consumer in the Work Log entry. An entry left behind errors on every firing, and a
+   `UserPromptSubmit` one blocks every prompt in that project.

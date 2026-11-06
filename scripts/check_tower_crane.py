@@ -68,7 +68,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config_lib import (
     get_shared_config, get_expanded_optin, get_dispatch_optin, materialize_skill_stub,
     HUB_POINTER_IMPORT_LINE, HUB_POINTER_RELPATH, HUB_DISPATCH_RELPATH, HUB_DISPATCH_TEMPLATE,
-    parse_hub_pointer,
+    parse_hub_pointer, dead_hook_tools,
 )
 from guidance_lib import read_sections, write_section, SECTION_CHECKER
 from registry_lib import parse_registry, effective_scope, host_path, reconcile_scope_floor
@@ -308,6 +308,15 @@ def test_consumer(c, config, this_host):
                 devs.append(Dev('FAIL', 'consumer',
                                  f"settings.json no longer contains the canonical opt-in snippet for '{tool}'.",
                                  f"Re-merge templates/optins/{tool}.json into .claude/settings.json (or re-run the scaffolder: new_consumer.py --force)."))
+
+    # A hook entry running a tool the hub has since retired (its script no longer exists) errors
+    # on every firing. WARN, not FAIL: a hard failure here would make the post-merge Pass B gate
+    # roll back the very `update` that retires the tool, leaving no way to land the cleanup.
+    for dead in dead_hook_tools(consumer_settings, SHARED_ROOT):
+        devs.append(Dev('WARN', 'consumer',
+                         f"settings.json still runs retired hook '{dead}' (hooks/{dead}.py no longer exists).",
+                         "Run `update consumers` from the hub (or `update` in that project) and apply "
+                         "the 'Retired hooks to remove' item."))
 
     # --- CLAUDE.md imports -----------------------------------------------------------------
     md_imports = []

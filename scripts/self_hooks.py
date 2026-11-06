@@ -14,7 +14,9 @@ written; a stub with no such placeholder is unaffected.
   --list              (default) show every available tool and whether it's currently on here.
   --enable <tool>     merge templates\\optins\\<tool>.json's hook(s) into .claude\\settings.local.json.
   --disable <tool>    remove them again.
-  --check-defaults    read-only; prints [SELF-USE-OFF] <tool> for each DEFAULT_SELF_USE tool that's off.
+  --check-defaults    read-only; prints [SELF-USE-OFF] <tool> for each DEFAULT_SELF_USE tool that's off,
+                       and [SELF-USE-STALE] <tool> for each hook entry whose script was retired.
+  --remove-stale      remove those retired-tool hook entries from .claude\\settings.local.json.
   --enable-defaults   --enable every DEFAULT_SELF_USE tool.
 
 Every run also rewrites .claude\\self_hooks_status.md, a plain human-readable mirror of current
@@ -30,7 +32,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from config_lib import get_shared_config, get_expanded_optin, materialize_skill_stub
+from config_lib import (
+    get_shared_config, get_expanded_optin, materialize_skill_stub, dead_hook_tools, strip_dead_hooks,
+)
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
 # Self-use always targets this hub's own repo: .claude\ (where Claude Code writes session state)
@@ -280,6 +284,22 @@ def cmd_check_defaults(config):
         if tool_status(t, settings, config) != 'on':
             print(f"[SELF-USE-OFF] '{t}' is a default hub self-use tool but is off on this machine "
                   f"- run: python toolkit/scripts/self_hooks.py --enable-defaults")
+    for t in dead_hook_tools(settings, SHARED_ROOT):
+        print(f"[SELF-USE-STALE] .claude\\settings.local.json still runs '{t}', whose hook script no longer "
+              f"exists - it errors every time it fires, and on a UserPromptSubmit hook it blocks every "
+              f"prompt. Run: python toolkit/scripts/self_hooks.py --remove-stale")
+
+
+def cmd_remove_stale(config):
+    settings = load_settings()
+    dead = dead_hook_tools(settings, SHARED_ROOT)
+    if not dead:
+        print("No stale hook entries in .claude\\settings.local.json - no change.")
+        return
+    strip_dead_hooks(settings, dead)
+    save_settings(settings)
+    write_status(config, settings)
+    print("Removed stale hook entries for: " + ', '.join(dead))
 
 
 def cmd_enable_defaults(config):
@@ -298,6 +318,8 @@ def main():
     group.add_argument('--disable', metavar='TOOL', help="Turn a tool off for this machine.")
     group.add_argument('--check-defaults', action='store_true',
                         help="Report default self-use tools that are off here. Read-only.")
+    group.add_argument('--remove-stale', action='store_true',
+                        help="Remove hook entries whose tool script no longer exists in toolkit\\hooks.")
     group.add_argument('--enable-defaults', action='store_true',
                         help="Turn on every default self-use tool for this machine.")
     args = parser.parse_args()
@@ -310,6 +332,8 @@ def main():
         cmd_disable(args.disable, config)
     elif args.check_defaults:
         cmd_check_defaults(config)
+    elif args.remove_stale:
+        cmd_remove_stale(config)
     elif args.enable_defaults:
         cmd_enable_defaults(config)
     else:

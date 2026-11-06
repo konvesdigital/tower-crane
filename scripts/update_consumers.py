@@ -32,9 +32,9 @@ from config_lib import get_shared_config, commit_consumer_changes
 from check_tower_crane import parse_registry, CONSUMERS_DIR
 from registry_lib import host_path, reconcile_scope_floor
 from scan_consumer_update import (
-    SKILL_PIECES, read_consumer_state, scan_hooks, scan_skills, scan_pieces, scan_private,
-    scan_permissions, apply_hook, apply_skill, apply_piece, apply_private, apply_permissions,
-    resolve_selection,
+    SKILL_PIECES, read_consumer_state, scan_hooks, scan_stale_hooks, scan_skills, scan_pieces, scan_private,
+    scan_permissions, apply_hook, apply_stale_hook, apply_skill, apply_piece, apply_private,
+    apply_permissions, resolve_selection,
 )
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent  # toolkit\
@@ -72,7 +72,7 @@ def scan_all(cfg, consumers, this_host):
             print(f"  [skip] {c['name']}: no CLAUDE.md at {this_path} - path stale or moved?")
             continue
         state = read_consumer_state(project_root)
-        items = (scan_hooks(cfg, state) + scan_skills(state, project_root, cfg) + scan_pieces(state)
+        items = (scan_hooks(cfg, state) + scan_stale_hooks(state) + scan_skills(state, project_root, cfg) + scan_pieces(state)
                   + scan_private(cfg, state, project_root) + scan_permissions(state))
         if items:
             slug = Path(c['file']).stem
@@ -87,8 +87,9 @@ def print_all(scanned):
         print("Nothing available - every locally-reachable consumer already has everything the "
               "hub currently offers.")
         return []
-    labels = {'hook': 'Hook opt-ins', 'skill': 'Toolkit skills', 'piece': 'Protocol pieces',
-              'private': 'Private tools (toolkit_private)', 'permission': 'Permission allowlist'}
+    labels = {'hook': 'Hook opt-ins', 'stale_hook': 'Retired hooks to remove', 'skill': 'Toolkit skills',
+              'piece': 'Protocol pieces', 'private': 'Private tools (toolkit_private)',
+              'permission': 'Permission allowlist'}
     global_index = []
     n = 0
     print(f"=== AVAILABLE across {len(scanned)} consumer(s) ===")
@@ -149,6 +150,32 @@ def _yaml_add_list_item(yaml_text, key, entry_lines):
     return '\n'.join(out)
 
 
+def _yaml_remove_list_item(yaml_text, key, tool):
+    """Removes the `  - tool: <tool>` row (and its indented continuation lines, e.g. `since:`)
+    from the block-style list under `key:`. No-op if the key or row isn't there."""
+    lines = yaml_text.splitlines()
+    out = []
+    in_key = False
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if re.match(rf'^{re.escape(key)}:', line):
+            in_key = True
+            out.append(line)
+            i += 1
+            continue
+        if in_key and line and not line.startswith((' ', '\t')):
+            in_key = False
+        if in_key and re.match(rf'^\s+-\s+tool:\s*{re.escape(tool)}\s*$', line):
+            i += 1
+            while i < len(lines) and re.match(r'^\s{4,}\S', lines[i]) and not re.match(r'^\s+-\s', lines[i]):
+                i += 1
+            continue
+        out.append(line)
+        i += 1
+    return '\n'.join(out)
+
+
 def update_registry_entry(registry_path, entries, today):
     """entries: list of (category, name) tuples actually applied this run for this consumer.
     Rewrites opted_in:/imported: directly (hub-owned file, no ticket needed for this path) and
@@ -165,12 +192,17 @@ def update_registry_entry(registry_path, entries, today):
     piece_names = [name for cat, name in entries if cat == 'piece']
     skill_names = [name for cat, name in entries if cat == 'skill']
     private_names = [name for cat, name in entries if cat == 'private']
+    stale_names = [name for cat, name in entries if cat == 'stale_hook']
     permission_names = [name for cat, name in entries if cat == 'permission']
 
     for tool in hook_names:
         if f"tool: {tool}" in yaml_text:
             continue
         yaml_text = _yaml_add_list_item(yaml_text, 'opted_in', [f'  - tool: {tool}', f'    since: {today}'])
+
+    for tool in stale_names:
+        yaml_text = _yaml_remove_list_item(yaml_text, 'opted_in', tool)
+        yaml_text = _yaml_remove_list_item(yaml_text, 'private_opted_in', tool)
 
     for p in piece_names:
         sp = SKILL_PIECES.get(p)
@@ -187,7 +219,8 @@ def update_registry_entry(registry_path, entries, today):
 
     new_raw = raw[:m.start(2)] + yaml_text + raw[m.end(2):]
 
-    note_items = hook_names + piece_names + skill_names + private_names + permission_names
+    note_items = (hook_names + [f'removal of retired hook {t}' for t in stale_names] + piece_names
+                  + skill_names + private_names + permission_names)
     if note_items:
         note = (f"\n**`update consumers` applied {', '.join(note_items)} — {today}, pushed "
                 f"directly from the hub (no filing ticket needed; the hub owns this file).**\n")
@@ -213,6 +246,9 @@ def do_apply(cfg, scanned, global_index, spec, today):
         if item['category'] == 'hook':
             if apply_hook(project_root, cfg, item):
                 per_consumer_writeback.setdefault(slug, []).append(('hook', item['name']))
+        elif item['category'] == 'stale_hook':
+            if apply_stale_hook(project_root, cfg, item):
+                per_consumer_writeback.setdefault(slug, []).append(('stale_hook', item['name']))
         elif item['category'] == 'skill':
             if apply_skill(project_root, cfg, item):
                 per_consumer_writeback.setdefault(slug, []).append(('skill', item['name']))

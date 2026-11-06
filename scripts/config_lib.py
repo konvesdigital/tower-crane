@@ -677,6 +677,79 @@ def apply_hook_command_fixes(settings, new_cmd, all_tools, dry_run=False, log=No
     return changed
 
 
+_DISPATCH_TOOL_RE = re.compile(r'_hub_dispatch\.py["\']?\s+([A-Za-z0-9_]+)')
+# A hub hook script path: .../hooks/<tool>.py|.ps1, but never a project-local .claude/hooks/ script
+# (those are the project's own, not the hub's) - the lookbehind skips a '.claude' parent.
+_HUB_HOOK_PATH_RE = re.compile(r'(?<!\.claude)[\\/]+hooks[\\/]+([A-Za-z0-9_]+)\.(?:py|ps1)')
+
+
+def hook_command_tool(command):
+    """The hub tool name a hook command runs - dispatch form (_hub_dispatch.py <tool>) or direct
+    hub-path form (.../hooks/<tool>.py) - or None for anything else (a project's own script,
+    an inline command, the dispatcher itself)."""
+    if not isinstance(command, str):
+        return None
+    m = _DISPATCH_TOOL_RE.search(command)
+    if m:
+        return m.group(1)
+    m = _HUB_HOOK_PATH_RE.search(command)
+    if m and not m.group(1).startswith('_hub_dispatch'):
+        return m.group(1)
+    return None
+
+
+def dead_hook_tools(settings, shared_root):
+    """Sorted tool names that hook entries in `settings` (an already-loaded settings dict) run
+    but whose script no longer exists under {shared_root}/hooks/ - a tool the hub retired. Such an
+    entry errors on every firing; on UserPromptSubmit a direct `python <missing>` call exits 2,
+    which blocks every prompt in that project. Read-only."""
+    hooks_dir = Path(shared_root) / 'hooks'
+    dead = set()
+    hooks = settings.get('hooks') if isinstance(settings, dict) else None
+    if not isinstance(hooks, dict):
+        return []
+    for groups in hooks.values():
+        for grp in groups if isinstance(groups, list) else []:
+            for h in grp.get('hooks', []) if isinstance(grp, dict) else []:
+                tool = hook_command_tool(h.get('command')) if isinstance(h, dict) else None
+                if tool and not (hooks_dir / f'{tool}.py').exists() and not (hooks_dir / f'{tool}.ps1').exists():
+                    dead.add(tool)
+    return sorted(dead)
+
+
+def strip_dead_hooks(settings, dead_tools):
+    """Remove, in place, every hook entry in `settings` that runs a tool in `dead_tools`; drop a
+    group left with no hooks, and an event left with no groups. Never touches any other entry.
+    Returns True if anything changed."""
+    dead_tools = set(dead_tools)
+    hooks = settings.get('hooks') if isinstance(settings, dict) else None
+    if not isinstance(hooks, dict) or not dead_tools:
+        return False
+    changed = False
+    for evt in list(hooks):
+        groups = hooks[evt]
+        if not isinstance(groups, list):
+            continue
+        kept = []
+        for grp in groups:
+            if isinstance(grp, dict) and isinstance(grp.get('hooks'), list):
+                before = len(grp['hooks'])
+                grp['hooks'] = [h for h in grp['hooks']
+                                if not (isinstance(h, dict) and hook_command_tool(h.get('command')) in dead_tools)]
+                if len(grp['hooks']) != before:
+                    changed = True
+                    if not grp['hooks']:
+                        continue
+            kept.append(grp)
+        if len(kept) != len(groups):
+            changed = True
+        if kept:
+            hooks[evt] = kept
+        else:
+            del hooks[evt]
+    return changed
+
+
 def fix_skill_stubs(consumer_path, templates_dir, import_base, dry_run=False, log=None, use_pointer=False):
     """Regenerate every installed .claude\\skills\\<name>\\SKILL.md stub whose content doesn't
     match what materialize_skill_stub() would produce right now from the canonical

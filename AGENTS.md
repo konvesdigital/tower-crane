@@ -167,9 +167,9 @@ operator moves or modifies these files, the steps that read them break and repor
      `[UNKNOWN]` → mention it as the user's to do in that project; `[HUB-MISMATCH]` (registered
      path missing, or no `hub_pointer.md`) → offer `"connect project"` or `"disconnect project"`.
      Silent → say nothing.
-   - `self_hooks.py --check-defaults` — any `[SELF-USE-OFF]` line names a default hub self-use tool
-     that's off on this machine; mention it and offer to run `self_hooks.py --enable-defaults`.
-     Silent → say nothing.
+   - `self_hooks.py --check-defaults` — `[SELF-USE-OFF]`: a default self-use tool is off here, offer
+     `--enable-defaults`; `[SELF-USE-STALE]`: a `.claude\settings.local.json` hook runs a retired script
+     (blocks every prompt if `UserPromptSubmit`), offer `--remove-stale`. Silent → say nothing.
    - `ticket_scan.py` (the scan step 5 acts on) — its "other OPEN tickets" list is the
      authoritative open set; report that list as the open tickets.
 4. Run `python toolkit/scripts/progress_sections.py` as one bare command — a capped, fixed-order

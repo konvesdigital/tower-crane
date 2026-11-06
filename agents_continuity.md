@@ -248,7 +248,10 @@ time — also run automatically as `setup_machine.md` Step 8a on a newly connect
 5. Close with exactly this line: `Register host: <n> registered | <n> declined | <n> self-contained`.
 
 **"update consumers"** — push-side of `update`: same scope as a consumer's own pull-side `update`
-skill (hooks, Track-1 skills, mandatory pieces; never `shared_resources`). User-initiated only.
+skill (hooks, Track-1 skills, mandatory pieces; never `shared_resources`). User-initiated only. It also
+offers the reverse of adding a hook: a `Retired hooks to remove` item for every consumer hook entry
+whose tool script no longer exists in `toolkit\hooks\`; applying it deletes the entry and the
+registry's `opted_in:` row.
 1. `python toolkit/scripts/update_consumers.py` (optionally `--consumer <slug>`) — indexed list across
    every locally-reachable consumer (Federate: other hosts skip silently); show it, ask what to apply.
 2. `python toolkit/scripts/update_consumers.py --apply <numbers-or-'all'>` — writes each touched project

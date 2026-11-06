@@ -3,7 +3,8 @@
 scan_consumer_update.py - the deterministic scan/apply half of the consumer-side `update` skill.
 Scope is functionality parity with a fresh new_consumer.py scaffold only - hooks, toolkit Track-1
 skills (STANDALONE_SKILLS + SKILL_PIECES), and mandatory/default-on protocol pieces a consumer
-project hasn't adopted yet. Excludes shared_resources content - that's data, adopted through the
+project hasn't adopted yet, plus the reverse: hook entries still running a tool the hub has since retired
+(offered for removal as 'Retired hooks to remove'). Excludes shared_resources content - that's data, adopted through the
 "shared resources" command instead.
 
 Two calls:
@@ -29,7 +30,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config_lib import (
     get_shared_config, get_dispatch_optin, materialize_skill_stub, _LEADING_COMMENT_RE,
-    merge_bash_allowlist,
+    merge_bash_allowlist, dead_hook_tools, strip_dead_hooks,
 )
 from registry_lib import parse_registry, host_path
 
@@ -131,6 +132,37 @@ def scan_hooks(cfg, state):
         if missing:
             items.append({'category': 'hook', 'name': tool, 'detail': f'templates/optins/{tool}.json'})
     return items
+
+
+def scan_stale_hooks(state):
+    """Hook entries in this project's settings.json that run a hub tool whose script the hub has
+    since removed - the reverse of scan_hooks(). One 'stale_hook' item per retired tool. Left in
+    place such an entry errors on every firing (and a direct-path one on UserPromptSubmit blocks
+    every prompt), so it is offered for removal the same way a missing hook is offered for adding."""
+    items = []
+    for tool in dead_hook_tools(state['settings'], SHARED_ROOT):
+        items.append({'category': 'stale_hook', 'name': tool,
+                      'detail': f'hooks/{tool}.py no longer exists in the toolkit; remove this project\'s entry for it'})
+    return items
+
+
+def apply_stale_hook(project_root, cfg, item):
+    tool = item['name']
+    settings_path = project_root / '.claude' / 'settings.json'
+    if not settings_path.exists():
+        print(f"  [skip] no .claude/settings.json - nothing to remove for '{tool}'")
+        return False
+    try:
+        settings = json.loads(settings_path.read_text(encoding='utf-8')) or {}
+    except json.JSONDecodeError:
+        print(f"  [MANUAL] .claude/settings.json isn't valid JSON - remove the '{tool}' hook entry by hand")
+        return False
+    if not strip_dead_hooks(settings, [tool]):
+        print(f"  [skip] no entry for '{tool}' found in .claude/settings.json")
+        return False
+    settings_path.write_text(json.dumps(settings, indent=2), encoding='utf-8', newline='\n')
+    print(f"  [applied] retired hook '{tool}' removed from .claude/settings.json")
+    return True  # needs registry write-back (drops its opted_in: row)
 
 
 def _skill_current(project_root, name, canon_path, import_base=None):
@@ -265,8 +297,9 @@ def print_items(items):
     if not items:
         print("Nothing available - this project already has everything the hub currently offers.")
         return
-    labels = {'hook': 'Hook opt-ins', 'skill': 'Toolkit skills', 'piece': 'Protocol pieces',
-              'private': 'Private tools (toolkit_private)', 'permission': 'Permission allowlist'}
+    labels = {'hook': 'Hook opt-ins', 'stale_hook': 'Retired hooks to remove', 'skill': 'Toolkit skills',
+              'piece': 'Protocol pieces', 'private': 'Private tools (toolkit_private)',
+              'permission': 'Permission allowlist'}
     print(f"=== AVAILABLE ({len(items)}) ===")
     current_cat = None
     for i, it in enumerate(items, 1):
@@ -428,6 +461,9 @@ def do_apply(project_root, cfg, items, spec):
         if item['category'] == 'hook':
             if apply_hook(project_root, cfg, item):
                 writeback.append(item['name'])
+        elif item['category'] == 'stale_hook':
+            if apply_stale_hook(project_root, cfg, item):
+                writeback.append(item['name'])
         elif item['category'] == 'skill':
             if apply_skill(project_root, cfg, item):
                 writeback.append(item['name'])
@@ -464,7 +500,7 @@ def main():
 
     cfg = get_shared_config(SHARED_ROOT)
     state = read_consumer_state(project_root)
-    items = (scan_hooks(cfg, state) + scan_skills(state, project_root, cfg) + scan_pieces(state)
+    items = (scan_hooks(cfg, state) + scan_stale_hooks(state) + scan_skills(state, project_root, cfg) + scan_pieces(state)
               + scan_private(cfg, state, project_root) + scan_permissions(state))
 
     if args.apply is None:
