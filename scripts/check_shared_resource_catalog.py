@@ -3,7 +3,7 @@
 check_shared_resource_catalog.py - internal-consistency checks for shared_resources\\CATALOG.md
 and shared_resources\\resource_relationships.yaml.
 
-Five checks, all notify-only:
+Six checks, all notify-only:
 
 1. File column - every CATALOG.md row's `File` cell must resolve to a real file in
    shared_resources\\, active or archived.
@@ -21,6 +21,11 @@ Five checks, all notify-only:
    on any machine whose hub lives elsewhere); one pointing outside the hub is a machine-local
    resource that belongs in the Hosts block. There is no exemption or escape marker: a URL
    (scheme://, other than file://) is not a path and is skipped; everything else is flagged.
+
+6. Host tag - an active reference/tool row whose entry has a `Hosts:` block must start its
+   Description with the matching tag (`[<host_a> only]`, or `[<host_a>, <host_b>]` for several hosts), and a
+   row whose entry has none (hub-resident `any`, insight) must carry no leading `[..]` tag. The SEO
+   stubs read CATALOG.md directly, so the tag is how they learn which machines have an entry.
 
 Message format leads with the practical effect on what Claude will or won't do; the technical
 cause is included secondarily.
@@ -45,6 +50,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from check_shared_resource_hosts import parse_catalog
+from check_shared_resource_refs import parse_hosts_block
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
 PROJECT_ROOT = SHARED_ROOT.parent
@@ -291,6 +297,49 @@ def check_absolute_paths(rows):
     return results
 
 
+# --- Check 6: the catalog row's host tag matches the entry's Hosts: block ------------------------
+
+LEADING_TAG_RE = re.compile(r'^\[[^\]]*\]')
+
+
+def expected_host_tag(hosts):
+    """The tag a catalog row's Description must start with for an entry with this Hosts: block:
+    `[<host_a> only]` for one host, `[<host_a>, <host_b>]` (sorted) for several."""
+    names = sorted(hosts)
+    return f"[{names[0]} only]" if len(names) == 1 else "[" + ", ".join(names) + "]"
+
+
+def check_host_tags(rows):
+    """Every active reference/tool row with a Hosts: block starts its Description with the matching
+    tag; every other row (hub-resident, `any`, insight) carries no leading [..] tag. The SEO stubs
+    read CATALOG.md directly, so the tag is how they see which machines have an entry."""
+    results = []
+    for row in rows:
+        if row['status'].lower().startswith('archived'):
+            continue
+        entry_path = CATALOG_PATH.parent / row['file']
+        if not entry_path.exists():
+            continue
+        hosts = parse_hosts_block(entry_path.read_text(encoding='utf-8')) if row['kind'] != 'insight' else {}
+        m = LEADING_TAG_RE.match(row['description'])
+        have = m.group(0) if m else None
+        want = expected_host_tag(hosts) if hosts else None
+        if have == want:
+            continue
+        if want:
+            current = f'"{have}"' if have else 'untagged'
+            listed = ", ".join(sorted(hosts))
+            results.append(('HOST-TAG', row['name'],
+                f'Claude reading the catalog will not see which machines have "{row["name"]}". '
+                f'Fix: start its Description with "{want} " (its Hosts: block lists '
+                f'{listed}); currently {current}.'))
+        else:
+            results.append(('HOST-TAG', row['name'],
+                f'"{row["name"]}" has no Hosts: block but its Description starts with "{have}", '
+                'which reads as a machine restriction. Fix: remove the tag, or give the entry a Hosts: block.'))
+    return results
+
+
 def run_entry_mode(file_args):
     """--entry <file>...: check 5 alone on the named file(s). Exit 1 if any path found."""
     total = 0
@@ -333,19 +382,21 @@ def main():
                             if r[0] == 'UNDECLARED']
     edge_fails = check_edges(edges, rows)  # already FAIL-only, see its own docstring/return shape
     path_fails = check_absolute_paths(rows)
+    tag_fails = check_host_tags(rows)
 
-    for _, _, message in file_fails + tier_mismatches + undeclared_identity + edge_fails + path_fails:
+    for _, _, message in (file_fails + tier_mismatches + undeclared_identity + edge_fails
+                          + path_fails + tag_fails):
         print(f"[!] {message}")
 
     total = (len(file_fails) + len(tier_mismatches) + len(undeclared_identity) + len(edge_fails)
-             + len(path_fails))
+             + len(path_fails) + len(tag_fails))
     print()
     if total:
         print(f"=== {total} issue(s) found across {len(rows)} catalog row(s)/{len(edges)} edge(s): "
               f"{len(file_fails)} broken file reference(s), {len(tier_mismatches)} tier "
               f"mismatch(es), {len(undeclared_identity)} undeclared identity_eligible categor"
-              f"y(ies), {len(edge_fails)} broken edge(s), {len(path_fails)} absolute path(s) "
-              "(notify only, not a failure) ===")
+              f"y(ies), {len(edge_fails)} broken edge(s), {len(path_fails)} absolute path(s), "
+              f"{len(tag_fails)} host tag mismatch(es) (notify only, not a failure) ===")
     else:
         print(f"=== no catalog/graph inconsistencies found across {len(rows)} catalog row(s)/"
               f"{len(edges)} edge(s) ===")

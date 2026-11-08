@@ -13,6 +13,13 @@ This file explains how to use the mechanism it covers. `capability_relationships
 this mechanism works and how it relates to other mechanisms.
 -->
 
+## Hosts
+
+Where something is listed per host, use and run only what's listed for your own host. If your host
+isn't listed, tell the user what the thing is and which hosts have it, and offer to register this
+one. A flow named in the entry itself (such as `[HOST-GAP]`'s options) takes precedence.
+`**Hosts:** any` applies everywhere.
+
 ## Running shell commands
 
 Run each command as its own call, from the current directory. To run git in another repo (for

@@ -33,6 +33,12 @@ this applies to tickets specifically.
 Missing → not set up (or uninstalled): don't guess machine identity, don't run `"checkpoint"`,
 `"update"`, or any consumer command — run `templates\setup_machine.md` first.
 
+## Hosts
+Where something is listed per host, use and run only what's listed for your own host. If your host
+isn't listed, tell the user what the thing is and which hosts have it, and offer to register this
+one. A flow named in the entry itself (such as `[HOST-GAP]`'s options) takes precedence.
+`**Hosts:** any` applies everywhere.
+
 ## Running shell commands
 Run each command as its own call, from the current directory. To run git in another repo (for
 example `toolkit\`), write `git -C <dir> <cmd>` rather than changing directory first — a directory

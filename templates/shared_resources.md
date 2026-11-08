@@ -210,6 +210,22 @@ from `<hub root>\toolkit\config.local.json`, the same file the hub itself reads 
 See "Per-host availability for pointer entries" below for why, and for what happens when a project
 that adopted this entry runs on a machine not yet in this list.
 
+**Every `reference` or `tool` entry states its host availability on one of two forms** (an `insight`
+is always hub-resident and states nothing):
+- **Content lives inside the entry's own file** (a hub-resident `reference`, or one whose target is
+  only a web link or Drive URL) → write the one line `**Hosts:** any` directly under the `**Kind:**`
+  line. No `Hosts:` block.
+- **Anything else** (a `tool`, or a `reference` pointing at a file or folder on a machine) → the
+  `Hosts:` block above, one key per machine that has it. A `tool` never takes `any`, and a pointer
+  never takes `any` even if every machine has the target today.
+
+**Host tag in the catalog row.** When the entry has a `Hosts:` block, start its `CATALOG.md`
+`Description` with a tag naming those machines: `[<host_a> only]` for one, `[<host_a>, <host_b>]` (sorted) for
+several. Rows for `any` entries and insights carry no tag. Update the tag in the same edit whenever a
+host is added to the block (including "register host" and the `[HOST-GAP]` "Connect it now" option).
+`check_shared_resource_catalog.py` reports a mismatch at `resume`; the tag exists so skills that read
+`CATALOG.md` directly see which machines have an entry without opening it.
+
 **No absolute paths in an entry.** The `path:` line inside an entry's `Hosts:` block is the only
 place an absolute path (a drive letter, `~/`, a network share, `/Users/...`, an environment-variable
 path, a `file://` link) may appear in any `shared_resources\` file. Everywhere else — the entry's
@@ -305,7 +321,10 @@ that gap structurally instead of restating the same prose instruction more empha
    `competitor_pricing_reference.md` directly). A Category-level fallback skill does this across
    the whole Category's live graph; a Tier-scoped skill does it within just its own Tier.
 2. **Read that entry.** Not a paraphrase from memory of a previous read — `CATALOG.md` and
-   `resource_relationships.yaml` float on HEAD and may have changed since.
+   `resource_relationships.yaml` float on HEAD and may have changed since. If the entry has a
+   `Hosts:` block (its `CATALOG.md` row carries a `[...]` tag), the standing "Hosts" rule applies:
+   use only your own host's path. Say so only when the task actually reaches for the entry, never
+   as an unprompted notice.
 3. **Look up its graph neighbors in `resource_relationships.yaml`** and state them by title —
    never preload their content just because an edge exists. E.g. completing a recurring report's
    "why" analysis surfaces `trend_shape_vs_period_totals.md` and `backlog_age_diagnostic.md` by

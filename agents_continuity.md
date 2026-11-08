@@ -230,17 +230,19 @@ time — also run automatically as `setup_machine.md` Step 8a on a newly connect
 1. Run `python toolkit/scripts/check_shared_resource_hosts.py` — notify-only,
    catalog-wide, exit 0 always. Buckets every non-`Archived`, non-`insight` catalog row as `[OK]`
    (already registered here — skip silently), `[UNREGISTERED]` (has a `Hosts:` block, this host
-   isn't in it), or `[NO-HOSTS-BLOCK]` (no `Hosts:` block at all — ambiguous).
+   isn't in it), `[ANY]` (carries `**Hosts:** any` — skip silently), `[BAD-ANY]` (a `tool` with the
+   `any` marker — fix it to a real `Hosts:` block), or `[NO-HOSTS-BLOCK]` (neither form — ambiguous).
 2. For every `[NO-HOSTS-BLOCK]` hit: ask the user to resolve the ambiguity. Genuinely self-contained
-   (nothing to ever register) → skip, no marker written (re-judged next pass — cheap while the
-   catalog stays small). An unmigrated pointer entry → migrate it to `Hosts:` block form first
+   (nothing to ever register) → write `**Hosts:** any` under its `Kind` line. An unmigrated pointer entry → migrate it to `Hosts:` block form first
    (same shape as `seo_resources.md`'s 2026-08-20 fix — including a quick existence check on any
    pre-existing flat path before trusting it, since that's exactly what caught that entry's own
    drift), then treat it as `[UNREGISTERED]` below.
 3. For every `[UNREGISTERED]` hit (including one just migrated): ask whether this host wants/has
    this entry. **Yes** — ask for the real path on **this** machine specifically (never assume it
    matches another host's path), confirm it exists on disk, then write a new `hosts.<this host>`
-   entry into that entry's own `Hosts:` block. **No** — leave it unregistered; this pass re-asks
+   entry into that entry's own `Hosts:` block, and update the host tag at the start of its
+   `CATALOG.md` row's `Description` to match (`templates\shared_resources.md`, "Host tag in the
+   catalog row"). **No** — leave it unregistered; this pass re-asks
    next time it's run (no suppression marker — on-demand, not run automatically every session).
 4. One combined propagation commit+push against the hub's own outer repo, scoped to
    `shared_resources\` (`templates\shared_resources.md`'s "Every write here ends with the same

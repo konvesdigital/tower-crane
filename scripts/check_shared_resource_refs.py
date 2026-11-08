@@ -50,6 +50,14 @@ SKILL_STUB_PATH_RE = re.compile(r'`(~/[^`]+)`')
 # parser rather than a registry_lib.py reuse.
 HOSTS_HEADER_RE = re.compile(r'\*\*Hosts:\*\*\s*\r?\n')
 HOST_KEY_RE = re.compile(r'^  (\S+):\s*$')
+# The one-line "no host restriction" marker for a hub-resident entry (content lives inside its own
+# shared_resources\ file): `**Hosts:** any`. Mutually exclusive with a Hosts: block.
+HOSTS_ANY_RE = re.compile(r'^\*\*Hosts:\*\*[ \t]+any[ \t\r]*$', re.MULTILINE)
+
+
+def hosts_is_any(entry_text):
+    """True if the entry carries the `**Hosts:** any` marker (hub-resident, usable on every host)."""
+    return bool(HOSTS_ANY_RE.search(entry_text))
 
 
 def resolve_import_path(raw):
