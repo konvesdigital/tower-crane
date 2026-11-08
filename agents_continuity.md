@@ -251,10 +251,24 @@ time — also run automatically as `setup_machine.md` Step 8a on a newly connect
 skill (hooks, Track-1 skills, mandatory pieces; never `shared_resources`). User-initiated only. It also
 offers the reverse of adding a hook: a `Retired hooks to remove` item for every consumer hook entry
 whose tool script no longer exists in `toolkit\hooks\`; applying it deletes the entry and the
-registry's `opted_in:` row.
+registry's `opted_in:` row. It also lists every deviation in each consumer's `CLAUDE.md`
+`## Tower Crane In Use` / `## Shared Workflow Protocol` block from what the current template would produce
+(`CLAUDE.md block deviations`), each with the exact text that patching removes and what goes in; the
+consumer's own `update` lists the same items (same code, `scan_consumer_update.py`).
 1. `python toolkit/scripts/update_consumers.py` (optionally `--consumer <slug>`) — indexed list across
    every locally-reachable consumer (Federate: other hosts skip silently); show it, ask what to apply.
+   For block deviations say plainly that patching removes the custom text shown (custom text can break
+   Tower Crane) and that `all` is the recommended answer.
 2. `python toolkit/scripts/update_consumers.py --apply <numbers-or-'all'>` — writes each touched project
-   plus its `consumers\<slug>.md` registry entry directly (no filing ticket needed), then run
-   `toolkit/scripts/check_tower_crane.py` to confirm it validates clean.
+   plus its `consumers\<slug>.md` registry entry directly (no filing ticket needed), commits and pushes
+   in the consumer's own repo, then run `toolkit/scripts/check_tower_crane.py` to confirm it validates
+   clean.
+   - To keep a block deviation instead: `--apply all --keep <n>` (or `--keep <n>` alone). It records the
+     text in that project's `.claude\tower_crane_exceptions.json`, prints a warning that Tower Crane may
+     not behave 100% as expected, and never offers it again.
+   - "reset exceptions" (all consumers in the run) / "reset exceptions for <slug>": `--reset-exceptions`
+     (with `--consumer <slug>`) clears the record and commits it, then the listing shows the former
+     exceptions as ordinary deviations; ask, then `--apply` as above.
 3. Close with exactly this line: `Update consumers: <n> applied | <n> skipped | check_tower_crane: <pass|fail>`.
+   While any consumer has recorded exceptions the scripts end with one reminder line per consumer; relay
+   it after the close line. It is never a question and needs no answer.

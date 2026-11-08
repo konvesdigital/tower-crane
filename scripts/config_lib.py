@@ -850,6 +850,101 @@ DISCONNECTED_HEADING = '## Tower Crane (disconnected)'
 DISCONNECT_NOTES_FILENAME = 'TOWER_CRANE_DISCONNECT_NOTES.md'
 FIRST_RUN_FILENAME = 'FIRST_RUN.md'
 
+# Per-consumer record of CLAUDE.md block deviations the operator chose to keep (written by
+# scan_consumer_update.py's block patcher; lives inside the consumer so it travels with its repo).
+EXCEPTIONS_RELPATH = '.claude/tower_crane_exceptions.json'
+
+# short human blurb per known tool for the "Tower Crane In Use" list (falls back to a generic line)
+TOOL_BLURBS = {
+    'consistency_check': 'AST static analysis on Python writes/edits - undefined names, arg-count, '
+                          'string-key spelling (PostToolUse hook).',
+}
+TOOL_BLURB_FALLBACK = 'see tower_crane MENU.md.'
+
+# The "Adopted Shared Resources" subsection's general paragraph is fixed template text; this is only
+# the "what's been adopted" LISTING underneath it, which shared_resources.md's Apply/Forget own.
+ADOPTED_SHARED_RESOURCES_NONE = '**Shared resources adopted for this project:** _None yet._'
+ADOPTED_LISTING_ANCHOR = '**Shared resources adopted for this project:**'
+NO_TOOLS_LINE = '_No shared tools opted in yet._'
+
+_CONSUMER_TMPL_PATH = Path(__file__).resolve().parent.parent / 'templates' / 'consumer_CLAUDE.md.tmpl'
+
+
+def find_block_region(text):
+    """(start, end) character offsets of a consumer CLAUDE.md's Tower Crane block: from
+    '## Tower Crane In Use' through the next '## ' heading after '## Shared Workflow Protocol'
+    (or EOF). None if either heading is missing - the caller reports [MANUAL], never guesses.
+    disconnect_consumer.replace_prose_sections() uses the same region."""
+    start = text.find(TC_IN_USE_HEADING)
+    if start == -1:
+        return None
+    wf = text.find(WORKFLOW_HEADING, start)
+    if wf == -1:
+        return None
+    end = len(text)
+    for m in re.finditer(r'(?m)^## .+$', text):
+        if m.start() > wf:
+            end = m.start()
+            break
+    return start, end
+
+
+def consumer_claude_md_template():
+    """(head, live) halves of consumer_CLAUDE.md.tmpl with its maintainer comment stripped:
+    head = everything before '## Tower Crane In Use' (still holding {{PROJECT_NAME}}), live = from
+    that heading to EOF (the two Tower-Crane-managed sections)."""
+    tmpl = _CONSUMER_TMPL_PATH.read_text(encoding='utf-8')
+    tmpl = re.sub(r'^\s*<!--.*?-->\s*', '', tmpl, count=1, flags=re.DOTALL)
+    idx = tmpl.find(TC_IN_USE_HEADING)
+    if idx == -1:
+        return '', f"{TC_IN_USE_HEADING}\n\n{WORKFLOW_HEADING}\n\n{{{{ADOPTED_SHARED_RESOURCES}}}}\n"
+    return tmpl[:idx], tmpl[idx:]
+
+
+def render_claude_md_block(tools, date, adopted, protocol_imports):
+    """The two live sections exactly as the current template produces them. The one renderer used
+    by new_consumer.py (scaffold/reconnect/adoption) and by the block patcher, so they cannot
+    disagree. `tools` is a list of tool names."""
+    tools_list = ('\n'.join(f"- `{t}` - {TOOL_BLURBS.get(t, TOOL_BLURB_FALLBACK)}" for t in tools)
+                  if tools else NO_TOOLS_LINE)
+    _, live = consumer_claude_md_template()
+    return (live.replace('{{DATE}}', date)
+                .replace('{{SHARED_TOOLS_LIST}}', tools_list)
+                .replace('{{ADOPTED_SHARED_RESOURCES}}', adopted)
+                .replace('{{PROTOCOL_IMPORTS}}', protocol_imports))
+
+
+def load_exceptions(project_root):
+    """(entries, error). entries is a list of {'kind','text','kept_on'} dicts; error is None, or a
+    message when the file exists but isn't valid (never silently treated as empty - that would hide
+    earlier choices)."""
+    path = Path(project_root) / EXCEPTIONS_RELPATH
+    if not path.exists():
+        return [], None
+    try:
+        data = json.loads(path.read_text(encoding='utf-8'))
+        entries = data['exceptions']
+        if not isinstance(entries, list) or not all(
+                isinstance(e, dict) and e.get('kind') in ('custom', 'missing') and isinstance(e.get('text'), str)
+                for e in entries):
+            raise ValueError('bad entry shape')
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
+        return [], f"{EXCEPTIONS_RELPATH} isn't a valid exceptions file ({e})"
+    return entries, None
+
+
+def save_exceptions(project_root, entries):
+    """Write the exceptions file, or delete it when entries is empty."""
+    path = Path(project_root) / EXCEPTIONS_RELPATH
+    if not entries:
+        if path.exists():
+            path.unlink()
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({'version': 1, 'exceptions': entries}, indent=2),
+                    encoding='utf-8', newline='\n')
+
+
 # The Tower-Crane-owned paths inside a consumer project's own working tree - every hub-invoked
 # writer (relocate.py, update_consumers.py) touches only these (fix_imports/apply_piece ->
 # CLAUDE.md; apply_hook_command_fixes/apply_hook/apply_private -> .claude/settings.json;
@@ -868,7 +963,7 @@ FIRST_RUN_FILENAME = 'FIRST_RUN.md'
 # anyway, bypassing .gitignore).
 CONSUMER_OWNED_PATHS = ('CLAUDE.md', 'README.md', '.claude/settings.json', '.claude/skills',
                          HUB_DISPATCH_RELPATH, '.gitignore', DISCONNECT_NOTES_FILENAME,
-                         FIRST_RUN_FILENAME)
+                         FIRST_RUN_FILENAME, EXCEPTIONS_RELPATH)
 
 
 def scoped_status_paths(repo_path, candidate_paths):

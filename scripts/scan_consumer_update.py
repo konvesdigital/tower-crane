@@ -22,15 +22,20 @@ category.
 """
 
 import argparse
+import difflib
 import json
 import re
 import sys
+from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config_lib import (
     get_shared_config, get_dispatch_optin, materialize_skill_stub, _LEADING_COMMENT_RE,
     merge_bash_allowlist, dead_hook_tools, strip_dead_hooks,
+    find_block_region, render_claude_md_block, load_exceptions, save_exceptions,
+    TC_IN_USE_HEADING, WORKFLOW_HEADING, DISCONNECTED_HEADING, HUB_POINTER_IMPORT_LINE,
+    ADOPTED_SHARED_RESOURCES_NONE, ADOPTED_LISTING_ANCHOR, EXCEPTIONS_RELPATH,
 )
 from registry_lib import parse_registry, host_path
 
@@ -293,19 +298,237 @@ def apply_permissions(project_root, cfg, item):
     return True  # audit-trail note only (update_registry_entry treats 'permission' like 'skill')
 
 
+# ---------------------------------------------------------------------------------------------
+# CLAUDE.md block patcher. A consumer's '## Tower Crane In Use' / '## Shared Workflow Protocol'
+# block is rendered from the template at scaffold time and otherwise never touched, so it drifts.
+# This renders what the CURRENT template would produce for this project, diffs it against the
+# file, and offers each diff hunk ("deviation") as one numbered item. Everything here depends only
+# on the project's own files and the toolkit, so the hub's `update consumers` and a project's own
+# `update` (both import this module) behave identically.
+# ---------------------------------------------------------------------------------------------
+
+CATEGORY_LABELS = {'hook': 'Hook opt-ins', 'stale_hook': 'Retired hooks to remove', 'skill': 'Toolkit skills',
+                   'piece': 'Protocol pieces', 'private': 'Private tools (toolkit_private)',
+                   'permission': 'Permission allowlist', 'claude_md_block': 'CLAUDE.md block deviations',
+                   'claude_md_manual': 'CLAUDE.md block (fix by hand)'}
+
+_TOOL_BULLET_RE = re.compile(r'(?m)^- `([^`]+)` - ')
+_WIRED_RE = re.compile(r'Opted-in tools \(wired (\d{4}-\d{2}-\d{2})\)')
+_LISTING_RE = re.compile(r'(?m)^' + re.escape(ADOPTED_LISTING_ANCHOR))
+_SENTINEL = '\x00ADOPTED\x00'
+KEEP_WARNING = ("Tower Crane may not behave 100% as expected with this custom text kept in "
+                "CLAUDE.md.")
+
+
+def _tool_still_exists(tool):
+    """False only for a tool bullet whose opt-in the hub has since retired. Where toolkit_private
+    is absent (another machine) a tool not found in the toolkit can't be judged, so it is kept."""
+    if (OPTINS_DIR / f'{tool}.json').exists():
+        return True
+    if not PRIVATE_ROOT.is_dir():
+        return True
+    return (PRIVATE_OPTINS_DIR / f'{tool}.json').exists() or (PRIVATE_SKILLS_DIR / tool).is_dir()
+
+
+def _analyze_block(project_root):
+    """Read-only. Returns None if there is nothing to analyze (no CLAUDE.md, or a disconnected
+    project), else a dict: {'manual': message} when the headings aren't standard, or
+    {'text','start','end','core','trailing','listing','head_lines','exp_lines','hunks'} where each
+    hunk is {'kind': 'custom'|'missing', 'i1','i2','j1','j2','cur_text','exp_text','key'}."""
+    md_path = Path(project_root) / 'CLAUDE.md'
+    if not md_path.exists():
+        return None
+    text = md_path.read_text(encoding='utf-8')
+    region = find_block_region(text)
+    if region is None:
+        if DISCONNECTED_HEADING in text:
+            return None
+        return {'manual': f"'{TC_IN_USE_HEADING}' / '{WORKFLOW_HEADING}' heading missing or "
+                          "non-standard - Tower Crane can't tell what to patch; fix it by hand"}
+    start, end = region
+    block = text[start:end]
+    core = block.rstrip()
+    trailing = block[len(core):]
+
+    # Slot values, all read from the existing block so the result is identical wherever it runs:
+    # tools = the block's own bullets minus retired ones; date = its wired date; imports = its own
+    # '@' lines (other mechanisms - apply_piece, relocate - own those); listing = verbatim.
+    wf_idx = core.find(WORKFLOW_HEADING)
+    tools_zone = core[:wf_idx] if wf_idx != -1 else core
+    tools = [t for t in _TOOL_BULLET_RE.findall(tools_zone) if _tool_still_exists(t)]
+    m = _WIRED_RE.search(core)
+    wired = m.group(1) if m else date.today().isoformat()
+    import_lines = [l.rstrip() for l in core[wf_idx:].splitlines() if re.match(r'^@\S+$', l.rstrip())] \
+        if wf_idx != -1 else []
+    imports = '\n'.join(import_lines) if import_lines else HUB_POINTER_IMPORT_LINE
+
+    lm = _LISTING_RE.search(core)
+    if lm:
+        listing = core[lm.start():]
+        head = core[:lm.start()]
+        expected = render_claude_md_block(tools, wired, _SENTINEL, imports).split(_SENTINEL)[0]
+    else:
+        listing = None
+        head = core
+        expected = render_claude_md_block(tools, wired, ADOPTED_SHARED_RESOURCES_NONE, imports)
+
+    head_lines = head.rstrip().split('\n')
+    exp_lines = expected.rstrip().split('\n')
+    sm = difflib.SequenceMatcher(None, [l.rstrip() for l in head_lines],
+                                 [l.rstrip() for l in exp_lines], autojunk=False)
+    hunks = []
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag == 'equal':
+            continue
+        cur_text = '\n'.join(head_lines[i1:i2]).rstrip()
+        exp_text = '\n'.join(exp_lines[j1:j2]).rstrip()
+        if not cur_text.strip() and not exp_text.strip():
+            continue  # blank-line-count difference only; nothing to say about it
+        kind = 'missing' if not cur_text.strip() else 'custom'
+        hunks.append({'kind': kind, 'i1': i1, 'i2': i2, 'j1': j1, 'j2': j2, 'cur_text': cur_text,
+                      'exp_text': exp_text, 'key': (kind, exp_text if kind == 'missing' else cur_text)})
+    return {'text': text, 'start': start, 'end': end, 'core': core, 'trailing': trailing,
+            'listing': listing, 'head_lines': head_lines, 'exp_lines': exp_lines, 'hunks': hunks}
+
+
+def scan_block(project_root):
+    """(items, live_exception_count). Items are the block deviations not already settled by a
+    recorded exception, plus a 'claude_md_manual' item when the block can't be analyzed."""
+    a = _analyze_block(project_root)
+    if a is None:
+        return [], 0
+    if 'manual' in a:
+        return [{'category': 'claude_md_manual', 'name': 'CLAUDE.md block', 'detail': a['manual']}], 0
+    entries, err = load_exceptions(project_root)
+    if err:
+        return [{'category': 'claude_md_manual', 'name': 'CLAUDE.md block exceptions',
+                 'detail': err + ' - fix or delete it by hand; until then block deviations are not scanned'}], 0
+    kept_keys = {(e['kind'], e['text']) for e in entries}
+    items, live = [], 0
+    for h in a['hunks']:
+        if h['key'] in kept_keys:
+            live += 1
+            continue
+        n = len(items) + 1
+        what = {'missing': 'template text this block lacks',
+                'custom': 'custom text, not in the template'}[h['kind']]
+        items.append({'category': 'claude_md_block', 'name': f'block change {n}', 'detail': what,
+                      'kind': h['kind'], 'cur_text': h['cur_text'], 'exp_text': h['exp_text']})
+    return items, live
+
+
+def exceptions_reminder(project_root, label=''):
+    """The one-line reminder printed after update work while exceptions are recorded, or ''."""
+    _, live = scan_block(project_root)
+    if not live:
+        return ''
+    noun = 'exception' if live == 1 else 'exceptions'
+    return (f"{label}{live} CLAUDE.md {noun} kept — say \"reset exceptions\" to align everything "
+            "with the template.")
+
+
+def block_item_lines(it):
+    """Indented lines showing exactly what patching this item removes/replaces and what goes in."""
+    if it['category'] != 'claude_md_block':
+        return []
+    out = []
+    if it['cur_text']:
+        out.append('      patching removes:')
+        out += [f'        | {l}' for l in it['cur_text'].split('\n')]
+    if it['exp_text']:
+        out.append('      and puts in:' if it['cur_text'] else '      patching adds:')
+        out += [f'        | {l}' for l in it['exp_text'].split('\n')]
+    return out
+
+
+def apply_block_items(project_root, patch_items, keep_items):
+    """Patch the chosen deviations in place (one CLAUDE.md write, however many) and record the
+    kept ones as exceptions. Both lists hold scan_block() items; they are re-matched against a
+    fresh analysis. Returns True if anything on disk changed."""
+    a = _analyze_block(project_root)
+    if a is None or 'manual' in a:
+        print("  [MANUAL] CLAUDE.md block can't be analyzed - fix its headings by hand")
+        return False
+    entries, err = load_exceptions(project_root)
+    if err:
+        print(f"  [MANUAL] {err}")
+        return False
+
+    def find(it):
+        for idx, h in enumerate(a['hunks']):
+            if (h['kind'], h['cur_text'], h['exp_text']) == (it['kind'], it['cur_text'], it['exp_text']):
+                return idx
+        return None
+
+    patch_idx = set()
+    for it in patch_items:
+        idx = find(it)
+        if idx is None:
+            print(f"  [skip] {it['name']} is no longer present")
+        else:
+            patch_idx.add(idx)
+    keep_hunks = []
+    for it in keep_items:
+        idx = find(it)
+        if idx is None:
+            print(f"  [skip] {it['name']} is no longer present")
+        else:
+            keep_hunks.append(a['hunks'][idx])
+
+    changed = False
+    # Record kept exceptions; drop entries whose text no longer exists in the block (hand-reverted).
+    live_keys = {h['key'] for h in a['hunks']}
+    new_entries = [e for e in entries if (e['kind'], e['text']) in live_keys]
+    have = {(e['kind'], e['text']) for e in new_entries}
+    for h in keep_hunks:
+        if h['key'] not in have:
+            new_entries.append({'kind': h['kind'], 'text': h['key'][1], 'kept_on': date.today().isoformat()})
+            have.add(h['key'])
+    for h in keep_hunks:
+        print(f"  [kept] {h['kind']} text recorded as an exception. {KEEP_WARNING}")
+    if new_entries != entries:
+        save_exceptions(project_root, new_entries)
+        changed = True
+
+    if patch_idx:
+        out = []
+        pos = 0
+        for idx, h in enumerate(a['hunks']):
+            out += a['head_lines'][pos:h['i1']]
+            out += a['exp_lines'][h['j1']:h['j2']] if idx in patch_idx else a['head_lines'][h['i1']:h['i2']]
+            pos = h['i2']
+        out += a['head_lines'][pos:]
+        new_core = '\n'.join(out)
+        if a['listing'] is not None:
+            new_core += '\n\n' + a['listing']
+        new_text = a['text'][:a['start']] + new_core + a['trailing'] + a['text'][a['end']:]
+        if new_text != a['text']:
+            (Path(project_root) / 'CLAUDE.md').write_text(new_text, encoding='utf-8', newline='\n')
+            changed = True
+        print(f"  [applied] {len(patch_idx)} CLAUDE.md block deviation(s) patched to match the template")
+    return changed
+
+
+def reset_exceptions(project_root):
+    """Delete the recorded exceptions so their text shows up as ordinary deviations again.
+    True if a file was removed."""
+    path = Path(project_root) / EXCEPTIONS_RELPATH
+    if not path.exists():
+        return False
+    path.unlink()
+    return True
+
+
 def print_items(items):
     if not items:
         print("Nothing available - this project already has everything the hub currently offers.")
         return
-    labels = {'hook': 'Hook opt-ins', 'stale_hook': 'Retired hooks to remove', 'skill': 'Toolkit skills',
-              'piece': 'Protocol pieces', 'private': 'Private tools (toolkit_private)',
-              'permission': 'Permission allowlist'}
     print(f"=== AVAILABLE ({len(items)}) ===")
     current_cat = None
     for i, it in enumerate(items, 1):
         if it['category'] != current_cat:
             current_cat = it['category']
-            print(f"-- {labels[current_cat]} --")
+            print(f"-- {CATEGORY_LABELS[current_cat]} --")
         # Call out a private skill matching one of this project's own private_categories:
         # subscriptions.
         tags = []
@@ -315,6 +538,8 @@ def print_items(items):
             tags.append('drifted — needs re-sync')
         tag = f" [{', '.join(tags)}]" if tags else ''
         print(f"  [{i}] {it['name']}{tag}  ({it['detail']})")
+        for line in block_item_lines(it):
+            print(line)
     print("=== END AVAILABLE ===")
 
 
@@ -449,12 +674,27 @@ def resolve_selection(spec, items):
     return out
 
 
-def do_apply(project_root, cfg, items, spec):
-    numbers = resolve_selection(spec, items)
-    if not numbers:
+def split_keep(items, spec, keep_spec):
+    """(numbers_to_apply, keep_numbers). `keep_spec` names block deviations to keep as
+    exceptions instead of patching; they are removed from whatever `spec` selects (so
+    `--apply all --keep 4` means 'all except 4'). Non-block numbers in keep_spec are ignored."""
+    numbers = resolve_selection(spec, items) if spec is not None else []
+    keeps = []
+    for n in (resolve_selection(keep_spec, items) if keep_spec else []):
+        if items[n - 1]['category'] == 'claude_md_block':
+            keeps.append(n)
+        else:
+            print(f"[WARN] item {n} isn't a CLAUDE.md block deviation - only those can be kept; skipping.")
+    return [n for n in numbers if n not in keeps], keeps
+
+
+def do_apply(project_root, cfg, items, spec, keep_spec=None):
+    numbers, keeps = split_keep(items, spec, keep_spec)
+    if not numbers and not keeps:
         print("Nothing valid to apply.")
         return
     writeback = []
+    block_patch = []
     for i in numbers:
         item = items[i - 1]
         print(f"[{i}] {item['name']} ({item['category']}):")
@@ -475,6 +715,14 @@ def do_apply(project_root, cfg, items, spec):
                 writeback.append(item['name'])
         elif item['category'] == 'permission':
             apply_permissions(project_root, cfg, item)
+        elif item['category'] == 'claude_md_block':
+            block_patch.append(item)  # written together below (hunks shift each other's offsets)
+        elif item['category'] == 'claude_md_manual':
+            print(f"  [MANUAL] {item['detail']}")
+    block_keep = [items[n - 1] for n in keeps]
+    if block_patch or block_keep:
+        print("CLAUDE.md block:")
+        apply_block_items(project_root, block_patch, block_keep)
     if writeback:
         print()
         print("[reminder] The hub's consumers/<slug>.md registry doesn't know about this yet - file "
@@ -484,6 +732,14 @@ def do_apply(project_root, cfg, items, spec):
               "not needed for flat @import-only pieces.")
 
 
+def all_items(cfg, state, project_root):
+    """Every available item for one project - the single list both this script and the hub's
+    update_consumers.py build, so the two entry points can't disagree."""
+    return (scan_hooks(cfg, state) + scan_stale_hooks(state) + scan_skills(state, project_root, cfg)
+            + scan_pieces(state) + scan_private(cfg, state, project_root) + scan_permissions(state)
+            + scan_block(project_root)[0])
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Consumer-side `update`: scan/apply hub features this project hasn't adopted yet."
@@ -491,6 +747,12 @@ def main():
     parser.add_argument('--project-root', default='.', help="This consumer project's root (default: cwd).")
     parser.add_argument('--apply', default=None,
                          help="Comma-separated item numbers from the last --check listing, or 'all'.")
+    parser.add_argument('--keep', default=None,
+                         help="Comma-separated CLAUDE.md block deviation numbers to keep as recorded "
+                              "exceptions instead of patching (alone, or with --apply all).")
+    parser.add_argument('--reset-exceptions', action='store_true',
+                         help="Clear this project's recorded CLAUDE.md exceptions first, so they show "
+                              "up as ordinary deviations again.")
     args = parser.parse_args()
 
     project_root = Path(args.project_root).resolve()
@@ -499,22 +761,36 @@ def main():
         sys.exit(1)
 
     cfg = get_shared_config(SHARED_ROOT)
+    if args.reset_exceptions:
+        print("[reset] recorded CLAUDE.md exceptions cleared." if reset_exceptions(project_root)
+              else "[reset] no recorded CLAUDE.md exceptions to clear.")
     state = read_consumer_state(project_root)
-    items = (scan_hooks(cfg, state) + scan_stale_hooks(state) + scan_skills(state, project_root, cfg) + scan_pieces(state)
-              + scan_private(cfg, state, project_root) + scan_permissions(state))
+    items = all_items(cfg, state, project_root)
 
-    if args.apply is None:
+    if args.apply is None and args.keep is None:
         print_items(items)
         if items:
             print()
-            print("Re-run with --apply <numbers-or-'all'> to adopt (e.g. --apply 1,3 or --apply all).")
+            print("Re-run with --apply <numbers-or-'all'> to adopt (e.g. --apply 1,3 or --apply all). "
+                  "Add --keep <numbers> to keep a CLAUDE.md block deviation as an exception instead.")
+        else:
+            _print_reminder(project_root)
         return
 
     if not items:
         print("Nothing available to apply - run without --apply first, or nothing has changed.")
+        _print_reminder(project_root)
         return
 
-    do_apply(project_root, cfg, items, args.apply)
+    do_apply(project_root, cfg, items, args.apply, args.keep)
+    _print_reminder(project_root)
+
+
+def _print_reminder(project_root):
+    line = exceptions_reminder(project_root)
+    if line:
+        print()
+        print(line)
 
 
 if __name__ == '__main__':

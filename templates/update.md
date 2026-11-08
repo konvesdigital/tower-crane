@@ -58,8 +58,12 @@ something `new_consumer.py` would wire into a brand-new consumer today:
 | Toolkit skill | A `STANDALONE_SKILLS` Track-1 skill (`update`, `commands`) not present under `.claude\skills\` |
 | Protocol piece | `filing`/`compliance`/`continuity` not `@import`ed (flat or Track-1 form) |
 
+It also compares this project's `CLAUDE.md` `## Tower Crane In Use` / `## Shared Workflow Protocol`
+block against what the current template would produce and lists each difference as a **CLAUDE.md block
+deviation**, showing the exact text that patching removes and what goes in.
+
 It prints an indexed, categorized list. If it's empty, this project already has everything the hub
-currently offers - stop here.
+currently offers - stop here (but still relay the exceptions reminder line, if the script printed one).
 
 ### Step 2 — present the list and ask
 
@@ -71,10 +75,14 @@ If a **protocol piece** item appears for something this project deliberately opt
 manages continuity a different way - register.md's own "omit only if..." caveat), say so and skip
 it rather than assuming it should be adopted.
 
+For **CLAUDE.md block deviations**, say plainly that patching removes the custom text shown (custom
+text can break Tower Crane), and recommend `all`. If the user wants to keep a deviation, that is a
+separate, explicit choice (`--keep <n>` in Step 3), not a way of declining.
+
 ### Step 3 — apply
 
-For a chosen **hook**, **toolkit skill**, or **protocol piece** item, re-run the same script with
-`--apply`:
+For a chosen **hook**, **toolkit skill**, **protocol piece**, or **CLAUDE.md block deviation** item,
+re-run the same script with `--apply`:
 
 ```
 <python_launcher> "<hub root>/toolkit/scripts/scan_consumer_update.py" --project-root "<this project's absolute root>" --apply <numbers-or-'all'>
@@ -85,6 +93,15 @@ for every mechanically-applicable item. This performs the actual write - the sam
 item type already uses elsewhere in this platform (a hook's opt-in JSON merge, a Track-1 skill's
 verbatim-copy-plus-`{{IMPORT_BASE}}`-substitution, a protocol piece's `@import` line) - nothing new
 to learn.
+
+To **keep** a block deviation instead of patching it, add `--keep <n>` (e.g. `--apply all --keep 4`
+means everything except item 4; `--keep 4` alone records only that). The script writes the kept text to
+`.claude\tower_crane_exceptions.json` in this project, prints a warning that Tower Crane may not behave
+100% as expected, and never lists that text again. Relay the warning.
+
+If the user says **"reset exceptions"**, run the Step 1 command with `--reset-exceptions` added: it
+clears this project's recorded exceptions and lists them as ordinary deviations again; then continue
+from Step 2 (patch all is the default). Never reset on your own.
 
 ### Step 4 — tell the hub about what changed (hooks and toolkit skills only)
 
@@ -100,3 +117,6 @@ nothing copied to go stale — registry write-back only matters for content that
 ### Step 5 — close
 
 Finish with exactly this line: `Update: <n> applied | <n> skipped | hub registry: <ticket filed | not needed>`.
+
+If the script printed an exceptions reminder (`N CLAUDE.md exceptions kept — say "reset exceptions" ...`),
+repeat it verbatim on the line after. It is information only: ask nothing, offer nothing else.

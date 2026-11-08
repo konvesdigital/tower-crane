@@ -32,9 +32,9 @@ from config_lib import get_shared_config, commit_consumer_changes
 from check_tower_crane import parse_registry, CONSUMERS_DIR
 from registry_lib import host_path, reconcile_scope_floor
 from scan_consumer_update import (
-    SKILL_PIECES, read_consumer_state, scan_hooks, scan_stale_hooks, scan_skills, scan_pieces, scan_private,
-    scan_permissions, apply_hook, apply_stale_hook, apply_skill, apply_piece, apply_private,
-    apply_permissions, resolve_selection,
+    SKILL_PIECES, CATEGORY_LABELS, read_consumer_state, all_items, apply_hook, apply_stale_hook,
+    apply_skill, apply_piece, apply_private, apply_permissions, apply_block_items, split_keep,
+    block_item_lines, exceptions_reminder, reset_exceptions,
 )
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent  # toolkit\
@@ -72,8 +72,7 @@ def scan_all(cfg, consumers, this_host):
             print(f"  [skip] {c['name']}: no CLAUDE.md at {this_path} - path stale or moved?")
             continue
         state = read_consumer_state(project_root)
-        items = (scan_hooks(cfg, state) + scan_stale_hooks(state) + scan_skills(state, project_root, cfg) + scan_pieces(state)
-                  + scan_private(cfg, state, project_root) + scan_permissions(state))
+        items = all_items(cfg, state, project_root)
         if items:
             slug = Path(c['file']).stem
             result.append((slug, {'consumer': c, 'project_root': project_root, 'items': items}))
@@ -87,9 +86,7 @@ def print_all(scanned):
         print("Nothing available - every locally-reachable consumer already has everything the "
               "hub currently offers.")
         return []
-    labels = {'hook': 'Hook opt-ins', 'stale_hook': 'Retired hooks to remove', 'skill': 'Toolkit skills',
-              'piece': 'Protocol pieces', 'private': 'Private tools (toolkit_private)',
-              'permission': 'Permission allowlist'}
+    labels = CATEGORY_LABELS
     global_index = []
     n = 0
     print(f"=== AVAILABLE across {len(scanned)} consumer(s) ===")
@@ -111,6 +108,8 @@ def print_all(scanned):
                 tags.append('drifted — needs re-sync')
             tag = f" [{', '.join(tags)}]" if tags else ''
             print(f"  [{n}] {it['name']}{tag}  ({it['detail']})")
+            for line in block_item_lines(it):
+                print(line)
     print("=== END AVAILABLE ===")
     return global_index
 
@@ -231,13 +230,17 @@ def update_registry_entry(registry_path, entries, today):
     print(f"  [registry] {registry_path.name} updated directly (opted_in/imported + audit note).")
 
 
-def do_apply(cfg, scanned, global_index, spec, today):
-    numbers = resolve_selection(spec, global_index)
-    if not numbers:
+def do_apply(cfg, scanned, global_index, spec, today, keep_spec=None):
+    numbers, keeps = split_keep([it for _, it in global_index], spec, keep_spec)
+    if not numbers and not keeps:
         print("Nothing valid to apply.")
         return
     scanned_by_slug = dict(scanned)
     per_consumer_writeback = {}
+    block_work = {}  # slug -> {'patch': [items], 'keep': [items]}
+    for i in keeps:
+        slug, item = global_index[i - 1]
+        block_work.setdefault(slug, {'patch': [], 'keep': []})['keep'].append(item)
     for i in numbers:
         slug, item = global_index[i - 1]
         data = scanned_by_slug[slug]
@@ -261,13 +264,30 @@ def do_apply(cfg, scanned, global_index, spec, today):
         elif item['category'] == 'permission':
             if apply_permissions(project_root, cfg, item):
                 per_consumer_writeback.setdefault(slug, []).append(('permission', item['name']))
+        elif item['category'] == 'claude_md_block':
+            block_work.setdefault(slug, {'patch': [], 'keep': []})['patch'].append(item)
+        elif item['category'] == 'claude_md_manual':
+            print(f"  [MANUAL] {item['detail']}")
+
+    # CLAUDE.md block: each consumer's chosen hunks are written together (offsets shift otherwise).
+    # No registry change - the block isn't a registry fact - but the consumer's repo still gets a commit.
+    block_changed = {}
+    for slug, work in block_work.items():
+        c = scanned_by_slug[slug]['consumer']
+        print(f"{c['name']} :: CLAUDE.md block:")
+        if apply_block_items(scanned_by_slug[slug]['project_root'], work['patch'], work['keep']):
+            block_changed[slug] = (f"claude_md_block: {len(work['patch'])} patched, "
+                                   f"{len(work['keep'])} kept")
 
     # Commits and pushes into each consumer's own repo, since no live session there would
     # otherwise notice and checkpoint this change.
-    for slug, entries in per_consumer_writeback.items():
+    for slug in dict.fromkeys(list(per_consumer_writeback) + list(block_changed)):
+        entries = per_consumer_writeback.get(slug, [])
         c = scanned_by_slug[slug]['consumer']
-        update_registry_entry(Path(c['file']), entries, today)
-        names = ', '.join(f"{cat}:{name}" for cat, name in entries)
+        if entries:
+            update_registry_entry(Path(c['file']), entries, today)
+        names = ', '.join([f"{cat}:{name}" for cat, name in entries]
+                          + ([block_changed[slug]] if slug in block_changed else []))
         result = commit_consumer_changes(
             scanned_by_slug[slug]['project_root'],
             f"Tower Crane sync: applied {names}", log=print,
@@ -291,6 +311,13 @@ def main():
     parser.add_argument('--consumer', default=None, help="Scope to one consumer slug. Default: all local consumers.")
     parser.add_argument('--apply', default=None,
                          help="Comma-separated global item numbers from the last --check listing, or 'all'.")
+    parser.add_argument('--keep', default=None,
+                         help="Comma-separated global numbers of CLAUDE.md block deviations to keep as "
+                              "recorded exceptions instead of patching (alone, or with --apply all).")
+    parser.add_argument('--reset-exceptions', action='store_true',
+                         help="Clear recorded CLAUDE.md exceptions for every consumer in this run "
+                              "(scope with --consumer) and commit that in each consumer's own repo; "
+                              "the scan then lists them as ordinary deviations.")
     args = parser.parse_args()
 
     cfg = get_shared_config(SHARED_ROOT)
@@ -300,20 +327,58 @@ def main():
         print(f"[ABORT] No local registry entry for consumer '{args.consumer}'.")
         sys.exit(1)
 
+    if args.reset_exceptions:
+        reset_all_exceptions(cfg, consumers, this_host)
+
     scanned = scan_all(cfg, consumers, this_host)
     global_index = print_all(scanned)
 
-    if args.apply is None:
+    if args.apply is None and args.keep is None:
         if global_index:
             print()
-            print("Re-run with --apply <numbers-or-'all'> to push (e.g. --apply 1,3 or --apply all).")
+            print("Re-run with --apply <numbers-or-'all'> to push (e.g. --apply 1,3 or --apply all). "
+                  "Add --keep <numbers> to keep a CLAUDE.md block deviation as an exception instead.")
+        print_reminders(consumers, this_host)
         return
 
     if not global_index:
         print("Nothing available to apply - run without --apply first, or nothing has changed.")
+        print_reminders(consumers, this_host)
         return
 
-    do_apply(cfg, scanned, global_index, args.apply, date.today().isoformat())
+    do_apply(cfg, scanned, global_index, args.apply, date.today().isoformat(), args.keep)
+    print_reminders(consumers, this_host)
+
+
+def reset_all_exceptions(cfg, consumers, this_host):
+    """Clear each consumer's recorded CLAUDE.md exceptions and commit that in its own repo."""
+    for c in consumers:
+        project_root = Path(host_path(c, this_host))
+        if not reset_exceptions(project_root):
+            print(f"  [reset] {c['name']}: no recorded CLAUDE.md exceptions.")
+            continue
+        print(f"  [reset] {c['name']}: recorded CLAUDE.md exceptions cleared.")
+        result = commit_consumer_changes(
+            project_root, "Tower Crane sync: reset CLAUDE.md exceptions", log=print,
+            config=cfg, imports=[i['name'] for i in c['imported']], shared_root=SHARED_ROOT)
+        if result in ('committed-pushed', 'committed-no-remote', 'reconciled-pushed'):
+            print(f"  [git] {c['name']}: reset committed in its own repo.")
+
+
+def print_reminders(consumers, this_host):
+    """One closing line per consumer that still has recorded CLAUDE.md exceptions - printed after
+    the work, never a question. Covers consumers with nothing new pending too."""
+    lines = []
+    for c in consumers:
+        project_root = Path(host_path(c, this_host))
+        if (project_root / 'CLAUDE.md').exists():
+            line = exceptions_reminder(project_root, label=f"{c['name']}: ")
+            if line:
+                lines.append(line.replace('say "reset exceptions"',
+                                          f'say "reset exceptions" (or "reset exceptions for {Path(c["file"]).stem}")'))
+    if lines:
+        print()
+        print('\n'.join(lines))
 
 
 if __name__ == '__main__':

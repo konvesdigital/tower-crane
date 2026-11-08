@@ -50,6 +50,7 @@ from config_lib import (
     write_new_connection_files, collapse_imports_to_pointer, ensure_local_read_rule, fix_imports, commit_hub_changes,
     commit_consumer_changes, path_is_clean, commit_consumer_progress_note, scoped_status_paths,
     sync_consumer_repo, merge_bash_allowlist,
+    render_claude_md_block, consumer_claude_md_template, ADOPTED_SHARED_RESOURCES_NONE,
 )
 import registry_lib
 
@@ -67,16 +68,8 @@ PRIVATE_ROOT = PROJECT_ROOT / 'toolkit_private'
 PRIVATE_OPTINS_DIR = PRIVATE_ROOT / 'templates' / 'optins'
 PRIVATE_SKILLS_DIR = PRIVATE_ROOT / 'templates' / 'skills'
 
-# short human blurb per known tool for the "Tower Crane In Use" list (falls back to the name)
-TOOL_BLURBS = {
-    'consistency_check': 'AST static analysis on Python writes/edits - undefined names, arg-count, '
-                          'string-key spelling (PostToolUse hook).',
-}
-
-# The "Adopted Shared Resources" subsection's general paragraph is fixed template text, shipped
-# with every scaffold. This fallback is only the "what's been adopted" LISTING underneath it,
-# which shared_resources.md's Apply/Forget procedures own from the first real adoption onward.
-ADOPTED_SHARED_RESOURCES_NONE = '**Shared resources adopted for this project:** _None yet._'
+# TOOL_BLURBS and ADOPTED_SHARED_RESOURCES_NONE now live in config_lib.py, next to the renderer
+# (render_claude_md_block) that both this scaffolder and the CLAUDE.md block patcher use.
 
 # Toolkit-governed Track-1 skill pieces: a piece name in here is scaffolded as one or more
 # project-local skill stubs (each sourced from templates/skills/<skill>/SKILL.md) plus a
@@ -525,21 +518,8 @@ def main():
             text, _ = strip_disconnected_section(claude_md_path.read_text(encoding='utf-8'))
         else:
             text = claude_md_path.read_text(encoding='utf-8')
-        if not tools:
-            tools_list = '_No shared tools opted in yet._'
-        else:
-            tools_list = '\n'.join(
-                f"- `{t}` - {TOOL_BLURBS.get(t, 'see tower_crane MENU.md.')}" for t in tools
-            )
-        tmpl = TMPL_PATH.read_text(encoding='utf-8')
-        tmpl = re.sub(r'^\s*<!--.*?-->\s*', '', tmpl, count=1, flags=re.DOTALL)
-        live_idx = tmpl.find(TC_IN_USE_HEADING)
-        live_sections = tmpl[live_idx:] if live_idx != -1 else f"{TC_IN_USE_HEADING}\n\n{WORKFLOW_HEADING}\n\n"
-        live_sections = (live_sections
-                          .replace('{{DATE}}', scaffold_date)
-                          .replace('{{SHARED_TOOLS_LIST}}', tools_list)
-                          .replace('{{ADOPTED_SHARED_RESOURCES}}', ADOPTED_SHARED_RESOURCES_NONE)
-                          .replace('{{PROTOCOL_IMPORTS}}', protocol_imports))
+        live_sections = render_claude_md_block(tools, scaffold_date, ADOPTED_SHARED_RESOURCES_NONE,
+                                               protocol_imports)
         text = text.rstrip('\n') + '\n\n' + live_sections
         write_utf8(claude_md_path, text)
         if is_reconnect:
@@ -561,22 +541,12 @@ def main():
             "still looks live') before using --force."
         )
     else:
-        if not tools:
-            tools_list = '_No shared tools opted in yet._'
-        else:
-            tools_list = '\n'.join(
-                f"- `{t}` - {TOOL_BLURBS.get(t, 'see tower_crane MENU.md.')}" for t in tools
-            )
-
-        tmpl = TMPL_PATH.read_text(encoding='utf-8')
-        # strip the template's own leading HTML-comment header (documentation for maintainers, not consumers)
-        tmpl = re.sub(r'^\s*<!--.*?-->\s*', '', tmpl, count=1, flags=re.DOTALL)
-        claude_md = (tmpl
-                     .replace('{{PROJECT_NAME}}', project_name)
-                     .replace('{{DATE}}', scaffold_date)
-                     .replace('{{SHARED_TOOLS_LIST}}', tools_list)
-                     .replace('{{ADOPTED_SHARED_RESOURCES}}', ADOPTED_SHARED_RESOURCES_NONE)
-                     .replace('{{PROTOCOL_IMPORTS}}', protocol_imports))
+        # head = the template's project-name header (its maintainer comment already stripped);
+        # the two live sections come from the same renderer the block patcher uses.
+        head, _ = consumer_claude_md_template()
+        claude_md = (head.replace('{{PROJECT_NAME}}', project_name)
+                     + render_claude_md_block(tools, scaffold_date, ADOPTED_SHARED_RESOURCES_NONE,
+                                              protocol_imports))
         write_utf8(claude_md_path, claude_md)
         print(f"  wrote  {claude_md_path}")
 

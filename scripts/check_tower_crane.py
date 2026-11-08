@@ -218,6 +218,108 @@ def invoke_golden_suite(config):
         shutil.rmtree(sandbox, ignore_errors=True)
 
 
+def invoke_block_patcher_tests():
+    """Pass A scenarios for the CLAUDE.md block patcher, run against throwaway projects. Covers
+    both entry points: scan_consumer_update.py (a project's `update`) and update_consumers.py
+    (the hub's `update consumers`) share one implementation, and the hub scenario proves it."""
+    print()
+    print("--- Pass A: CLAUDE.md block patcher ---")
+    import scan_consumer_update as scu
+    from config_lib import (render_claude_md_block, load_exceptions, EXCEPTIONS_RELPATH,
+                            ADOPTED_SHARED_RESOURCES_NONE)
+
+    def ok(name, cond, why=''):
+        report('PASS' if cond else 'FAIL', f"block patcher / {name}" + ('' if cond else f" : {why}"))
+
+    adopted = '**Shared resources adopted for this project:** `foo`.'
+    clean = ("# Project: T\n\nDirectives here.\n\n"
+             + render_claude_md_block(['consistency_check'], '2026-01-01', adopted, HUB_POINTER_IMPORT_LINE))
+    stale = (clean.replace("Don't guess.", "Guess freely.", 1)
+                  .replace("### Adopted Shared Resources\n\n", "", 1)
+                  .replace("1. **General directive.**", "1. **General rule.**", 1))
+
+    tmp = Path(tempfile.mkdtemp(prefix='tc_block_'))
+    try:
+        def project(name, text):
+            root = tmp / name
+            root.mkdir()
+            (root / 'CLAUDE.md').write_text(text, encoding='utf-8', newline='\n')
+            return root
+
+        def md(root):
+            return (root / 'CLAUDE.md').read_text(encoding='utf-8')
+
+        def block_items(root):
+            return [i for i in scu.scan_block(root)[0] if i['category'] == 'claude_md_block']
+
+        # clean block: nothing offered, no reminder
+        r = project('clean', clean)
+        ok('clean block has no deviations', scu.scan_block(r) == ([], 0))
+        ok('clean block prints no reminder', scu.exceptions_reminder(r) == '')
+
+        # stale block: three deviations found and all patched; adopted listing and rest preserved
+        r = project('stale', stale)
+        items = block_items(r)
+        ok('stale block yields 3 deviations', len(items) == 3, f"got {len(items)}")
+        scu.apply_block_items(r, items, [])
+        ok('patch all restores the template text exactly (adopted listing carried over)', md(r) == clean)
+        ok('patched block rescans clean', scu.scan_block(r) == ([], 0))
+
+        # keep one: recorded, warned, not re-offered, reminder printed, others patched
+        r = project('keep', stale)
+        items = block_items(r)
+        kept = [i for i in items if 'Guess freely' in i['cur_text']]
+        rest = [i for i in items if i not in kept]
+        scu.apply_block_items(r, rest, kept)
+        ok('kept text stays in CLAUDE.md', 'Guess freely' in md(r) and 'General rule' not in md(r))
+        left, live = scu.scan_block(r)
+        ok('kept deviation is settled, not re-offered', left == [] and live == 1, f"left={len(left)} live={live}")
+        ok('reminder line names the exception count',
+           scu.exceptions_reminder(r).startswith('1 CLAUDE.md exception kept'))
+
+        # reset: exceptions cleared, deviation offered again, patch-all aligns the file
+        ok('reset reports it removed the record', scu.reset_exceptions(r) is True)
+        again = block_items(r)
+        ok('after reset the kept text is a deviation again', len(again) == 1, f"got {len(again)}")
+        scu.apply_block_items(r, again, [])
+        ok('reset then patch-all matches the template', md(r) == clean)
+
+        # hand-reverted kept text self-cleans on the next write
+        r = project('revert', stale)
+        items = block_items(r)
+        kept = [i for i in items if 'Guess freely' in i['cur_text']]
+        scu.apply_block_items(r, [], kept)
+        (r / 'CLAUDE.md').write_text(md(r).replace('Guess freely.', "Don't guess."), encoding='utf-8', newline='\n')
+        scu.apply_block_items(r, [], [])
+        ok('hand-reverted exception is dropped', not (r / EXCEPTIONS_RELPATH).exists())
+
+        # unusable inputs are reported for hand-fixing, never guessed at
+        r = project('noheading', "# Project: T\n\nNothing here.\n")
+        ok('missing heading is [MANUAL]', [i['category'] for i in scu.scan_block(r)[0]] == ['claude_md_manual'])
+        r = project('badjson', clean)
+        (r / '.claude').mkdir()
+        (r / EXCEPTIONS_RELPATH).write_text('{bad', encoding='utf-8')
+        ok('invalid exception file is [MANUAL]', [i['category'] for i in scu.scan_block(r)[0]] == ['claude_md_manual'])
+        r = project('disc', "# Project: T\n\n## Tower Crane (disconnected)\n\nGone.\n")
+        ok('disconnected project is left alone', scu.scan_block(r) == ([], 0))
+
+        # hub entry point: update_consumers applies and keeps through the same code
+        import update_consumers as uc
+        ok('hub and project share one item builder', uc.all_items is scu.all_items)
+        r = project('hub', stale)
+        items = block_items(r)
+        c = {'name': 'Hub Test', 'file': str(tmp / 'hub_test.md'), 'imported': []}
+        scanned = [('hub_test', {'consumer': c, 'project_root': r, 'items': items})]
+        index = [('hub_test', it) for it in items]
+        guess_n = next(n for n, it in enumerate(items, 1) if 'Guess freely' in it['cur_text'])
+        uc.do_apply({}, scanned, index, 'all', '2026-01-01', keep_spec=str(guess_n))
+        ok('hub: all-but-one patched, one kept',
+           'Guess freely' in md(r) and 'General rule' not in md(r) and scu.scan_block(r)[1] == 1)
+        ok('hub: exception file written', len(load_exceptions(r)[0]) == 1)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 # ==================================================================================================
 # Pass B - per-consumer reference & drift scan
 # ==================================================================================================
@@ -317,6 +419,17 @@ def test_consumer(c, config, this_host):
                          f"settings.json still runs retired hook '{dead}' (hooks/{dead}.py no longer exists).",
                          "Run `update consumers` from the hub (or `update` in that project) and apply "
                          "the 'Retired hooks to remove' item."))
+
+    # CLAUDE.md block drift: deviations neither patched nor recorded as exceptions. WARN (same
+    # reasoning as the retired-hook WARN above); recorded exceptions are the operator's choice.
+    from scan_consumer_update import scan_block
+    block_items, _ = scan_block(cpath)
+    n_dev = sum(1 for it in block_items if it['category'] == 'claude_md_block')
+    if n_dev:
+        devs.append(Dev('WARN', 'consumer',
+                         f"CLAUDE.md's Tower Crane block has {n_dev} deviation(s) from the current template.",
+                         "Run `update consumers` from the hub (or `update` in that project) and patch "
+                         "them, or keep a deviation deliberately."))
 
     # --- CLAUDE.md imports -----------------------------------------------------------------
     md_imports = []
@@ -886,6 +999,7 @@ def main():
 
     if not args.skip_golden:
         invoke_golden_suite(config)
+        invoke_block_patcher_tests()
     if not args.skip_reference:
         invoke_reference_scan(config, this_host, args.consumer, args.write_guidance, head_sha, today)
         check_hub_self_use_skills(config)

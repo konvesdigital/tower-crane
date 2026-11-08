@@ -41,7 +41,7 @@ from config_lib import (
     TC_IN_USE_HEADING, WORKFLOW_HEADING, DISCONNECTED_HEADING,
     DISCONNECT_NOTES_FILENAME as NOTES_FILENAME,
     HUB_POINTER_IMPORT_LINE, HUB_POINTER_RELPATH, HUB_DISPATCH_RELPATH,
-    CONSUMER_OWNED_PATHS, scoped_status_paths,
+    CONSUMER_OWNED_PATHS, scoped_status_paths, EXCEPTIONS_RELPATH,
 )
 import registry_lib
 from new_consumer import SKILL_PIECES, STANDALONE_SKILLS
@@ -426,6 +426,14 @@ def strip_local_references(target_path, consumer, config, mode, log, is_last_hos
             dispatch_path.unlink()
             dispatch_removed = True
             log(f"  removed {dispatch_path}")
+
+    # .claude\tower_crane_exceptions.json - the CLAUDE.md block patcher's record of kept deviations;
+    # tracked, meaningless once the block itself is gone (last host only).
+    if is_last_host:
+        exceptions_path = target_path / EXCEPTIONS_RELPATH
+        if exceptions_path.exists():
+            exceptions_path.unlink()
+            log(f"  removed {exceptions_path}")
 
     # .claude\skills\<name>\ - every skill this hub scaffolded (SHARED tracked content - last host only).
     removed_skills = []
