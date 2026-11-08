@@ -3,7 +3,7 @@
 check_shared_resource_catalog.py - internal-consistency checks for shared_resources\\CATALOG.md
 and shared_resources\\resource_relationships.yaml.
 
-Four checks, all notify-only:
+Five checks, all notify-only:
 
 1. File column - every CATALOG.md row's `File` cell must resolve to a real file in
    shared_resources\\, active or archived.
@@ -15,6 +15,13 @@ Four checks, all notify-only:
    to some CATALOG.md row, by filename stem. An edge to an archived entry PASSes; only a stem
    matching no row at all is a failure.
 
+5. No absolute paths in an entry - no shared_resources\\ entry file may contain an absolute path
+   anywhere except inside its own `**Hosts:**` block (the one place a machine-local path
+   belongs). An absolute path pointing back into the hub is a mis-recorded hub reference (breaks
+   on any machine whose hub lives elsewhere); one pointing outside the hub is a machine-local
+   resource that belongs in the Hosts block. There is no exemption or escape marker: a URL
+   (scheme://, other than file://) is not a path and is skipped; everything else is flagged.
+
 Message format leads with the practical effect on what Claude will or won't do; the technical
 cause is included secondarily.
 
@@ -25,6 +32,11 @@ Wired into `resume` (not `quick resume`) via resume_check.py.
 Usage: python scripts\\check_shared_resource_catalog.py (run from inside toolkit\\, or anywhere).
 Quiet when clean - prints one `[!] <message>` line per problem found, then a one-line summary.
 Always exits 0.
+
+Single-file mode, used by `save` before it propagates a write:
+  python scripts\\check_shared_resource_catalog.py --entry <file> [<file> ...]
+Runs only check 5 on the named file(s); prints one `[!]` line per absolute path found and exits 1
+if any were found (0 if clean), so `save` can require a clean result before committing.
 """
 
 import re
@@ -192,7 +204,117 @@ def check_edges(edges, rows):
     return results
 
 
+# --- Check 5: no absolute paths outside an entry's own Hosts: block -----------------------------
+
+# A URL (scheme://...) is not a filesystem path - except file://, which IS one and must be scanned.
+URL_RE = re.compile(r'\b(?!file:)[A-Za-z][A-Za-z0-9+.\-]*://\S*')
+_BOUNDARY = r'(?:^|[\s`"\'(\[=])'
+ABS_PATH_PATTERNS = [
+    re.compile(r'(?<![A-Za-z0-9])[A-Za-z]:[\\/]'),                 # C:\ or C:/
+    re.compile(_BOUNDARY + r'~[\\/]'),                              # ~/ or ~\
+    re.compile(_BOUNDARY + r'\\\\[A-Za-z0-9_.$-]+\\'),              # \\server\share
+    re.compile(_BOUNDARY + r'/(?:Users|home|mnt|opt|var|etc|usr|tmp|root)/'),  # POSIX roots
+    re.compile(r'%[A-Za-z_]+%[\\/]|\$\{?HOME\}?[\\/]'),             # %APPDATA%\ or $HOME/
+    re.compile(r'\bfile:/{2,3}'),                                    # file:// URLs
+]
+PATH_END_RE = re.compile(r'[\s`"\')>\]]')
+HUB_SEGMENT_RE = re.compile(r'[\\/]shared_resources(?:[\\/]|$)', re.IGNORECASE)
+
+
+def _hosts_block_indexes(lines):
+    """Line indexes inside the entry's `**Hosts:**` block: the header line plus every following
+    blank or indented line (the block ends at the first unindented, non-blank line)."""
+    inside = set()
+    for i, line in enumerate(lines):
+        if line.strip() != '**Hosts:**':
+            continue
+        inside.add(i)
+        j = i + 1
+        while j < len(lines) and (not lines[j].strip() or lines[j][0] in ' \t'):
+            inside.add(j)
+            j += 1
+    return inside
+
+
+def find_absolute_paths(text):
+    """Return [(line_number, path_token, points_into_hub)] for every absolute path in `text`
+    outside the Hosts: block. No exemptions beyond that block and plain URLs."""
+    lines = text.splitlines()
+    skip = _hosts_block_indexes(lines)
+    found = []
+    for idx, line in enumerate(lines):
+        if idx in skip:
+            continue
+        scan = URL_RE.sub(lambda m: ' ' * len(m.group(0)), line)
+        starts = set()
+        for pattern in ABS_PATH_PATTERNS:
+            for m in pattern.finditer(scan):
+                start = m.start()
+                while start < m.end() and scan[start] in ' \t`"\'([=':
+                    start += 1
+                starts.add(start)
+        covered_to = 0  # a later hit inside an earlier hit's token (file:///C:/...) is the same path
+        for start in sorted(starts):
+            if start < covered_to:
+                continue
+            end_m = PATH_END_RE.search(scan, start)
+            end = end_m.start() if end_m else len(scan)
+            token = scan[start:end].rstrip('.,;:')
+            covered_to = end
+            found.append((idx + 1, token, bool(HUB_SEGMENT_RE.search(token))))
+    return found
+
+
+def absolute_path_message(name, line_no, token, into_hub):
+    if into_hub:
+        return (f'"{name}" (line {line_no}) names the hub file "{token}" by absolute path, so the '
+                'reference breaks on any machine whose hub lives somewhere else. Fix: replace it '
+                'with the shared_resources file name alone.')
+    return (f'"{name}" (line {line_no}) writes the absolute path "{token}" in its body, which makes '
+            'the resource local to one machine while looking available everywhere. Fix: move the '
+            'path into the entry\'s Hosts: block under the machine that has it, and refer to it in '
+            'the body by name only.')
+
+
+def check_absolute_paths(rows):
+    """Scan every catalog row's entry file (active or archived) for absolute paths outside its
+    Hosts: block. A missing file is check 1's finding, not this one's."""
+    results = []
+    for row in rows:
+        entry_path = CATALOG_PATH.parent / row['file']
+        if not entry_path.exists():
+            continue
+        text = entry_path.read_text(encoding='utf-8')
+        for line_no, token, into_hub in find_absolute_paths(text):
+            results.append(('ABSOLUTE-PATH', row['name'],
+                            absolute_path_message(row['name'], line_no, token, into_hub)))
+    return results
+
+
+def run_entry_mode(file_args):
+    """--entry <file>...: check 5 alone on the named file(s). Exit 1 if any path found."""
+    total = 0
+    for arg in file_args:
+        path = Path(arg)
+        if not path.exists():
+            print(f"[!] {arg} does not exist - nothing to check.")
+            total += 1
+            continue
+        for line_no, token, into_hub in find_absolute_paths(path.read_text(encoding='utf-8')):
+            print(f"[!] {absolute_path_message(path.name, line_no, token, into_hub)}")
+            total += 1
+    print(f"=== {total} absolute-path problem(s) in {len(file_args)} file(s) ===" if total
+          else f"=== no absolute paths found in {len(file_args)} file(s) ===")
+    sys.exit(1 if total else 0)
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == '--entry':
+        if len(sys.argv) < 3:
+            print("usage: check_shared_resource_catalog.py --entry <file> [<file> ...]")
+            sys.exit(1)
+        run_entry_mode(sys.argv[2:])
+
     print("=== check_shared_resource_catalog.py ===")
 
     if not CATALOG_PATH.exists():
@@ -210,17 +332,20 @@ def main():
     undeclared_identity = [r for r in check_identity_eligible_declared(rows, identity_eligible)
                             if r[0] == 'UNDECLARED']
     edge_fails = check_edges(edges, rows)  # already FAIL-only, see its own docstring/return shape
+    path_fails = check_absolute_paths(rows)
 
-    for _, _, message in file_fails + tier_mismatches + undeclared_identity + edge_fails:
+    for _, _, message in file_fails + tier_mismatches + undeclared_identity + edge_fails + path_fails:
         print(f"[!] {message}")
 
-    total = len(file_fails) + len(tier_mismatches) + len(undeclared_identity) + len(edge_fails)
+    total = (len(file_fails) + len(tier_mismatches) + len(undeclared_identity) + len(edge_fails)
+             + len(path_fails))
     print()
     if total:
         print(f"=== {total} issue(s) found across {len(rows)} catalog row(s)/{len(edges)} edge(s): "
               f"{len(file_fails)} broken file reference(s), {len(tier_mismatches)} tier "
               f"mismatch(es), {len(undeclared_identity)} undeclared identity_eligible categor"
-              f"y(ies), {len(edge_fails)} broken edge(s) (notify only, not a failure) ===")
+              f"y(ies), {len(edge_fails)} broken edge(s), {len(path_fails)} absolute path(s) "
+              "(notify only, not a failure) ===")
     else:
         print(f"=== no catalog/graph inconsistencies found across {len(rows)} catalog row(s)/"
               f"{len(edges)} edge(s) ===")

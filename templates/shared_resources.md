@@ -160,8 +160,11 @@ organizational scheme applied on top of it.
    `identity_eligible:` block in `shared_resources\resource_relationships.yaml` (create it with an
    empty mapping first if it doesn't exist yet), keyed by Category name — e.g.
    `identity_eligible: {SEO: true}`. For `insight`, see "Insights are different" below —
-   its save flow is a negotiation, not a fixed write, but ends the same way. Either way, finish with
-   **propagate the write** (see below).
+   its save flow is a negotiation, not a fixed write, but ends the same way. Either way, before
+   propagating, **run `python toolkit/scripts/check_shared_resource_catalog.py --entry
+   shared_resources/<the entry file>`** (path from the hub root) and fix every `[!]` line it prints
+   by editing the entry, then re-run until it exits 0 — see "No absolute paths in an entry" below.
+   Then finish with **propagate the write** (see below).
 7. **Coverage guarantee, then a precision offer — only when this entry has a Category.** Two
    distinct things, not one:
    - **This save is the Category's very first entry, of any kind** (`Primary`, or the first entry
@@ -206,6 +209,22 @@ from `<hub root>\toolkit\config.local.json`, the same file the hub itself reads 
 
 See "Per-host availability for pointer entries" below for why, and for what happens when a project
 that adopted this entry runs on a machine not yet in this list.
+
+**No absolute paths in an entry.** The `path:` line inside an entry's `Hosts:` block is the only
+place an absolute path (a drive letter, `~/`, a network share, `/Users/...`, an environment-variable
+path, a `file://` link) may appear in any `shared_resources\` file. Everywhere else — the entry's
+prose, its examples, its code blocks — write the thing by name only. Before drafting an entry,
+sort each path you are about to mention into one of two cases:
+- **It names another hub file** → write that file's name alone (`weekly_ticket_triage_workflow.md`),
+  never a path to it.
+- **It names something outside the hub** (a script, folder, or program on this machine) → the entry
+  is machine-local: make it a `tool` (or a pointer `reference`), put the path in its `Hosts:` block
+  under this machine's `host_id`, and refer to the thing in the body by name only.
+
+Web links (`https://...`) are not paths and are fine. `check_shared_resource_catalog.py` enforces
+this with no exemptions — `save` runs it on the new entry (step 6) before propagating, and the
+hub's `resume` runs it over every entry. Nothing marks an absolute path as "intentional"; if
+the entry needs a path in its prose, it needs a `Hosts:` block instead.
 
 ### Every write here ends with the same propagation step
 
