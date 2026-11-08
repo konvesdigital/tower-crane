@@ -54,7 +54,7 @@ something `new_consumer.py` would wire into a brand-new consumer today:
 
 | Category | What "available" means |
 |---|---|
-| Hook | A `MENU.md` hook this project hasn't opted into |
+| Hook | A `MENU.md` hook this project hasn't opted into (a hook whose opt-in names a narrower `audience`, such as `blind_clone`, is never offered) |
 | Toolkit skill | A `STANDALONE_SKILLS` Track-1 skill (`update`, `commands`) not present under `.claude\skills\` |
 | Protocol piece | `filing`/`compliance`/`continuity` not `@import`ed (flat or Track-1 form) |
 

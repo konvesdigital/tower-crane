@@ -316,6 +316,32 @@ def invoke_block_patcher_tests():
         ok('hub: all-but-one patched, one kept',
            'Guess freely' in md(r) and 'General rule' not in md(r) and scu.scan_block(r)[1] == 1)
         ok('hub: exception file written', len(load_exceptions(r)[0]) == 1)
+
+        # false positives the scan must not report (pointer-form pieces, audience-restricted hooks)
+        from config_lib import build_hub_pointer_content
+        cfg = get_shared_config(SHARED_ROOT)
+        pieces = ['filing_resume_check', 'compliance', 'shared_resources_resume_check',
+                  'continuity_resume_check']
+        r = project('pointer', clean)
+        (r / '.claude').mkdir(exist_ok=True)
+        for s in ('filing', 'checkpoint', 'archive', 'shared_resources'):
+            (r / '.claude' / 'skills' / s).mkdir(parents=True)
+        ok('without hub_pointer.md the protocol pieces look missing (control)',
+           len(scu.scan_pieces(scu.read_consumer_state(r))) == 4)
+        (r / '.claude' / 'hub_pointer.md').write_text(build_hub_pointer_content(cfg, pieces),
+                                                      encoding='utf-8', newline='\n')
+        ok('pieces imported via hub_pointer.md are not offered',
+           scu.scan_pieces(scu.read_consumer_state(r)) == [])
+
+        restricted = tmp / 'restricted.json'
+        restricted.write_text('{"audience": "x", "hooks": {}}', encoding='utf-8')
+        plain = tmp / 'plain.json'
+        plain.write_text('{"hooks": {}}', encoding='utf-8')
+        ok('an opt-in with an audience note is restricted, one without is not',
+           scu._has_restricted_audience(restricted) and not scu._has_restricted_audience(plain))
+        offered = {i['name'] for i in scu.scan_hooks(cfg, scu.read_consumer_state(r))}
+        ok('audience-restricted hooks (blind_clone) are never offered by the generic scan',
+           'blind_clone' not in offered, f"offered={sorted(offered)}")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

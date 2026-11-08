@@ -36,6 +36,7 @@ from config_lib import (
     find_block_region, render_claude_md_block, load_exceptions, save_exceptions,
     TC_IN_USE_HEADING, WORKFLOW_HEADING, DISCONNECTED_HEADING, HUB_POINTER_IMPORT_LINE,
     ADOPTED_SHARED_RESOURCES_NONE, ADOPTED_LISTING_ANCHOR, EXCEPTIONS_RELPATH,
+    parse_hub_pointer, HUB_POINTER_RELPATH,
 )
 from registry_lib import parse_registry, host_path
 
@@ -104,6 +105,11 @@ def read_consumer_state(project_root):
     # '.' matches an import_base path containing a space; safe since an @import line is always
     # exactly one line.
     md_imports = set(re.findall(r'@.*?templates/(\w+)\.md', md_text))
+    # A pointer-form project's CLAUDE.md carries only '@.claude/hub_pointer.md'; the real piece
+    # imports live in that (gitignored, per-host) file, so read them too or every piece looks missing.
+    pointer = parse_hub_pointer(project_root / HUB_POINTER_RELPATH)
+    if pointer:
+        md_imports |= set(pointer['imports'])
 
     settings_path = project_root / '.claude' / 'settings.json'
     settings = {}
@@ -120,10 +126,23 @@ def read_consumer_state(project_root):
             'have_skills': have_skills}
 
 
+def _has_restricted_audience(optin_path):
+    """True when the opt-in snippet declares an `audience` note (e.g. blind_clone: 'for people
+    modifying Tower Crane itself'). Such a tool is available for whoever it names but is never
+    offered to every consumer by the generic scan."""
+    try:
+        data = json.loads(Path(optin_path).read_text(encoding='utf-8'))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return isinstance(data, dict) and bool(data.get('audience'))
+
+
 def scan_hooks(cfg, state):
     items = []
     have_hooks = state['settings'].get('hooks') if isinstance(state['settings'], dict) else None
     for optin_path in sorted(OPTINS_DIR.glob('*.json')):
+        if _has_restricted_audience(optin_path):
+            continue
         tool = optin_path.stem
         expanded = get_dispatch_optin(optin_path, tool, cfg)
         missing = False
