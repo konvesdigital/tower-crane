@@ -333,6 +333,30 @@ def invoke_block_patcher_tests():
         ok('pieces imported via hub_pointer.md are not offered',
            scu.scan_pieces(scu.read_consumer_state(r)) == [])
 
+        # grouping: every finding lands under exactly the heading that says what is wrong with it
+        r = project('groups', stale)
+        groups = sorted(scu.item_group(i) for i in block_items(r))
+        ok('block findings split into remove / replace / add',
+           groups.count('replace') == 2 and groups.count('add') == 1, f"got {groups}")
+        r = project('groups2', clean.replace("### Adopted Shared Resources", "Stray note.\n\n### Adopted Shared Resources", 1))
+        ok('text the template lacks nothing for is a REMOVE finding',
+           [scu.item_group(i) for i in block_items(r)] == ['remove'])
+        ok('items print in group order (remove, replace, add)',
+           [scu.item_group(i) for i in scu.sort_by_group(
+               [{'category': 'permission', 'name': 'a', 'detail': ''},
+                {'category': 'stale_hook', 'name': 'b', 'detail': ''},
+                {'category': 'skill', 'name': 'c', 'detail': '', 'drifted': True}])] == ['remove', 'replace', 'add'])
+
+        # optional: private tools an unregistered project never opted into stay out of the list
+        r = project('optional', clean)
+        (r / '.claude').mkdir()
+        state = scu.read_consumer_state(r)
+        opt = scu.optional_names(get_shared_config(SHARED_ROOT), state, r)
+        default = {i['name'] for i in scu.all_items(get_shared_config(SHARED_ROOT), state, r)}
+        wide = {i['name'] for i in scu.all_items(get_shared_config(SHARED_ROOT), state, r, include_optional=True)}
+        ok('optional items are left out by default and listed with --include-optional',
+           not (set(opt) & default) and set(opt) <= wide, f"opt={opt}")
+
         restricted = tmp / 'restricted.json'
         restricted.write_text('{"audience": "x", "hooks": {}}', encoding='utf-8')
         plain = tmp / 'plain.json'

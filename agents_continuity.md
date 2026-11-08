@@ -256,7 +256,10 @@ registry's `opted_in:` row. It also lists every deviation in each consumer's `CL
 (`CLAUDE.md block deviations`), each with the exact text that patching removes and what goes in; the
 consumer's own `update` lists the same items (same code, `scan_consumer_update.py`).
 1. `python toolkit/scripts/update_consumers.py` (optionally `--consumer <slug>`) — indexed list across
-   every locally-reachable consumer (Federate: other hosts skip silently); show it, ask what to apply.
+   every locally-reachable consumer (Federate: other hosts skip silently); show it with its
+   REMOVE / REPLACE / ADD / FIX BY HAND headings intact, ask what to apply. Private tools a consumer
+   never opted into are not numbered (one "Optional, not listed" line per consumer, relayed as
+   information only; `--include-optional`, on the `--apply` call too, lists them).
    For block deviations say plainly that patching removes the custom text shown (custom text can break
    Tower Crane) and that `all` is the recommended answer.
 2. `python toolkit/scripts/update_consumers.py --apply <numbers-or-'all'>` — writes each touched project

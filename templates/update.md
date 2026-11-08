@@ -62,8 +62,15 @@ It also compares this project's `CLAUDE.md` `## Tower Crane In Use` / `## Shared
 block against what the current template would produce and lists each difference as a **CLAUDE.md block
 deviation**, showing the exact text that patching removes and what goes in.
 
-It prints an indexed, categorized list. If it's empty, this project already has everything the hub
-currently offers - stop here (but still relay the exceptions reminder line, if the script printed one).
+It prints an indexed list under plain headings that say what is wrong with each item: **REMOVE**
+(in place but shouldn't be), **REPLACE** (in place but out of date), **ADD** (should be there but is
+missing), and **FIX BY HAND**. Keep those headings when you show it. Anything that merely *could* be
+added (a private tool this project never opted into) is not numbered or applied by `all`; the script
+ends with one "Optional, not listed" line instead. Relay that line, but treat it as information: do
+not recommend or ask about those items unless the user does (`--include-optional` lists them, on the
+`--apply` call too, so the numbers match). If the list is empty, this project already has everything
+the hub currently expects - stop here (but still relay the exceptions reminder line, if the script
+printed one).
 
 ### Step 2 — present the list and ask
 

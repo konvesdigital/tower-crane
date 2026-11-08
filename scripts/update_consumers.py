@@ -32,7 +32,8 @@ from config_lib import get_shared_config, commit_consumer_changes
 from check_tower_crane import parse_registry, CONSUMERS_DIR
 from registry_lib import host_path, reconcile_scope_floor
 from scan_consumer_update import (
-    SKILL_PIECES, CATEGORY_LABELS, read_consumer_state, all_items, apply_hook, apply_stale_hook,
+    SKILL_PIECES, print_groups, optional_note, optional_names, read_consumer_state, all_items,
+    apply_hook, apply_stale_hook,
     apply_skill, apply_piece, apply_private, apply_permissions, apply_block_items, split_keep,
     block_item_lines, exceptions_reminder, reset_exceptions,
 )
@@ -61,9 +62,10 @@ def local_consumers(this_host, consumer_filter=None):
     return out
 
 
-def scan_all(cfg, consumers, this_host):
+def scan_all(cfg, consumers, this_host, include_optional=False):
     """Returns an ordered dict-like list of (slug, {'consumer': c, 'project_root': Path,
-    'items': [...]}) for every consumer that has at least one available item."""
+    'items': [...], 'omitted': [optional names left out]}) for every consumer that has at least
+    one item to act on, or optional items worth mentioning."""
     result = []
     for c in consumers:
         this_path = host_path(c, this_host)
@@ -72,44 +74,38 @@ def scan_all(cfg, consumers, this_host):
             print(f"  [skip] {c['name']}: no CLAUDE.md at {this_path} - path stale or moved?")
             continue
         state = read_consumer_state(project_root)
-        items = all_items(cfg, state, project_root)
-        if items:
+        items = all_items(cfg, state, project_root, include_optional)
+        omitted = [] if include_optional else optional_names(cfg, state, project_root)
+        if items or omitted:
             slug = Path(c['file']).stem
-            result.append((slug, {'consumer': c, 'project_root': project_root, 'items': items}))
+            result.append((slug, {'consumer': c, 'project_root': project_root, 'items': items,
+                                  'omitted': omitted}))
     return result
 
 
 def print_all(scanned):
-    """Prints the aggregated, globally-numbered listing grouped by consumer. Returns the flat
-    (slug, item) index list the printed numbers refer to, in print order."""
-    if not scanned:
-        print("Nothing available - every locally-reachable consumer already has everything the "
-              "hub currently offers.")
+    """Prints the aggregated, globally-numbered listing: per consumer, items under REMOVE / REPLACE /
+    ADD / FIX BY HAND headings (OPTIONAL only with --include-optional, otherwise one trailing note).
+    Returns the flat (slug, item) index list the printed numbers refer to, in print order."""
+    if not any(data['items'] or data['omitted'] for _, data in scanned):
+        print("Nothing to change - every locally-reachable consumer already has everything the "
+              "hub currently expects.")
         return []
-    labels = CATEGORY_LABELS
     global_index = []
     n = 0
-    print(f"=== AVAILABLE across {len(scanned)} consumer(s) ===")
+    n_items = sum(len(data['items']) for _, data in scanned)
+    print(f"=== AVAILABLE: {n_items} item(s) across {len(scanned)} consumer(s) ===")
     for slug, data in scanned:
         c = data['consumer']
         print(f"\n-- {c['name']} ({slug}) --")
-        current_cat = None
-        for it in data['items']:
-            n += 1
-            global_index.append((slug, it))
-            if it['category'] != current_cat:
-                current_cat = it['category']
-                print(f"   [{labels[current_cat]}]")
-            # Mirrors scan_consumer_update.py's print_items() tag rendering - keep in sync.
-            tags = []
-            if it.get('subscribed'):
-                tags.append(f"{it['skill_category']} — subscribed")
-            if it.get('drifted'):
-                tags.append('drifted — needs re-sync')
-            tag = f" [{', '.join(tags)}]" if tags else ''
-            print(f"  [{n}] {it['name']}{tag}  ({it['detail']})")
-            for line in block_item_lines(it):
-                print(line)
+        if not data['items']:
+            print("  Nothing to change.")
+        for slug_item in data['items']:
+            global_index.append((slug, slug_item))
+        n += print_groups(data['items'], first_number=n + 1, indent='')
+        note = optional_note(data['omitted'])
+        if note:
+            print(note)
     print("=== END AVAILABLE ===")
     return global_index
 
@@ -318,6 +314,9 @@ def main():
                          help="Clear recorded CLAUDE.md exceptions for every consumer in this run "
                               "(scope with --consumer) and commit that in each consumer's own repo; "
                               "the scan then lists them as ordinary deviations.")
+    parser.add_argument('--include-optional', action='store_true',
+                         help="Also list OPTIONAL items (private tools a consumer never opted into). "
+                              "Pass it on the --apply call too, so the numbers match the listing.")
     args = parser.parse_args()
 
     cfg = get_shared_config(SHARED_ROOT)
@@ -330,7 +329,7 @@ def main():
     if args.reset_exceptions:
         reset_all_exceptions(cfg, consumers, this_host)
 
-    scanned = scan_all(cfg, consumers, this_host)
+    scanned = scan_all(cfg, consumers, this_host, args.include_optional)
     global_index = print_all(scanned)
 
     if args.apply is None and args.keep is None:

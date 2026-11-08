@@ -69,12 +69,13 @@ def read_skill_category(skill_md_path):
     return cm.group(1) if cm else None
 
 
-def find_private_categories(cfg, project_root):
-    """This project's own `private_categories:` subscriptions, found by matching its
-    hosts.<this host>.path against consumers\\*.md (registry_lib.host_path). Empty set if this
-    project isn't registered yet, or no registry entry's host path resolves to project_root."""
+def find_private_registration(cfg, project_root):
+    """(categories, tool_names): this project's own `private_categories:` subscriptions and
+    `private_opted_in:` tool names, found by matching its hosts.<this host>.path against
+    consumers\\*.md (registry_lib.host_path). Both empty if this project isn't registered yet, or
+    no registry entry's host path resolves to project_root."""
     if not CONSUMERS_DIR.is_dir():
-        return set()
+        return set(), set()
     host_id = cfg.get('host_id')
     resolved = project_root.resolve()
     for f in sorted(CONSUMERS_DIR.glob('*.md')):
@@ -83,8 +84,14 @@ def find_private_categories(cfg, project_root):
             continue
         p = host_path(c, host_id)
         if p and Path(p).resolve() == resolved:
-            return {pc['name'] for pc in c['private_categories']}
-    return set()
+            return ({pc['name'] for pc in c['private_categories']},
+                    {o['name'] for o in c['private_opted_in']})
+    return set(), set()
+
+
+def find_private_categories(cfg, project_root):
+    """Just the subscriptions half of find_private_registration()."""
+    return find_private_registration(cfg, project_root)[0]
 
 # Keep in sync with scripts\new_consumer.py's SKILL_PIECES / check_tower_crane.py's SKILL_PIECES.
 SKILL_PIECES = {
@@ -230,7 +237,7 @@ def scan_private(cfg, state, project_root):
     `subscribed` flag - True when that category is in this project's own `private_categories:`
     registry list."""
     items = []
-    subscribed_categories = find_private_categories(cfg, project_root)
+    subscribed_categories, opted_names = find_private_registration(cfg, project_root)
     have_hooks = state['settings'].get('hooks') if isinstance(state['settings'], dict) else None
     if PRIVATE_OPTINS_DIR.is_dir():
         for optin_path in sorted(PRIVATE_OPTINS_DIR.glob('*.json')):
@@ -245,8 +252,10 @@ def scan_private(cfg, state, project_root):
                 if any(c not in have for c in canon):
                     missing = True
             if missing:
+                # 'optional': the project never opted into this tool - it merely exists on the hub.
                 items.append({'category': 'private', 'kind': 'hook', 'name': tool,
-                               'detail': f'toolkit_private/templates/optins/{tool}.json'})
+                               'detail': f'toolkit_private/templates/optins/{tool}.json',
+                               'optional': tool not in opted_names})
     if PRIVATE_SKILLS_DIR.is_dir():
         for skill_dir in sorted(d for d in PRIVATE_SKILLS_DIR.iterdir() if d.is_dir()):
             name = skill_dir.name
@@ -263,7 +272,8 @@ def scan_private(cfg, state, project_root):
                     continue
                 items.append({**item, 'drifted': True})
                 continue
-            items.append(item)
+            # Absent AND neither subscribed (its category) nor registered (its name): an option, not a gap.
+            items.append({**item, 'optional': not item['subscribed'] and name not in opted_names})
     return items
 
 
@@ -326,10 +336,71 @@ def apply_permissions(project_root, cfg, item):
 # `update` (both import this module) behave identically.
 # ---------------------------------------------------------------------------------------------
 
-CATEGORY_LABELS = {'hook': 'Hook opt-ins', 'stale_hook': 'Retired hooks to remove', 'skill': 'Toolkit skills',
-                   'piece': 'Protocol pieces', 'private': 'Private tools (toolkit_private)',
-                   'permission': 'Permission allowlist', 'claude_md_block': 'CLAUDE.md block deviations',
-                   'claude_md_manual': 'CLAUDE.md block (fix by hand)'}
+# What kind of thing an item is (shown on each line); the GROUP says what is wrong with it.
+CATEGORY_SHORT = {'hook': 'hook', 'stale_hook': 'retired hook', 'skill': 'skill', 'piece': 'protocol piece',
+                  'private': 'private tool', 'permission': 'allowlist', 'claude_md_block': 'CLAUDE.md block',
+                  'claude_md_manual': 'CLAUDE.md block'}
+
+# The four kinds of finding, in print/number order. 'manual' is a fifth, for what a script can't fix.
+GROUP_ORDER = ['remove', 'replace', 'add', 'manual', 'optional']
+GROUP_LABELS = {
+    'remove': "REMOVE - in place, but shouldn't be (retired or stray)",
+    'replace': 'REPLACE - in place, but out of date',
+    'add': 'ADD - should be there, but is missing',
+    'manual': "FIX BY HAND - a script can't safely do this",
+    'optional': 'OPTIONAL - could be added; nothing requires it',
+}
+
+
+def item_group(it):
+    """Which of GROUP_ORDER an item belongs to."""
+    cat = it['category']
+    if cat == 'stale_hook':
+        return 'remove'
+    if cat == 'claude_md_manual':
+        return 'manual'
+    if cat == 'claude_md_block':
+        if it['kind'] == 'missing':
+            return 'add'
+        return 'replace' if it['exp_text'] else 'remove'
+    if it.get('optional'):
+        return 'optional'
+    return 'replace' if it.get('drifted') else 'add'
+
+
+def sort_by_group(items):
+    """Stable sort so numbering follows the printed group order."""
+    return sorted(items, key=lambda it: GROUP_ORDER.index(item_group(it)))
+
+
+def print_groups(items, first_number=1, indent=''):
+    """Print items under their group headings, numbered from first_number. Returns the count."""
+    current = None
+    n = first_number - 1
+    for it in items:
+        n += 1
+        g = item_group(it)
+        if g != current:
+            current = g
+            print(f"{indent}-- {GROUP_LABELS[g]} --")
+        tags = []
+        if it.get('subscribed'):
+            tags.append(f"{it['skill_category']} — subscribed")
+        if it.get('drifted'):
+            tags.append('drifted — needs re-sync')
+        tag = f" [{', '.join(tags)}]" if tags else ''
+        print(f"{indent}  [{n}] {it['name']}{tag}  ({CATEGORY_SHORT[it['category']]}: {it['detail']})")
+        for line in block_item_lines(it):
+            print(f"{indent}{line}")
+    return len(items)
+
+
+def optional_note(names):
+    """One trailing line for optional items that were left out of the numbered list ('' if none)."""
+    if not names:
+        return ''
+    return (f"Optional, not listed (could be added; nothing requires it): {', '.join(names)}. "
+            "Re-run with --include-optional to list them.")
 
 _TOOL_BULLET_RE = re.compile(r'(?m)^- `([^`]+)` - ')
 _WIRED_RE = re.compile(r'Opted-in tools \(wired (\d{4}-\d{2}-\d{2})\)')
@@ -428,10 +499,13 @@ def scan_block(project_root):
         if h['key'] in kept_keys:
             live += 1
             continue
-        n = len(items) + 1
-        what = {'missing': 'template text this block lacks',
-                'custom': 'custom text, not in the template'}[h['kind']]
-        items.append({'category': 'claude_md_block', 'name': f'block change {n}', 'detail': what,
+        if h['kind'] == 'missing':
+            name, what = 'add missing text', 'the template has text this block lacks'
+        elif h['exp_text']:
+            name, what = 'replace outdated text', "this block's wording differs from the template"
+        else:
+            name, what = 'remove extra text', "text in this block that isn't in the template"
+        items.append({'category': 'claude_md_block', 'name': name, 'detail': what,
                       'kind': h['kind'], 'cur_text': h['cur_text'], 'exp_text': h['exp_text']})
     return items, live
 
@@ -538,28 +612,16 @@ def reset_exceptions(project_root):
     return True
 
 
-def print_items(items):
+def print_items(items, omitted_optional=()):
     if not items:
-        print("Nothing available - this project already has everything the hub currently offers.")
-        return
-    print(f"=== AVAILABLE ({len(items)}) ===")
-    current_cat = None
-    for i, it in enumerate(items, 1):
-        if it['category'] != current_cat:
-            current_cat = it['category']
-            print(f"-- {CATEGORY_LABELS[current_cat]} --")
-        # Call out a private skill matching one of this project's own private_categories:
-        # subscriptions.
-        tags = []
-        if it.get('subscribed'):
-            tags.append(f"{it['skill_category']} — subscribed")
-        if it.get('drifted'):
-            tags.append('drifted — needs re-sync')
-        tag = f" [{', '.join(tags)}]" if tags else ''
-        print(f"  [{i}] {it['name']}{tag}  ({it['detail']})")
-        for line in block_item_lines(it):
-            print(line)
-    print("=== END AVAILABLE ===")
+        print("Nothing to change - this project already has everything the hub currently expects.")
+    else:
+        print(f"=== AVAILABLE ({len(items)}) ===")
+        print_groups(items)
+        print("=== END AVAILABLE ===")
+    note = optional_note(omitted_optional)
+    if note:
+        print(note)
 
 
 def _insert_import_line(md_text, line):
@@ -751,12 +813,22 @@ def do_apply(project_root, cfg, items, spec, keep_spec=None):
               "not needed for flat @import-only pieces.")
 
 
-def all_items(cfg, state, project_root):
-    """Every available item for one project - the single list both this script and the hub's
-    update_consumers.py build, so the two entry points can't disagree."""
-    return (scan_hooks(cfg, state) + scan_stale_hooks(state) + scan_skills(state, project_root, cfg)
-            + scan_pieces(state) + scan_private(cfg, state, project_root) + scan_permissions(state)
-            + scan_block(project_root)[0])
+def all_items(cfg, state, project_root, include_optional=False):
+    """Every item to act on for one project, ordered by group (remove, replace, add, manual, then
+    optional) - the single list both this script and the hub's update_consumers.py build, so the
+    two entry points can't disagree. Optional items (things that merely exist on the hub, which
+    this project never opted into) are left out unless include_optional; see optional_names()."""
+    items = (scan_hooks(cfg, state) + scan_stale_hooks(state) + scan_skills(state, project_root, cfg)
+             + scan_pieces(state) + scan_private(cfg, state, project_root) + scan_permissions(state)
+             + scan_block(project_root)[0])
+    if not include_optional:
+        items = [it for it in items if not it.get('optional')]
+    return sort_by_group(items)
+
+
+def optional_names(cfg, state, project_root):
+    """Names of the optional items all_items() leaves out by default."""
+    return [it['name'] for it in scan_private(cfg, state, project_root) if it.get('optional')]
 
 
 def main():
@@ -772,6 +844,9 @@ def main():
     parser.add_argument('--reset-exceptions', action='store_true',
                          help="Clear this project's recorded CLAUDE.md exceptions first, so they show "
                               "up as ordinary deviations again.")
+    parser.add_argument('--include-optional', action='store_true',
+                         help="Also list OPTIONAL items (private tools this project never opted into). "
+                              "Pass it on the --apply call too, so the numbers match the listing.")
     args = parser.parse_args()
 
     project_root = Path(args.project_root).resolve()
@@ -784,10 +859,10 @@ def main():
         print("[reset] recorded CLAUDE.md exceptions cleared." if reset_exceptions(project_root)
               else "[reset] no recorded CLAUDE.md exceptions to clear.")
     state = read_consumer_state(project_root)
-    items = all_items(cfg, state, project_root)
+    items = all_items(cfg, state, project_root, args.include_optional)
 
     if args.apply is None and args.keep is None:
-        print_items(items)
+        print_items(items, [] if args.include_optional else optional_names(cfg, state, project_root))
         if items:
             print()
             print("Re-run with --apply <numbers-or-'all'> to adopt (e.g. --apply 1,3 or --apply all). "
