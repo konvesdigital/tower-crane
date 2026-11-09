@@ -15,6 +15,10 @@ actually invoked.
      is a queue: work identified but not yet started, deferred until its time comes. An item
      graduates Next Up → Current Status the session someone actually starts it, and out of Current
      Status → Work Log the session it's done — never sideways.
+   - **A finished item is deleted, never relabeled.** When this session completes an item in
+     Current Status or Next Up, remove it from the list entirely (the Work Log entry carries the
+     "done" fact); never leave it in place marked `DONE`/`REMOVED`/`BUILT`/`DROPPED`. A partly
+     finished item is rewritten to describe only what remains.
    - **Fold in what changed this session** — edit the existing text in place to match what's true
      right now, or add a line only for something this session discovered that doesn't already fit
      an existing one. When you add a Next Up item, put it where its priority puts it: under the
@@ -38,7 +42,8 @@ actually invoked.
       was NOT run or verified (omit if everything was), and a final `Next:` sentence. Total cap:
       10 lines including the header, wrapped at 100 columns. Then run
       `python toolkit/scripts/work_log_entry_check.py --project-root "<this hub's absolute root>"`; on `[OVER-CAP]`/`[BAD-HEADER]`,
-      shorten or fix the entry and re-run until it prints `[OK]`.
+      shorten or fix the entry and re-run until it prints `[OK]`; on `[STALE-MARKER]`, delete or
+      rewrite the named item per the rule above and re-run.
    - Do NOT prune or move older entries automatically — only "archive" does that.
 2. Git mechanics for both repos — mechanized (mechanical
    steps live in the script, same split as `update_toolkit.py` keeps below):

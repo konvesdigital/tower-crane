@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
 work_log_entry_check.py - checks the NEWEST Work Log entry in project_progress.md against the
-entry template `checkpoint` step 1 defines. Read-only; prints [OK] or one [OVER-CAP]/[BAD-HEADER]
-line per problem. Always exits 0 - a warning to fix before committing, never a block.
+entry template `checkpoint` step 1 defines, and flags DONE/REMOVED/BUILT/DROPPED in Current
+Status and Next Up. Read-only; prints [OK] or one [OVER-CAP]/[BAD-HEADER]/[STALE-MARKER] line per
+problem. Always exits 0 - a warning to fix before committing, never a block.
 
 The template (what checkpoint step 1 tells the author to write):
   Header line:  **YYYY-MM-DD - <host or author> session (<topic>):** <first sentence of body>
@@ -22,6 +23,8 @@ from resume_digest import split_sections  # noqa: E402
 from archive_candidates import split_entries  # noqa: E402
 
 MAX_LINES = 10
+LIVE_SECTIONS = ('current status', 'next up')
+MARKER_RE = re.compile(r'\b(DONE|REMOVED|BUILT|DROPPED)\b')
 HEADER_RE = re.compile(r'^\*\*\d{4}-\d{2}-\d{2}\s*[—–-]\s*.+?:\*\*')
 
 
@@ -35,16 +38,26 @@ def main():
     except OSError:
         print('[ABSENT] project_progress.md not readable - no entry to check.')
         return 0
+    problems = []
+    for text, s, e in split_sections(lines):
+        name = next((n for n in LIVE_SECTIONS if text.lower().startswith(n)), None)
+        if not name:
+            continue
+        for i in range(s, e):
+            m = MARKER_RE.search(lines[i])
+            if m:
+                problems.append('[STALE-MARKER] line %d (%s): `%s` - delete the finished item or '
+                                'rewrite it to what remains.' % (i + 1, name, m.group(1)))
     sec = next(((s, e) for text, s, e in split_sections(lines)
                 if text.lower().startswith('work log')), None)
     entries = split_entries(lines[sec[0]:sec[1]], sec[0]) if sec else []
     if not entries:
-        print('[ABSENT] no Work Log entries found - nothing to check.')
+        print('\n'.join(problems) if problems else
+              '[ABSENT] no Work Log entries found - nothing to check.')
         return 0
     start, body = entries[0]
     while body and not body[-1].strip():
         body = body[:-1]
-    problems = []
     if not HEADER_RE.match(body[0]):
         problems.append('[BAD-HEADER] line %d should start `**YYYY-MM-DD — <who> session '
                         '(<topic>):**`.' % start)
