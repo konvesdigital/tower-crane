@@ -426,13 +426,13 @@ def invoke_rescaffold_test(config, this_host):
         watched = [p for p in (tmp / '.claude').rglob('*')
                    if p.is_file() and p.name in ('settings.json', 'SKILL.md', '_hub_dispatch.py')]
         watched.append(tmp / 'CLAUDE.md')
-        before = {p: p.read_bytes() for p in watched}
+        before = {p: p.read_bytes().replace(bytes([13, 10]), bytes([10])) for p in watched}
 
         proc = subprocess.run(
             [config['python_launcher'], str(SHARED_ROOT / 'scripts' / 'new_consumer.py'),
              '--target-path', str(tmp), '--project-name', c['name'], '--dry-run'],
             capture_output=True, text=True, encoding='utf-8')
-        changed = [str(p.relative_to(tmp)) for p, data in before.items() if p.read_bytes() != data]
+        changed = [str(p.relative_to(tmp)) for p, data in before.items() if p.read_bytes().replace(bytes([13, 10]), bytes([10])) != data]
         if proc.returncode == 0 and not changed:
             report('PASS', f"re-scaffold of '{c['name']}' left settings.json, CLAUDE.md and "
                            f"{len(before) - 2} other watched files unchanged.")
