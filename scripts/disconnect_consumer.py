@@ -265,8 +265,8 @@ def write_disconnect_notes(target_path, date, mode, host_id, n_imports, removed_
                       f"untouched (another host is still connected and depends on that shared, "
                       f"tracked content), not because they're missing or hand-edited. This file is "
                       f"therefore the only place this disconnect is recorded at a glance for this "
-                      f"host - check `CLAUDE.md` by hand too if you want the full manual-purge "
-                      f"checklist under \"Your options from here\" below.")
+                      f"host. To remove those sections yourself, the manual-purge checklist is "
+                      f"under \"Your options from here\" below.")
     else:
         cross_ref = (f"`CLAUDE.md` does **not** carry a pointer to this file - its "
                       f"`{TC_IN_USE_HEADING}`/`{WORKFLOW_HEADING}` sections weren't found in "

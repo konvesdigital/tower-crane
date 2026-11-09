@@ -370,6 +370,25 @@ def invoke_block_patcher_tests():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def invoke_duplicate_hook_tests():
+    """Pass A: duplicate_hook_tools flags a tool running twice (any command form) and nothing else."""
+    print()
+    print("--- Pass A: duplicate hook detection ---")
+    direct = {'hooks': [{'command': 'python "C:/x/toolkit/hooks/consistency_check.py"'}]}
+    dispatch = {'hooks': [{'command': 'L=$(x); $L "$CLAUDE_PROJECT_DIR/.claude/hooks/_hub_dispatch.py" consistency_check'}]}
+    other = {'hooks': [{'command': 'python mine.py'}]}
+
+    def case(name, groups, expected):
+        got = duplicate_hook_tools({'hooks': {'PostToolUse': groups}}, ['consistency_check'])
+        report('PASS' if got == expected else 'FAIL',
+               f"duplicate hooks / {name}" + ('' if got == expected else f" : got {got}"))
+
+    case('one entry is fine', [dispatch, other], [])
+    case('exact duplicate is flagged', [dispatch, dispatch], [('consistency_check', 'PostToolUse', 2)])
+    case('direct plus dispatch is flagged', [direct, dispatch], [('consistency_check', 'PostToolUse', 2)])
+    case('unrelated hooks are never flagged', [other, other], [])
+
+
 def invoke_rescaffold_test(config, this_host):
     """Pass A: re-running new_consumer.py on an already-connected, pointer-form project must leave
     its settings.json (no repointed or duplicated hooks), CLAUDE.md and skill stubs byte-identical.
@@ -422,6 +441,26 @@ def invoke_rescaffold_test(config, this_host):
                            f"{', '.join(changed) or '(none)'}. {proc.stderr.strip()[-200:]}")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def duplicate_hook_tools(settings, tool_names):
+    """[(tool, event, count)] for each tool whose hook command appears in more than one entry under
+    one event of a consumer's settings.json. A command names its tool as `<tool>.py` (direct form)
+    or as the word after `_hub_dispatch.py` (dispatch form)."""
+    hooks = settings.get('hooks') if isinstance(settings, dict) else None
+    if not isinstance(hooks, dict):
+        return []
+    out = []
+    for evt, groups in hooks.items():
+        if not isinstance(groups, list):
+            continue
+        for tool in tool_names:
+            pat = re.compile(r'(?:/|\\\\|\\)%s\.py\b|_hub_dispatch\.py"?\s+%s\b' % (re.escape(tool), re.escape(tool)))
+            n = sum(1 for g in groups
+                    if any(pat.search(h.get('command', '')) for h in (g.get('hooks') or []) if isinstance(h, dict)))
+            if n > 1:
+                out.append((tool, evt, n))
+    return out
 
 
 # ==================================================================================================
@@ -514,6 +553,17 @@ def test_consumer(c, config, this_host):
                 devs.append(Dev('FAIL', 'consumer',
                                  f"settings.json no longer contains the canonical opt-in snippet for '{tool}'.",
                                  f"Re-merge templates/optins/{tool}.json into .claude/settings.json (or re-run the scaffolder: new_consumer.py --force)."))
+
+    # A registered tool that runs more than once (an exact duplicate, or the same tool in both the
+    # direct-path and dispatch forms) fires twice per event. WARN, not FAIL: it is noisy, not
+    # broken, and a hard failure would make the post-merge Pass B gate roll back an `update`.
+    # Unrecognized hooks are never flagged - they may be the operator's own.
+    for dup_tool, dup_evt, dup_n in duplicate_hook_tools(
+            consumer_settings, [t['name'] for t in c['opted_in']] + [t['name'] for t in c['private_opted_in']]):
+        devs.append(Dev('WARN', 'consumer',
+                         f"settings.json runs '{dup_tool}' {dup_n} times under {dup_evt}.",
+                         "Delete the extra entry (keep the dispatch-wrapper form), or run "
+                         "scripts\\relocate.py for this project."))
 
     # A hook entry running a tool the hub has since retired (its script no longer exists) errors
     # on every firing. WARN, not FAIL: a hard failure here would make the post-merge Pass B gate
@@ -1105,6 +1155,7 @@ def main():
         invoke_golden_suite(config)
         invoke_block_patcher_tests()
         invoke_rescaffold_test(config, this_host)
+        invoke_duplicate_hook_tests()
     if not args.skip_reference:
         invoke_reference_scan(config, this_host, args.consumer, args.write_guidance, head_sha, today)
         check_hub_self_use_skills(config)
