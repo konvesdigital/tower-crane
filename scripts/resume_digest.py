@@ -15,6 +15,8 @@ Output order (always):
   when there is no Current Status (wrapped lines joined; 400 chars max,
   cut at a sentence/word boundary with a `…[truncated, full item at ... line N]` marker)
   NEXT: line - the first unchecked checkbox item in Next Up, else the first list item (same rules)
+  STATUS LIST block - only when Current Status has 2+ top-level list items: one line per item
+  (same builder and truncation as NEXT LIST), so every "In progress" / "Known defect" bullet shows
   NEXT LIST block - only when Next Up has 2+ open top-level items: the open top-level items, tiered
   by Next Up's `### ` sub-headings (up to 5 above the first heading, 3 from the first group, later
   groups as a name and count); a flat list is its first 5 items. Each tier ends `+N more` when cut.
@@ -281,6 +283,12 @@ def main():
                 break
         missing = '(section absent)' if not sections else '(none found - the section has no text)'
         print(f"{key.upper()}: {trim_item(item, 400, item_line) if item else missing}")
+
+    for _text, start, end in found['status'][:1]:
+        block = next_list(lines[start + 1:end], start + 2)
+        if len(block) > 1:
+            print("STATUS LIST (resume's Status; quick resume uses the STATUS: line above):")
+            print('\n'.join(block))
 
     for _text, start, end in found['next'][:1]:
         block = next_list(lines[start + 1:end], start + 2)

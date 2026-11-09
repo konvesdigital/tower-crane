@@ -99,18 +99,20 @@ reached) read whatever is present.
       interpret per `shared_resources_resume_check.md`.
    6. `resume_digest.py` — `project_progress.md`'s live-state sections (Current Status, Current
       Focus, Next Up, Decisions, Phases, newest Work Log entry), stating which sections are absent,
-      then a `STATUS:` line, a `NEXT:` line, and (when Next Up has 2+ open items) a `NEXT LIST`
-      block. A line ending in `…[truncated, full item at … line N]` or `…(line N)` is partial on
+      then a `STATUS:` line, a `NEXT:` line, and (when Current Status / Next Up has 2+ open items)
+      a `STATUS LIST` / `NEXT LIST` block. A line ending in `…[truncated, full item at … line N]` or `…(line N)` is partial on
       purpose: copy it as printed, marker included.
 4. If the `RESUME SUMMARY` line `compliance guidance file` says PRESENT, `Read` the path it gives
    and surface it now (see the compliance protocol). That summary line is the only existence
    check; do not `Glob` for the file.
-5. Output exactly these three entries, then stop (the third may span several lines):
+5. Output exactly these four entries, then stop (the third and fourth may span several lines):
    - `Host: <Host line from step 3> | git: <already up to date | pulled | failed: <reason>> | checks: <clean | N area(s) flagged>`
    - `Needs you: nothing` — or, if any `RESUME SUMMARY` line is not clean, a `;`-separated list with
      one entry per flagged line: the area, then what it needs in a few words (a ticket by file
      name plus its `last log line` text; a `[TODO]` line; a hub-behind-upstream notice; guidance
      file present; a step that didn't run).
+   - `Status:` followed by the `STATUS LIST` block from section 6, copied as printed; with no such
+     block, `Status: <the STATUS: line from section 6, copied as printed>`.
    - `Next:` followed by the `NEXT LIST` block from section 6, copied as printed; with no such
      block, `Next: <the NEXT: line from section 6, copied as printed>`.
    Resume reports and stops: do not begin the `Next` item, do not open `project_progress.md`

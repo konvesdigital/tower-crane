@@ -370,6 +370,60 @@ def invoke_block_patcher_tests():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def invoke_rescaffold_test(config, this_host):
+    """Pass A: re-running new_consumer.py on an already-connected, pointer-form project must leave
+    its settings.json (no repointed or duplicated hooks), CLAUDE.md and skill stubs byte-identical.
+    Runs a --dry-run re-scaffold against a throwaway copy of the first registered consumer that is
+    connected here and already on the pointer form; skips quietly when there is none."""
+    print()
+    print("--- Pass A: re-scaffold of an already-connected project ---")
+    if not CONSUMERS_DIR.is_dir():
+        print("  [skip] no consumers/ folder.")
+        return
+    pick = None
+    for f in sorted(CONSUMERS_DIR.glob('*.md')):
+        c = parse_registry(f)
+        raw = host_path(c, this_host) if c else None
+        if not raw:
+            continue
+        root = Path(raw)
+        settings = root / '.claude' / 'settings.json'
+        if (root / '.claude' / 'hub_pointer.md').exists() and settings.exists() \
+                and '_hub_dispatch' in settings.read_text(encoding='utf-8') \
+                and (root / 'CLAUDE.md').exists():
+            pick = (c, root)
+            break
+    if pick is None:
+        print("  [skip] no registered consumer is connected here in pointer form.")
+        return
+    c, root = pick
+
+    tmp = Path(tempfile.mkdtemp(prefix='tc_rescaffold_'))
+    try:
+        shutil.copytree(root / '.claude', tmp / '.claude')
+        shutil.copy2(root / 'CLAUDE.md', tmp / 'CLAUDE.md')
+        if (root / '.gitignore').exists():
+            shutil.copy2(root / '.gitignore', tmp / '.gitignore')
+        watched = [p for p in (tmp / '.claude').rglob('*')
+                   if p.is_file() and p.name in ('settings.json', 'SKILL.md', '_hub_dispatch.py')]
+        watched.append(tmp / 'CLAUDE.md')
+        before = {p: p.read_bytes() for p in watched}
+
+        proc = subprocess.run(
+            [config['python_launcher'], str(SHARED_ROOT / 'scripts' / 'new_consumer.py'),
+             '--target-path', str(tmp), '--project-name', c['name'], '--dry-run'],
+            capture_output=True, text=True, encoding='utf-8')
+        changed = [str(p.relative_to(tmp)) for p, data in before.items() if p.read_bytes() != data]
+        if proc.returncode == 0 and not changed:
+            report('PASS', f"re-scaffold of '{c['name']}' left settings.json, CLAUDE.md and "
+                           f"{len(before) - 2} other watched files unchanged.")
+        else:
+            report('FAIL', f"re-scaffold of '{c['name']}' : exit {proc.returncode}; changed: "
+                           f"{', '.join(changed) or '(none)'}. {proc.stderr.strip()[-200:]}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 # ==================================================================================================
 # Pass B - per-consumer reference & drift scan
 # ==================================================================================================
@@ -1050,6 +1104,7 @@ def main():
     if not args.skip_golden:
         invoke_golden_suite(config)
         invoke_block_patcher_tests()
+        invoke_rescaffold_test(config, this_host)
     if not args.skip_reference:
         invoke_reference_scan(config, this_host, args.consumer, args.write_guidance, head_sha, today)
         check_hub_self_use_skills(config)
