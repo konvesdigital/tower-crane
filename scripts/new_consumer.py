@@ -335,8 +335,8 @@ def main():
     if target_path.exists() and not args.dry_run:
         sync_consumer_repo(target_path, log=print)
 
-    # protocol pieces: filing + compliance + shared_resources mandatory; continuity default-on
-    pieces = ['filing', 'compliance', 'shared_resources']
+    # protocol pieces: identity + filing + compliance + shared_resources mandatory; continuity default-on
+    pieces = ['identity', 'filing', 'compliance', 'shared_resources']
     if not args.no_continuity:
         pieces.append('continuity')
     for p in pieces:
@@ -477,7 +477,7 @@ def main():
     if claude_md_path.exists() and existing_consumer is None and not is_reconnect:
         existing_text = claude_md_path.read_text(encoding='utf-8')
         has_import_line = bool(re.search(
-            r'(?m)^@\S+/(filing_resume_check|compliance|shared_resources_resume_check|'
+            r'(?m)^@\S+/(identity|filing_resume_check|compliance|shared_resources_resume_check|'
             r'continuity_resume_check)\.md\s*$', existing_text))
         is_adoption = TC_IN_USE_HEADING not in existing_text and not has_import_line
 

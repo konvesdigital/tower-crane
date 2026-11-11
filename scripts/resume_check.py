@@ -11,13 +11,14 @@ Runs, in order:
   6. readiness.py --hub                   (every consumer registered on this host)
   7. self_hooks.py --check-defaults       (default hub self-use tools off on this machine)
   8. ticket_scan.py                       (read-only categorization of change_requests\\ tickets)
+  9. check_hub_identity_import.py         (outer CLAUDE.md imports templates\\identity.md)
 
-All eight are side-effect-free and always exit 0. This script does no pass/fail interpretation of
+All nine are side-effect-free and always exit 0. This script does no pass/fail interpretation of
 its own - it runs each in turn and prints its output verbatim under a numbered header, silent
 sub-sections included. Reporting tags per step: dirty/incoming/outgoing lines (step 1),
 [UNWIRED]/[BROKEN] (step 2), [NUDGE] (step 3), [STALE-PATH] (step 4), [FAIL]/[MISMATCH] (step 5),
 [TODO]/[NOTE]/[UNKNOWN]/[HUB-MISMATCH] (step 6),
-[SELF-USE-OFF] (step 7).
+[SELF-USE-OFF] (step 7), [NO-IDENTITY-IMPORT] (step 9).
 
 Usage: python scripts\\resume_check.py [--project-root <path>]
 --project-root defaults to this toolkit\\ checkout's own parent (the outer repo root).
@@ -72,6 +73,7 @@ def main():
         ('readiness.py --hub', 'readiness.py', ['--hub']),
         ('self_hooks.py --check-defaults', 'self_hooks.py', ['--check-defaults']),
         ('ticket_scan.py', 'ticket_scan.py', []),
+        ('check_hub_identity_import.py', 'check_hub_identity_import.py', []),
     ]
 
     print("=== resume_check.py - consolidated resume checks ===")

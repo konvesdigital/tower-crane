@@ -320,14 +320,14 @@ def invoke_block_patcher_tests():
         # false positives the scan must not report (pointer-form pieces, audience-restricted hooks)
         from config_lib import build_hub_pointer_content
         cfg = get_shared_config(SHARED_ROOT)
-        pieces = ['filing_resume_check', 'compliance', 'shared_resources_resume_check',
+        pieces = ['identity', 'filing_resume_check', 'compliance', 'shared_resources_resume_check',
                   'continuity_resume_check']
         r = project('pointer', clean)
         (r / '.claude').mkdir(exist_ok=True)
         for s in ('filing', 'checkpoint', 'archive', 'shared_resources'):
             (r / '.claude' / 'skills' / s).mkdir(parents=True)
         ok('without hub_pointer.md the protocol pieces look missing (control)',
-           len(scu.scan_pieces(scu.read_consumer_state(r))) == 4)
+           len(scu.scan_pieces(scu.read_consumer_state(r))) == 5)
         (r / '.claude' / 'hub_pointer.md').write_text(build_hub_pointer_content(cfg, pieces),
                                                       encoding='utf-8', newline='\n')
         ok('pieces imported via hub_pointer.md are not offered',
@@ -639,7 +639,7 @@ def test_consumer(c, config, this_host):
     # mandatory pieces (filing + compliance + shared_resources) - a glance, not a hard fail. A
     # SKILL_PIECES entry (e.g. 'filing') is satisfied either the old flat way (imports itself
     # directly) or the Track-1 way (imports its companion + carries a project-local skill stub).
-    for m in ('filing', 'compliance', 'shared_resources'):
+    for m in ('identity', 'filing', 'compliance', 'shared_resources'):
         if m in md_imports:
             continue
         skill_piece = SKILL_PIECES.get(m)
@@ -900,7 +900,7 @@ DIAGNOSE_COMMIT_PATTERNS = [
 
 # The four protocol-piece @import targets a live CLAUDE.md carries - mirrors SKILL_PIECES'
 # companion values above plus 'compliance' (the one piece that stays flat, never Track-1).
-DIAGNOSE_IMPORT_NAMES = ('filing_resume_check', 'compliance', 'shared_resources_resume_check',
+DIAGNOSE_IMPORT_NAMES = ('identity', 'filing_resume_check', 'compliance', 'shared_resources_resume_check',
                           'continuity_resume_check')
 
 

@@ -204,6 +204,7 @@ This is the one file in either repo (outer or `toolkit\\`) that keeps Claude Cod
    fork. There is nothing local-only to add yet; this file stays this short until there is.
 
 @toolkit/AGENTS.md
+@toolkit/templates/identity.md
 """
 
 GITIGNORE_TEMPLATE = """/toolkit/

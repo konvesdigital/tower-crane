@@ -99,7 +99,7 @@ SKILL_PIECES = {
     'continuity': {'companion': 'continuity_resume_check', 'skills': ['checkpoint', 'archive']},
     'shared_resources': {'companion': 'shared_resources_resume_check', 'skills': ['shared_resources']},
 }
-MANDATORY_OR_DEFAULT_PIECES = ['filing', 'compliance', 'shared_resources', 'continuity']
+MANDATORY_OR_DEFAULT_PIECES = ['identity', 'filing', 'compliance', 'shared_resources', 'continuity']
 
 # Keep in sync with scripts\new_consumer.py's STANDALONE_SKILLS. Anything else under
 # templates\skills\* (e.g. hub_commands, distributed via self_hooks.py) must never be offered here.
@@ -730,6 +730,11 @@ def apply_piece(project_root, cfg, item):
 
     claude_md_path = project_root / 'CLAUDE.md'
     md_text = claude_md_path.read_text(encoding='utf-8') if claude_md_path.exists() else ''
+    if HUB_POINTER_IMPORT_LINE in md_text:
+        # Pointer-form consumer: the real @import lines live in this host's hub_pointer.md,
+        # regenerated from the registry's imported: list by update_consumers.do_apply.
+        print(f"  [applied] '{p}' will be imported through .claude/hub_pointer.md")
+        return True
     new_text = _insert_import_line(md_text, line)
     if new_text is None:
         print(f"  [MANUAL] couldn't find '## Shared Workflow Protocol' in CLAUDE.md - add this "
@@ -737,7 +742,7 @@ def apply_piece(project_root, cfg, item):
     elif new_text != md_text:
         claude_md_path.write_text(new_text, encoding='utf-8', newline='\n')
         print(f"  [applied] added '{line}' to CLAUDE.md")
-    return bool(sp)  # needs registry write-back only when a skill stub was (or already is) involved
+    return True  # the piece is now imported, so the registry's imported: list needs the row
 
 
 def resolve_selection(spec, items):

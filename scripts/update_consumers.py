@@ -28,7 +28,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from config_lib import get_shared_config, commit_consumer_changes
+from config_lib import get_shared_config, commit_consumer_changes, fix_hub_pointer
 from check_tower_crane import parse_registry, CONSUMERS_DIR
 from registry_lib import host_path, reconcile_scope_floor
 from scan_consumer_update import (
@@ -282,7 +282,14 @@ def do_apply(cfg, scanned, global_index, spec, today, keep_spec=None):
         c = scanned_by_slug[slug]['consumer']
         if entries:
             update_registry_entry(Path(c['file']), entries, today)
-        names = ', '.join([f"{cat}:{name}" for cat, name in entries]
+            # Re-read the registry so this host's hub_pointer.md (gitignored, so no commit effect)
+            # and the commit's reconcile path both see the pieces just added.
+            refreshed = parse_registry(Path(c['file']))
+            if refreshed is not None:
+                c = refreshed
+                fix_hub_pointer(scanned_by_slug[slug]['project_root'], cfg,
+                                [i['name'] for i in c['imported']], dry_run=False, log=print)
+        names =', '.join([f"{cat}:{name}" for cat, name in entries]
                           + ([block_changed[slug]] if slug in block_changed else []))
         result = commit_consumer_changes(
             scanned_by_slug[slug]['project_root'],

@@ -178,6 +178,9 @@ operator moves or modifies these files, the steps that read them break and repor
      (blocks every prompt if `UserPromptSubmit`), offer `--remove-stale`. Silent → say nothing.
    - `ticket_scan.py` (the scan step 5 acts on) — its "other OPEN tickets" list is the
      authoritative open set; report that list as the open tickets.
+   - `check_hub_identity_import.py` — `[NO-IDENTITY-IMPORT]`: the outer `CLAUDE.md` lacks the
+     `@toolkit/templates/identity.md` line; offer to add it below the `@toolkit/AGENTS.md` line.
+     Silent → say nothing.
 4. Run `python toolkit/scripts/progress_sections.py` as one bare command — a capped, fixed-order
    digest of `project_progress.md` (Current Status, Next Up, Decisions, newest Work Log entry; absent
    sections stated; a `[truncated: …]` marker names the exact `Read` offset/limit for anything cut),
