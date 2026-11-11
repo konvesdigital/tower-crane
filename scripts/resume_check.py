@@ -2,6 +2,10 @@
 """
 resume_check.py - chains resume's notify-only checks into one call.
 
+Starts with a `Cell:` line (`Cell: <host_id> / <repo>`). With --quick (`quick resume`) it prints
+that line and then the same project_progress.md digest progress_sections.py prints, and runs none
+of the checks below.
+
 Runs, in order:
   1. update_toolkit.py --notify           (toolkit\\ dirty / incoming / outgoing state)
   2. check_hook_activation.py             (--project-root <outer repo root>)
@@ -20,7 +24,7 @@ sub-sections included. Reporting tags per step: dirty/incoming/outgoing lines (s
 [TODO]/[NOTE]/[UNKNOWN]/[HUB-MISMATCH] (step 6),
 [SELF-USE-OFF] (step 7), [NO-IDENTITY-IMPORT] (step 9).
 
-Usage: python scripts\\resume_check.py [--project-root <path>]
+Usage: python scripts\\resume_check.py [--project-root <path>] [--quick]
 --project-root defaults to this toolkit\\ checkout's own parent (the outer repo root).
 """
 
@@ -31,7 +35,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from config_lib import get_shared_config
+from config_lib import get_shared_config, cell_line
+import resume_digest
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent
 PROJECT_ROOT = SHARED_ROOT.parent
@@ -59,7 +64,16 @@ def main():
     parser.add_argument('--project-root', default=str(PROJECT_ROOT),
                          help="Outer repo root, passed through to check_hook_activation.py. "
                               "Defaults to this toolkit\\ checkout's own parent.")
+    parser.add_argument('--quick', action='store_true',
+                         help="`quick resume`: print the Cell line and the project_progress.md "
+                              "digest, and run none of the checks.")
     args = parser.parse_args()
+
+    if args.quick:
+        print(cell_line(args.project_root))
+        sys.argv = [sys.argv[0], '--project-root', args.project_root]
+        resume_digest.main()
+        return
 
     cfg = get_shared_config(SHARED_ROOT)
     launcher = cfg['python_launcher']
@@ -77,6 +91,7 @@ def main():
     ]
 
     print("=== resume_check.py - consolidated resume checks ===")
+    print(cell_line(args.project_root))
     for i, (label, script_name, extra_args) in enumerate(checks, 1):
         print(f"\n--- {i}/{len(checks)}: {label} ---")
         print(_run(launcher, script_name, extra_args))

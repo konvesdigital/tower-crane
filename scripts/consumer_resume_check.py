@@ -23,7 +23,8 @@ Runs, in order:
   6. resume_digest.py --project-root <root>  (project_progress.md's live-state sections, capped,
                                                absent sections stated, plus the STATUS LIST, NEXT: line and NEXT LIST block)
 
-Starts with a Host line (host_id from this hub's config.local.json), prints each step's output
+Starts with a `Cell:` line (`Cell: <host_id> / <repo>`; --quick, for `quick resume`, prints that
+line and the project_progress.md digest and runs none of the checks), prints each step's output
 verbatim under a numbered header, and ends with a RESUME SUMMARY block: one line per area, each
 either "clean" or what needs the operator, naming the section number to read for detail. The
 summary also reports whether COMPLIANCE_GUIDANCE.md exists in the project - checked here, after
@@ -41,14 +42,14 @@ the caller's cwd.
 
 import argparse
 import os
-import json
 import re
 import subprocess
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from config_lib import get_shared_config
+from config_lib import get_shared_config, cell_line
+import resume_digest
 from readiness import registry_slug_for, registry_entry_for
 
 SHARED_ROOT = Path(__file__).resolve().parent.parent  # toolkit\
@@ -65,14 +66,6 @@ def _run(python_launcher, script_name, extra_args=None):
     if proc.returncode != 0 and 'Traceback' in proc.stderr:
         output = f"[CRASHED: {script_name} exited {proc.returncode}]" + chr(10) + output
     return output if output else '(nothing to report)'
-
-
-def _host_id():
-    try:
-        cfg = json.loads((SHARED_ROOT / 'config.local.json').read_text(encoding='utf-8'))
-    except (OSError, ValueError):
-        return None
-    return cfg.get('host_id')
 
 
 def _summary_lines(outputs, project_root, slug):
@@ -127,10 +120,18 @@ def main():
     parser = argparse.ArgumentParser(description="Consumer-side resume checks, chained.")
     parser.add_argument('--project-root', default=str(Path.cwd()),
                          help="This project's root. Defaults to the current directory.")
+    parser.add_argument('--quick', action='store_true',
+                         help="`quick resume`: print the Cell line and the project_progress.md "
+                              "digest, and run none of the checks.")
     args = parser.parse_args()
     # Resolve once, before any use or forwarding to sub-scripts: a relative value ("." / "..\Foo")
     # would otherwise read as "unregistered" instead of resolving.
     args.project_root = str(Path(args.project_root).expanduser().resolve())
+    if args.quick:
+        print(cell_line(args.project_root))
+        sys.argv = [sys.argv[0], '--project-root', args.project_root]
+        resume_digest.main()
+        return
 
     cfg = get_shared_config(SHARED_ROOT)
     launcher = cfg['python_launcher']
@@ -152,7 +153,7 @@ def main():
     ]
 
     print("=== consumer_resume_check.py - consolidated consumer resume checks ===")
-    print(f"Host: {_host_id() or '(unknown - toolkit/config.local.json missing or has no host_id)'}")
+    print(cell_line(args.project_root))
     if not slug:
         print(f"[UNREGISTERED] no consumers\\ entry lists this host at {args.project_root} - "
               "steps that need the registry are skipped (check the path, or run `connect project`).")

@@ -39,6 +39,29 @@ def missing_template_message(path, needed_for):
             "at that location.")
 
 
+def cell_line(project_root):
+    """The `Cell:` line every resume prints: `Cell: <host_id> / <repo>`. A cell is one host plus
+    one repo (templates\\identity.md). host_id comes only from this hub's config.local.json; repo
+    is the folder name of the git repo containing project_root (the folder name itself when
+    project_root is not inside a git repo). Read-only and fast on purpose - `quick resume` calls
+    it - so it does not go through get_shared_config(), which can rewrite the config file."""
+    unknown = '(unknown - toolkit/config.local.json missing or has no host_id)'
+    try:
+        cfg = json.loads((Path(__file__).resolve().parent.parent / 'config.local.json')
+                         .read_text(encoding='utf-8'))
+        host = cfg.get('host_id') or unknown
+    except (OSError, ValueError):
+        host = unknown
+    root = Path(project_root).expanduser().resolve()
+    try:
+        top = subprocess.run(['git', '-C', str(root), 'rev-parse', '--show-toplevel'],
+                             capture_output=True, text=True, encoding='utf-8').stdout.strip()
+    except OSError:
+        top = ''
+    repo = Path(top).name if top else root.name
+    return f"Cell: {host} / {repo}"
+
+
 def get_shared_config(shared_root=None):
     """Read config.local.json from the tower_crane repo root. Raises RuntimeError with a clear,
     actionable message if it is missing (the #1 first-run mistake) so a fresh clone gets told

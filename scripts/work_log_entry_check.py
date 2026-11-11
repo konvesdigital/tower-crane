@@ -6,7 +6,7 @@ Status and Next Up. Read-only; prints [OK] or one [OVER-CAP]/[BAD-HEADER]/[STALE
 problem. Always exits 0 - a warning to fix before committing, never a block.
 
 The template (what checkpoint step 1 tells the author to write):
-  Header line:  **YYYY-MM-DD - <host or author> session (<topic>):** <first sentence of body>
+  Header line:  **YYYY-MM-DD - <host> / <repo> session (<topic>):** <first sentence of body>
   Body:         what changed, then what was NOT run or verified, then `Next:` - in that order.
   Cap:          MAX_LINES lines in total (header included), wrapped at 100 columns.
 
@@ -59,8 +59,8 @@ def main():
     while body and not body[-1].strip():
         body = body[:-1]
     if not HEADER_RE.match(body[0]):
-        problems.append('[BAD-HEADER] line %d should start `**YYYY-MM-DD — <who> session '
-                        '(<topic>):**`.' % start)
+        problems.append('[BAD-HEADER] line %d should start `**YYYY-MM-DD — <host> / <repo> '
+                        'session (<topic>):**`.' % start)
     if len(body) > MAX_LINES:
         problems.append('[OVER-CAP] newest entry (line %d) is %d lines; cap is %d. Cut it to '
                         'what changed / what was not run / Next:.' % (start, len(body), MAX_LINES))

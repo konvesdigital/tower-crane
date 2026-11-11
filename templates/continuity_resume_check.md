@@ -64,7 +64,7 @@ reached) read whatever is present.
 - Make exactly these three tool calls, in this order, one at a time (each finishes before the next
   starts): **A.** `Read` on `.claude\hub_pointer.md`. **B.** `git pull`, as one bare command.
   **C.** `consumer_resume_check.py`, as one bare command (below). Every later file read uses the
-  `Read` tool on an absolute path.
+  `Read` tool on an absolute path. (`quick resume` below has its own calls.)
 - The only Bash commands are B and C. Do not use pipes, `cat`, `ls`, `grep`, `head`, `tail`,
   or `;`/`&&` chaining. To find or open a file use `Read`, `Glob` or `Grep`; never list or grep the
   hub's `change_requests\` folder (step 3's output already contains everything resume needs from it).
@@ -74,13 +74,13 @@ reached) read whatever is present.
 1. Call A: read `shared_root:` from this project's own `.claude\hub_pointer.md`. If that file
    doesn't exist, Tower Crane connection is not active on this machine for this project — skip
    steps 2-3, do not try to determine the machine by any other means (path, hostname, prior
-   context), and report `Host: not connected` on line 1 of step 5's block. (A consumer that predates
+   context), and report `Cell: not connected` on line 1 of step 5's block. (A consumer that predates
    pointer-indirection and never had this file takes this same branch.)
 2. Call B: `git pull` (this project's own repo).
 3. Call C: `python "<shared_root>/scripts/consumer_resume_check.py" --project-root "<this project's
    absolute root, forward slashes>"` (`<shared_root>` is the hub's `toolkit\` folder). It is
-   read-only, runs after the pull on purpose, and prints: a `Host:` line (the machine identity,
-   read from the hub's `config.local.json` — never infer it any other way), six numbered
+   read-only, runs after the pull on purpose, and prints: a `Cell:` line (`Cell: <host_id> / <repo>`,
+   the machine and this project's repo — never infer either any other way), six numbered
    sections, and a final `RESUME SUMMARY` block. Read all of it. The sections:
    1. `update_toolkit.py --notify --consumer` — whether the hub's own toolkit source has fallen
       behind its public upstream (never merges). If it reports that, mention it but do **not**
@@ -106,7 +106,7 @@ reached) read whatever is present.
    and surface it now (see the compliance protocol). That summary line is the only existence
    check; do not `Glob` for the file.
 5. Output exactly these four entries, then stop (the third and fourth may span several lines):
-   - `Host: <Host line from step 3> | git: <already up to date | pulled | failed: <reason>> | checks: <clean | N area(s) flagged>`
+   - `<the Cell line from step 3, copied as printed> | git: <already up to date | pulled | failed: <reason>> | checks: <clean | N area(s) flagged>`
    - `Needs you: nothing` — or, if any `RESUME SUMMARY` line is not clean, a `;`-separated list with
      one entry per flagged line: the area, then what it needs in a few words (a ticket by file
      name plus its `last log line` text; a `[TODO]` line; a hub-behind-upstream notice; guidance
@@ -127,11 +127,13 @@ flush a long context window mid-session, typically right after a `checkpoint`. S
 the whole `consumer_resume_check.py` chain except the digest: a session reopened moments after its
 own `checkpoint`'s push has nothing new to find. No tag or disclaimer noting what was skipped. Use
 plain `resume` instead at the start of a day or after any gap long enough that something could
-actually have changed. The run-sheet above applies, with these two calls in this order:
+actually have changed. The run-sheet above applies, with these calls in this order:
 
-1. `Read` on `.claude\hub_pointer.md` (no file → output the one line `Host: not connected` and
+1. `Read` on `.claude\hub_pointer.md` (no file → output the one line `Cell: not connected` and
    stop).
-2. `python "<shared_root>/scripts/resume_digest.py" --project-root "<this project's absolute root,
-   forward slashes>"` as one bare command; read all of it.
-3. Output exactly two lines, then stop: `Host: <the digest's Host line>` and
+2. `python "<shared_root>/scripts/consumer_resume_check.py" --quick --project-root "<this
+   project's absolute root, forward slashes>"` as one bare command — it prints the `Cell:` line,
+   then the same `project_progress.md` digest section 6 of `resume` prints, and runs none of the
+   checks; read all of it.
+3. Output exactly two lines, then stop: the `Cell:` line and
    `Status: <the STATUS: line> | Next: <the NEXT: line>`, both copied as printed.

@@ -143,11 +143,11 @@ operator moves or modifies these files, the steps that read them break and repor
 | Lives here (created later, once you use that mechanism) | `decisions_detail.md`, `shared_resources\`, `toolkit_private\` | — |
 
 **"resume"**
-1. Read `host_id` from `toolkit\config.local.json`. Never infer machine identity any other way
-   (path, `hostname`, prior context).
+1. Host and repo come from the `Cell:` line that step 3's output starts with. Never infer machine
+   identity any other way (path, `hostname`, prior context).
 2. Outer project repo: `git pull`.
-3. If `toolkit\` exists: `python toolkit/scripts/resume_check.py` — one call chaining the
-   notify-only checks below; never pulls/merges/pushes
+3. If `toolkit\` exists: `python toolkit/scripts/resume_check.py` — one call that prints the
+   `Cell:` line, then chains the notify-only checks below; never pulls/merges/pushes
    (`update`/`checkpoint` are separate) and never mutates. `toolkit\` missing: skip silently.
    Interpret its consolidated output per sub-check, exactly as each already reports on its own:
    - `update_toolkit.py --notify` (dirty / incoming-vs-`last_reviewed_sha` / outgoing-vs-`origin/main`)
@@ -192,7 +192,7 @@ operator moves or modifies these files, the steps that read them break and repor
    hub. Resume only reports tickets; applying a fix or flipping a ticket happens when the operator
    asks.
 6. Output exactly these four entries, then stop (the third and fourth may span several lines):
-   - `Host: <host_id from step 1> | pull: <already up to date | pulled | failed: <reason>> | checks: <clean | N finding(s)>`
+   - `<the Cell line from step 3, copied as printed> | pull: <already up to date | pulled | failed: <reason>> | checks: <clean | N finding(s)>`
    - `Needs you: nothing` — or a `;`-separated list, one entry per finding from steps 3 and 5, in the
      order they printed (each ticket by file name and category; each sub-check finding by its
      printed line and the offer its bullet above names).
@@ -206,8 +206,8 @@ operator moves or modifies these files, the steps that read them break and repor
 (the only way to flush a long context window mid-session). Skips every sync check above entirely —
 a session opened moments after its own `checkpoint`'s push has nothing new to find. No staleness
 tag by design. Use plain `resume` for a day-start or any longer gap.
-1. Read `host_id` from `toolkit\config.local.json`.
-2. Run `python toolkit/scripts/progress_sections.py` as one bare command (same call `resume` step 4
-   uses); read its output.
-3. Output exactly two lines, then stop: `Host: <host_id from step 1>` and
+1. Run `python toolkit/scripts/resume_check.py --quick` as one bare command — it prints the
+   `Cell:` line, then the same `project_progress.md` digest `resume` step 4 prints, and runs none of
+   the checks; read its output.
+2. Output exactly two lines, then stop: the `Cell:` line and
    `Status: <the STATUS: line> | Next: <the NEXT: line>`, both copied as printed.

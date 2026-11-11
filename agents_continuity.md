@@ -37,7 +37,8 @@ actually invoked.
      columns stay resident and readable at a glance; full detail is always one click away, never
      inline — same shape as a skill stub vs. its template.
    - Prepend **one** dated Work Log entry, newest on top, in this fixed shape: a header line
-      `**YYYY-MM-DD — <host_id> session (<topic>):**` followed on the same line by the first
+      `**YYYY-MM-DD — <host_id> / <repo> session (<topic>):**` (`<host_id> / <repo>` is the value of
+      the `Cell:` line `resume` printed this session) followed on the same line by the first
       sentence, then the rest in this order — what changed (name files/scripts, not process), what
       was NOT run or verified (omit if everything was), and a final `Next:` sentence. Total cap:
       10 lines including the header, wrapped at 100 columns. Then run

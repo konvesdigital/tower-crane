@@ -49,7 +49,7 @@ Subcommands (mutually exclusive):
   --known-hosts
       Read-only. Lists host identities this hub already knows about - every consumer registry's
       `hosts:` map (`consumers\\*.md`) plus `project_progress.md`'s own Work Log host tags
-      (`**YYYY-MM-DD — HOST session:**`). Does not scan `project_progress_archive.md`: its heading
+      (`**YYYY-MM-DD — HOST / repo session:**`, or the older `HOST session`). Does not scan `project_progress_archive.md`: its heading
       parenthetical isn't reliably a host tag at all (real examples found: `(later session)`,
       `(discussion)` - free text, not host identities). Empty output is expected on a genuinely
       first-ever machine.
@@ -370,7 +370,8 @@ def cmd_clear_uninstall_note(cwd):
 
 
 HOST_TAG_RE = re.compile(
-    r'^\*\*\d{4}-\d{2}-\d{2}\s*—\s*([A-Za-z][A-Za-z0-9_]*)\s+session', re.MULTILINE)
+    r'^\*\*\d{4}-\d{2}-\d{2}\s*—\s*([A-Za-z][A-Za-z0-9_]*)(?:\s*/\s*[\w.-]+)?\s+session',
+    re.MULTILINE)
 
 
 def cmd_known_hosts(cwd):

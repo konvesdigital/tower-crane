@@ -6,7 +6,6 @@ with fixed headers, exactly the pieces the procedure names, states plainly which
 caps each section so one oversized section can never silently cut off the ones after it.
 
 Output order (always):
-  Host line (host_id from this hub's config.local.json)
   Sections found / absent
   Current Status, Current Focus, Next Up, Decisions (every '## Decisions...' heading, in file
   order - covers the single-table form and the Locked/Open split), Phases, and ONLY the newest
@@ -35,7 +34,6 @@ Always exits 0 for a readable project_progress.md (a missing one prints a plain 
 """
 
 import argparse
-import json
 import re
 import sys
 from pathlib import Path
@@ -63,15 +61,6 @@ SECTIONS = [
     ('phs', 'Phases', 'phase', False),
     ('worklog', 'Work Log', 'work log', True),
 ]
-
-
-def host_line():
-    cfg = SHARED_ROOT / 'config.local.json'
-    try:
-        host = json.loads(cfg.read_text(encoding='utf-8')).get('host_id')
-    except (OSError, ValueError):
-        host = None
-    return host or '(unknown - toolkit/config.local.json missing or has no host_id)'
 
 
 def split_sections(lines):
@@ -221,7 +210,6 @@ def main():
     root = Path(args.project_root).expanduser().resolve()
     path = root / 'project_progress.md'
     print("=== resume_digest.py ===")
-    print(f"Host: {host_line()}")
     if not path.exists():
         print(f"[ABSENT] {path} does not exist - no progress doc to digest.")
         return
