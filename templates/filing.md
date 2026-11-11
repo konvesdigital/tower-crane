@@ -20,13 +20,11 @@ this mechanism works and how it relates to other mechanisms.
 
 ## Reporting bugs & improvements in shared tools
 
-The person operating this project and the person operating the tower_crane hub are the same
-individual — this file's "filing" and "fixing" happen in two different sessions because of where
-each one can actually write, not because two different people are involved. Read everything below
-with that in mind: "file a request, don't fix it here" is about *where* an edit happens, not a
-handoff to some other party awaiting instructions; a ticket already closed, or a fix already
-present, that this session didn't personally see land almost certainly means the operator did that
-directly in another session.
+This file's "filing" and "fixing" happen in two different sessions because of where each one can
+actually write. "File a request, don't fix it here" is about *where* an edit happens, not a handoff
+to some other party awaiting instructions; a ticket already closed, or a fix already present, that
+this session didn't personally see land almost certainly means the operator did that directly in
+another session.
 
 This project uses shared Claude Code tools that live in a local **tower_crane** hub — the same
 hub this file's own `@import` line (in this project's `CLAUDE.md`) points at. That hub is two

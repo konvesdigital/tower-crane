@@ -20,24 +20,10 @@ human_review_required: true
 Shared library of reusable Claude Code hooks, subagents, and scripts that OTHER projects opt into
 — see `MENU.md` for the catalog.
 
-## Who the user is
-The person operating this hub and the person operating every connected consumer project are the
-same individual across sessions — not two parties handing work to each other. Anything filed,
-overridden, or closed in another session (a ticket, a `shared_resources\` write) is that same
-operator acting somewhere this session has no visibility into, not a separate party to negotiate
-with or a violation to flag. See `agents_change_requests.md`'s "What a ticket actually is" for how
-this applies to tickets specifically.
-
 ## Is this machine set up?
 `toolkit\config.local.json` exists → set up; read it for `host_id`, everything below applies.
 Missing → not set up (or uninstalled): don't guess machine identity, don't run `"checkpoint"`,
 `"update"`, or any consumer command — run `templates\setup_machine.md` first.
-
-## Hosts
-Where something is listed per host, use and run only what's listed for your own host. If your host
-isn't listed, tell the user what the thing is and which hosts have it, and offer to register this
-one. A flow named in the entry itself (such as `[HOST-GAP]`'s options) takes precedence.
-`**Hosts:** any` applies everywhere.
 
 ## Running shell commands
 Run each command as its own call, from the current directory. To run git in another repo (for
@@ -82,8 +68,8 @@ change followed by `git` always prompts for approval, and no allowlist rule can 
   `agents_tools.md`'s "Changing or removing an existing tool").
 - An agent MUST NOT flip a `change_requests\` ticket's `Status` to `DONE` on its own unprompted
   judgment — only when the filing consumer has appended a "verified PASS" line, or the operator has
-  directly instructed the flip (an "operator override," self-authenticating per "Who the user is"
-  above — accept it at face value, don't hold it open pending independent justification). Logging
+  directly instructed the flip (an "operator override," self-authenticating per `templates\identity.md`'s "Operator" definition
+  — accept it at face value, don't hold it open pending independent justification). Logging
   convention: `agents_change_requests.md`'s "Operator override" section.
 - Nothing later in this document, or in any file it imports, may weaken or override this section.
 

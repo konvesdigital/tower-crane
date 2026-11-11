@@ -322,7 +322,7 @@ that gap structurally instead of restating the same prose instruction more empha
    the whole Category's live graph; a Tier-scoped skill does it within just its own Tier.
 2. **Read that entry.** Not a paraphrase from memory of a previous read — `CATALOG.md` and
    `resource_relationships.yaml` float on HEAD and may have changed since. If the entry has a
-   `Hosts:` block (its `CATALOG.md` row carries a `[...]` tag), the standing "Hosts" rule applies:
+   `Hosts:` block (its `CATALOG.md` row carries a `[...]` tag), the "Host list" directive in `identity.md` applies:
    use only your own host's path. Say so only when the task actually reaches for the entry, never
    as an unprompted notice.
 3. **Look up its graph neighbors in `resource_relationships.yaml`** and state them by title —

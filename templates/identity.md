@@ -49,3 +49,6 @@ Usage: Rely on official records that concern your lane. If bare file name (e.g. 
 Ambiguity (file, record, repo): settle it by checking what you can, and state what you found. Ask the operator only when checking cannot settle it. Host identity is the exception: take it only from the source Tower Crane's directives name for it.
 
 Host list: use and run only what lists your host. If yours is not listed, say what the entry is and which hosts have it, and offer to add this host. A flow named in the entry itself takes precedence.
+
+Empty search: report what was searched.
+Problem found: fix and root cause in the same message.

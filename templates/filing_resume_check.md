@@ -14,12 +14,10 @@ this mechanism works and how it relates to other mechanisms.
 
 ## Change-request ticket scan (resume)
 
-The person operating this project and the person operating the tower_crane hub are the same
-individual, in a different session — not two parties handing tickets back and forth. A ticket you
-find here `OPEN` and untouched is that same operator's own earlier note to their future hub self,
-not a request pending from someone else; a ticket you find already `DONE`, or carrying a round-trip
-entry this session didn't write, most likely means the operator took a manual action in the hub
-(or another session of this project) that this session simply has no visibility into — treat that
+A ticket you find here `OPEN` and untouched is the operator's own earlier note to their future hub
+self, not a request pending from someone else; a ticket you find already `DONE`, or carrying a
+round-trip entry this session didn't write, most likely means the operator took a manual action in
+the hub (or another session of this project) that this session has no visibility into — treat that
 as expected, not as something to flag or second-guess.
 
 At session start, and on every `resume`, `consumer_resume_check.py` step 4 runs the scan of the hub
