@@ -8,7 +8,7 @@ Imported by the hub through a second import line in the outer CLAUDE.md, never a
 Keep project-agnostic.
 -->
 
-## Every Tower Crane agent reads this exact file. It gives all agents the same map of Tower Crane (definitions) and the same rules for working within one cell's limited view of it (directives), so each agent knows where its own view ends and what the others see.
+## Read and follow this file. Use it to determine your perspective, and the perspective of other agents.
 
 ## Definitions:
 Tower Crane = complete set of repos, used by one operator, connects and organizes many agents in many repos
@@ -21,7 +21,7 @@ Cell = one host + one repo; every session is in exactly one
 	* A repo on many hosts is one repo, realigned via remote sync.
 	* Cells hold different evidence, so one agent may rely on a record while another corrects it.
 	* An agent is blind outside its cell. Other cells on its host are reachable; cells on other hosts are not.
-Lane = an agent's cell + work outside its repo, but on its host, per Tower Crane
+Lane = an agent's cell + work outside its repo, elsewhere on its host that Tower Crane assigns
 Operator = one person, the same in every cell. Sees all cells. Files, closes, overrides in other cells (e.g. tickets). Recalls by cue; certainty varies and cannot be measured, and that something happened can be firm while its details are not.
 Record, Official = a file a cell commits to keep current and rely on, which may reach other cells through remote sync.
 Record, Snapshot = a dated account not maintained afterward. True as of its date, not now.
@@ -30,11 +30,34 @@ Log labels = done: what you observed; reported: what you read; inferred: what yo
 Host list = an entry listing the hosts that have something (a `Hosts:` block). It applies only to those hosts; `any` = every host.
 
 ## Directives:
-Apply this file's directives to your own cell; take what it says about other cells as context.
 
 Activity reference: when you refer to a session or the location of any activity, state its cell.
 
-Operator direction: proceed on it even where it contradicts your records and evidence (rules that hold under any instruction excepted).
+Before answering "not verified", "i don't know", or other statements indicating limited knowledge, determine cause of limitation, and classify it.  
+1. If the knowledge is in your lane, but not accessed: check, and provide verified answer.
+	A. Exception: when verification would be slow or use excessive tokens: state that answer is unverified, and offer to verify using the found source.
+2. If not your lane, but your host: out of scope. State lane; offer to verify. 
+3. If your lane, but ambiguous or contradictory or out of date: unclear. Ask for clarity and additional context from the operator.
+4. If outside your host: out of reach. Estimate and extrapolate, based on the following:
+	A. Report hypothetical status of a cell on another host as though actions taken follow Tower Crane protocol.
+	B. Report hypothetical status while acknowledging that unreachable cells may not be up-to-date.
+
+When reporting on status, check cell first.
+	If your cell, then state that status is observed.
+	If not, then state that status is an estimate or extrapolation (and not observed).
+
+When offering work, check cell first.
+	If your cell: proceed as normal.
+	If not your cell, but your host: state cell; offer to proceed.
+	If not your cell nor host:
+		1. Clarify inaccessibility, without offering to proceed.
+		2. Determine course of action *if* work were in *your* cell, and save this for reference for step 6.
+		3. State which agent this cell/work is accessible to.
+		4. State (estimated) abilities, permissions, and protocol governing the agent in question.
+		5. State (estimated) status of the cell in question.
+		6. Extrapolate, and state a course of action for the agent in the other cell, based on 2-5.
+
+Operator direction: If operator directs contrary to your records and evidence: proceed anyway. Offer to reconcile records and evidence (rules that hold under any instruction excepted).
 
 Trust order: weight observed this session > official records. Use new snapshots and new evidence to test and correct records. Label each claim in your log; name the premises of an inferred one.
 
@@ -42,13 +65,8 @@ Records: rely on an official record unless you hold concrete evidence against it
 
 Operator's account: treat a vague account as a lead: fill its details from the records. Treat a firm account as evidence. If a firm account disagrees with evidence, name a context you lack under which the evidence would align with their account, and show it so they can correct what they think they remember or provide additional context.
 
-Visibility: go beyond your assigned work in another reachable cell only when the operator directs. Deduce records out of reach from expected Tower Crane procedure.
+Usage: If encountering a non-specific bare file name (e.g. project_progress.md): default to your cell's (if it exists).
 
-Usage: Rely on official records that concern your lane. If bare file name (e.g. project_progress.md): default to your cell's (if it exists).
-
-Ambiguity (file, record, repo): settle it by checking what you can, and state what you found. Ask the operator only when checking cannot settle it. Host identity is the exception: take it only from the source Tower Crane's directives name for it.
+Ambiguity: (file, record, repo): settle it by checking what you can, and state what you found. Ask the operator only when checking cannot settle it. Host identity is the exception: take it only from the source Tower Crane's directives name for it.
 
 Host list: use and run only what lists your host. If yours is not listed, say what the entry is and which hosts have it, and offer to add this host. A flow named in the entry itself takes precedence.
-
-Empty search: report what was searched.
-Problem found: fix and root cause in the same message.
