@@ -140,8 +140,8 @@ exists but isn't reachable from this session rather than omitting it silently.
 checkpoint → also mention: resume (reciprocal)
 archive (work log) → also mention: checkpoint (lifecycle-sibling, only once the Work Log has
   actually grown large enough to need archiving)
-update → also mention: update consumers, the hub-operator side of the same content pushed
-  instead of pulled (accelerant)
+update → also mention: update consumers, the hub-operator side that runs the same update for
+  every consumer at once (accelerant)
 ```
 
 ### Reaching the hub from here

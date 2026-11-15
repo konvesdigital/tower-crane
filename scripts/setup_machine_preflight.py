@@ -205,6 +205,7 @@ This is the one file in either repo (outer or `toolkit\\`) that keeps Claude Cod
 
 @toolkit/AGENTS.md
 @toolkit/templates/identity.md
+@toolkit/templates/hub_capabilities.md
 """
 
 GITIGNORE_TEMPLATE = """/toolkit/

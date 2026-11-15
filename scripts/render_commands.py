@@ -9,6 +9,8 @@ Modes (pick one; --context hub|consumer says which session is asking, default co
                           carries NAME, one `trigger - summary` line each. Nodes sharing the
                           literal trigger prefix before ` "` or ` search` (every `shared
                           resources "..."` node) collapse into one line listing their actions.
+  --nodes ID [ID...]      the named nodes in the order given, one `trigger - summary` line each,
+                          with no context filter (the caller names exactly the nodes it wants).
   --path                  the catalog's `path` section, in order, filtered to nodes whose
                           `context` fits (the beginner tier's spine).
   --reach                 consumer view: three tiers - fully reachable, partially reachable
@@ -145,6 +147,14 @@ def render_theme(cat, ctx, theme):
     return '\n'.join(out)
 
 
+def render_nodes(cat, ids):
+    out = []
+    for nid in ids:
+        n = cat['by_id'].get(nid)
+        out.append(f'  {n["trigger"]} - {summary(n)}' if n else f'[!] unknown node id: {nid}')
+    return '\n'.join(out)
+
+
 def render_path(cat, ctx):
     out, step = [], 0
     for nid in cat['path']:
@@ -206,6 +216,7 @@ def main():
     ap.add_argument('--catalog', default=str(DEFAULT_CATALOG))
     mode = ap.add_mutually_exclusive_group(required=True)
     mode.add_argument('--theme', nargs='+')
+    mode.add_argument('--nodes', nargs='+', metavar='NODE_ID')
     mode.add_argument('--path', action='store_true')
     mode.add_argument('--reach', action='store_true')
     mode.add_argument('--neighbors', metavar='NODE_ID')
@@ -217,6 +228,10 @@ def main():
         return 1
     if args.theme:
         print('\n\n'.join(render_theme(cat, args.context, t) for t in args.theme))
+    elif args.nodes:
+        text = render_nodes(cat, args.nodes)
+        print(text)
+        return 1 if '[!] unknown node id' in text else 0
     elif args.path:
         print(render_path(cat, args.context))
     elif args.reach:

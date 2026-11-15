@@ -6,14 +6,13 @@ same as every other self-use tool. Float-on-HEAD: this file is the one canonical
 always re-reads live. This file describes THIS hub's own operator-facing capabilities — it never
 governs a consumer project's session (that's templates\commands.md instead).
 
-Fluent-tier track sourcing ("partial conversion" decision, 2026-08-02): only "Efficiency habits"
-below is catalog-derived - the only one of this file's three
-tracks with a real matching theme tag in the locked design (`efficiency-rationale`). "Toolkit
-evolution" and "Fleet operations" stay hand-authored - no matching theme tag exists for either yet,
-and inventing one just to force uniformity would violate the theme-tag test itself (two members
-from different structural clusters, nameable in one clause). No functional loss either way - the
-theme layer is additive to `capability_relationships`' own answers regardless. Revisit only if a
-real third theme naturally emerges - don't invent one for this. See templates\commands.md's own
+Fluent-tier track sourcing: "Efficiency habits" is catalog-derived by theme (`efficiency-rationale`).
+"Toolkit evolution" and "Fleet operations" have no matching theme tag, and inventing one just to
+force uniformity would violate the theme-tag test itself (two members from different structural
+clusters, nameable in one clause). Their membership is a hand-kept list of node ids in the commands
+below, and each node's one-line action is rendered from the catalog by `render_commands.py --nodes`,
+so no command's definition is written twice. Revisit only if a real third theme naturally emerges -
+don't invent one for this. See templates\commands.md's own
 header for the consumer-side half of the same call.
 
 "Reciprocal pairs to volunteer" below is separately catalog-derived as of 2026-08-03, mirroring
@@ -50,6 +49,11 @@ follow-up turn required.
 as one bare command (`<python_launcher>` and `<hub root>` as in `templates\update.md` Step 1) and
 use its block as that track, one short one-line action per printed node.
 
+**"Toolkit evolution" and "Fleet operations" are rendered live from node ids**, one bare command
+each, and each printed line is that track's line for the node:
+- Toolkit evolution: `<python_launcher> "<hub root>/toolkit/scripts/render_commands.py" --nodes new_tool modify_tool propose_upstream update_hub self_hooks`
+- Fleet operations: `<python_launcher> "<hub root>/toolkit/scripts/render_commands.py" --nodes connect_project disconnect_consumer update_consumers curate_shared_resources setup_automation`
+
 ```
 commands
 
@@ -61,18 +65,10 @@ Efficiency habits:
   archive — move resolved Work Log entries into the archive file, once it's grown enough to need it
 
 Toolkit evolution:
-  new tool — add a tool to the shared library
-  modify tool — change/remove an existing tool
-  propose upstream — send a local fix to the public repo
-  update — pull the public repo's latest
-  self hooks — toggle this hub's own dogfooding
+  <rendered from capability_catalog.yaml by node id, same format as above>
 
 Fleet operations:
-  connect project — register a new or existing consumer
-  disconnect project — remove a consumer (this machine, every other machine, or everywhere)
-  update consumers — bulk-push new hub functionality to every registered consumer
-  curate shared resources — push an insight to every consumer
-  read setup_automation.md and follow it — wire up unattended ticket processing
+  <rendered from capability_catalog.yaml by node id, same format as above>
 ```
 
 ### Beginner tier - guided story

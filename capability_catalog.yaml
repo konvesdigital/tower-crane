@@ -64,19 +64,19 @@ nodes:
   - id: update_consumer
     trigger: "update (consumer session)"
     context: consumer
-    description: "Pulls hub functionality this project hasn't adopted yet"
+    description: "Writes into this project's own files whatever the hub now offers that the project hasn't adopted. A change to a hub file this project already reads is live for it and needs no run."
     themes: []
 
   - id: update_consumers
     trigger: "update consumers"
     context: hub
-    description: "Bulk-pushes hub functionality to every registered consumer"
+    description: "Writes changes into each registered consumer's own project files and its registry entry so they match what the hub now offers. A change to a hub file a consumer already reads is live for it and needs no run. It does not carry shared-resources entries."
     themes: [push-outward]
 
   - id: new_tool
     trigger: "new tool"
     context: hub
-    description: "Adds a new tool, public (toolkit\\, world-readable) or private (toolkit_private\\, never leaves this machine) — asks which, or jump straight to private via \"new private tool\". Both branches reach every connected consumer the identical automatic way once opted in via `update`/`update consumers` — the public/private choice only decides who else can see the code, never how many of this operator's own projects it can reach"
+    description: "Adds a new tool to the shared library, public (`toolkit\\`) or private (`toolkit_private\\`, kept on this machine); asks which first, and `new private tool` skips the question. A consumer gets the tool only by opting in through `update` or `update consumers`, and the public/private choice decides who else can see the code, nothing more."
     themes: [push-outward]
     partial_reach:
       from: consumer
@@ -85,7 +85,7 @@ nodes:
   - id: modify_tool
     trigger: "modify tool"
     context: hub
-    description: "Changes or removes an existing shared tool"
+    description: "Changes or removes an existing shared tool. A change to the tool's own files is live for every consumer already opted in; a change to its opt-in snippet, or removal of its hook script, needs `update consumers`."
     themes: [push-outward]
     partial_reach:
       from: consumer
@@ -171,13 +171,13 @@ nodes:
   - id: broadcast_guidance
     trigger: "(no standalone trigger — reached only via curate_shared_resources step 3)"
     context: hub
-    description: "General reusable primitive: pushes one hand-authored guidance file into every (or one) registered consumer's COMPLIANCE_GUIDANCE.md"
+    description: "Writes one hand-authored guidance file into every (or one) registered consumer's COMPLIANCE_GUIDANCE.md, and is reached only through `curate shared resources`."
     themes: [push-outward]
 
   - id: curate_shared_resources
     trigger: "curate shared resources"
     context: hub
-    description: "Proactively pushes awareness of a catalog entry to consumers"
+    description: "Writes a one-line pointer for each chosen shared-resources entry into every registered consumer's `COMPLIANCE_GUIDANCE.md` `## Broadcast` section, never the entry's content. A consumer sees it at its next resume check."
     themes: [push-outward]
 
   - id: save
@@ -263,7 +263,7 @@ edges:
     a: update_consumers
     b: update_consumer
     conditional: false
-    note: "a consumer could always run its own `update`; bulk-push is a convenience, not a requirement"
+    note: "a consumer could always run its own `update`; running it for every consumer at once is a convenience, not a requirement"
 
   - type: lifecycle-sibling
     a: new_tool
