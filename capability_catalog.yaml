@@ -52,7 +52,7 @@ nodes:
   - id: update_hub
     trigger: "update (hub session)"
     context: hub
-    description: "Pulls the public toolkit repo's latest into the hub, trust-review gated"
+    description: "Pulls the public toolkit repo's latest into the hub on this host, trust-review gated. A consumer on this host sees changes to imported hub files when it begins a new session. A consumer on another host sees such changes when it begins a new session after its host's hub has updated."
     themes: []
 
   - id: propose_upstream

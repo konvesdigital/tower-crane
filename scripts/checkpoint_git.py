@@ -38,6 +38,7 @@ caller's cwd.
 """
 
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -53,7 +54,20 @@ OUTER_ROOT = TOOLKIT_ROOT.parent
 
 def _git(root, args, check=False):
     return subprocess.run(['git', '-C', str(root)] + args, capture_output=True,
-                           encoding='utf-8', check=check)
+                           encoding='utf-8', errors='replace', check=check)
+
+
+def _run_child(cmd):
+    """Runs a child script and returns (returncode, combined output). The child's output is
+    decoded as UTF-8 with replacement (never the Windows locale codec, which fails on UTF-8
+    output and leaves the captured text as None), and the child is told to write UTF-8. A
+    nonzero exit with no output is reported as an explicit error line, never as empty text."""
+    proc = subprocess.run(cmd, capture_output=True, encoding='utf-8', errors='replace',
+                          env={**os.environ, 'PYTHONIOENCODING': 'utf-8'})
+    out = (proc.stdout or '') + (proc.stderr or '')
+    if proc.returncode != 0 and not out.strip():
+        out = '[ERROR] %s exited %d and printed nothing.\n' % (Path(cmd[1]).name, proc.returncode)
+    return proc.returncode, out
 
 
 def is_repo(root):
@@ -147,23 +161,18 @@ def run_leak_scan(cfg):
     staged anything untracked it wants covered, since a truly untracked file is invisible to `git
     diff` regardless of options). Returns (passed: bool, output: str)."""
     _git(TOOLKIT_ROOT, ['fetch', 'origin'])
-    proc = subprocess.run(
+    code, out = _run_child(
         [cfg['python_launcher'], str(TOOLKIT_ROOT / 'scripts' / 'check_file_surface.py'),
-         '--base-sha', 'origin/main', '--head-sha', 'worktree'],
-        capture_output=True, text=True,
-    )
-    return proc.returncode == 0, proc.stdout + proc.stderr
+         '--base-sha', 'origin/main', '--head-sha', 'worktree'])
+    return code == 0, out
 
 
 def run_standing_constraints_check(cfg):
     """AGENTS.md's Standing Constraints section, HEAD vs the current worktree (uncommitted
     changes included). Returns (changed: bool, output: str)."""
-    proc = subprocess.run(
+    _code, out = _run_child(
         [cfg['python_launcher'], str(TOOLKIT_ROOT / 'scripts' / 'check_standing_constraints.py'),
-         '--base', 'HEAD', '--head', 'worktree'],
-        capture_output=True, text=True,
-    )
-    out = proc.stdout + proc.stderr
+         '--base', 'HEAD', '--head', 'worktree'])
     return out.lstrip().startswith('[CHANGED]'), out
 
 

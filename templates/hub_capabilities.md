@@ -9,7 +9,7 @@ Imported by the hub's outer CLAUDE.md only; consumers do not load it.
 - **checkpoint** — Saves progress, commits, pushes — scoped to whichever project the session is in
 - **resume / quick resume** — Pulls latest, checks compliance/tickets, picks up where left off. "quick resume" is the identical capability run in a faster mode right after a checkpoint, skipping sync checks — not a separate capability, just a lighter mode of this same one.
 - **archive** — Moves resolved Work Log entries into the archive file
-- **update (hub session)** — Pulls the public toolkit repo's latest into the hub, trust-review gated
+- **update (hub session)** — Pulls the public toolkit repo's latest into the hub on this host, trust-review gated. A consumer on this host sees changes to imported hub files when it begins a new session. A consumer on another host sees such changes when it begins a new session after its host's hub has updated.
 - **propose upstream** — Sends a local toolkit fix to the public repo via fork+PR
 - **update consumers** — Writes changes into each registered consumer's own project files and its registry entry so they match what the hub now offers. A change to a hub file a consumer already reads is live for it and needs no run. It does not carry shared-resources entries.
 - **new tool** — Adds a new tool to the shared library, public (`toolkit\`) or private (`toolkit_private\`, kept on this machine); asks which first, and `new private tool` skips the question. A consumer gets the tool only by opting in through `update` or `update consumers`, and the public/private choice decides who else can see the code, nothing more.

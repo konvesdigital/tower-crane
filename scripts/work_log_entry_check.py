@@ -2,8 +2,10 @@
 """
 work_log_entry_check.py - checks the NEWEST Work Log entry in project_progress.md against the
 entry template `checkpoint` step 1 defines, and flags DONE/REMOVED/BUILT/DROPPED in Current
-Status and Next Up. Read-only; prints [OK] or one [OVER-CAP]/[BAD-HEADER]/[STALE-MARKER] line per
-problem. Always exits 0 - a warning to fix before committing, never a block.
+Status and Next Up. Also scans the WHOLE file for stray control characters (TAB, BEL, a lone
+carriage return, any other non-text byte; a CRLF line ending is fine). Read-only; prints [OK] or
+one [OVER-CAP]/[BAD-HEADER]/[STALE-MARKER]/[CONTROL-CHAR] line per problem. Always exits 0 - a
+warning to fix before committing, never a block.
 
 The template (what checkpoint step 1 tells the author to write):
   Header line:  **YYYY-MM-DD - <host> / <repo> session (<topic>):** <first sentence of body>
@@ -26,6 +28,29 @@ MAX_LINES = 10
 LIVE_SECTIONS = ('current status', 'next up')
 MARKER_RE = re.compile(r'\b(DONE|REMOVED|BUILT|DROPPED)\b')
 HEADER_RE = re.compile(r'^\*\*\d{4}-\d{2}-\d{2}\s*[—–-]\s*.+?:\*\*')
+# Every control character except the line feed; a carriage return is checked separately in
+# control_char_problems() because only a CRLF pair is legitimate.
+CONTROL_RE = re.compile(r'[\x00-\x09\x0b-\x1f\x7f]')
+CONTROL_NAMES = {'\t': 'TAB', '\x07': 'BEL', '\r': 'lone carriage return'}
+MAX_SHOWN = 5
+
+
+def control_char_problems(text):
+    """One [CONTROL-CHAR] line per kind of stray character, with up to MAX_SHOWN line numbers.
+    A carriage return directly before a line feed (CRLF) is normal and not reported."""
+    found = {}
+    for m in CONTROL_RE.finditer(text):
+        char = m.group()
+        if char == '\r' and text[m.end():m.end() + 1] == '\n':
+            continue
+        found.setdefault(char, []).append(text.count('\n', 0, m.start()) + 1)
+    out = []
+    for char, where in found.items():
+        shown = ', '.join(str(n) for n in where[:MAX_SHOWN])
+        more = ' (+%d more)' % (len(where) - MAX_SHOWN) if len(where) > MAX_SHOWN else ''
+        out.append('[CONTROL-CHAR] %s x%d at line %s%s - delete it; it is not text.'
+                   % (CONTROL_NAMES.get(char, 'U+%04X' % ord(char)), len(where), shown, more))
+    return out
 
 
 def main():
@@ -34,11 +59,14 @@ def main():
     root = Path(ap.parse_args().project_root)
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     try:
-        lines = (root / 'project_progress.md').read_text(encoding='utf-8').splitlines()
+        # Raw bytes, not read_text(): universal-newline reading would turn a lone carriage
+        # return into a line break and hide it from the control-character scan below.
+        text = (root / 'project_progress.md').read_bytes().decode('utf-8', errors='replace')
     except OSError:
         print('[ABSENT] project_progress.md not readable - no entry to check.')
         return 0
-    problems = []
+    lines = text.splitlines()
+    problems = control_char_problems(text)
     for text, s, e in split_sections(lines):
         name = next((n for n in LIVE_SECTIONS if text.lower().startswith(n)), None)
         if not name:
