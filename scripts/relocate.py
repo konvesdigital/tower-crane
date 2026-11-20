@@ -16,9 +16,11 @@ It rewrites ONLY the command string of hooks that reference an opted-in tool's h
 (hooks/<tool>.ps1 or .py). It never adds, removes, or reorders unrelated settings/hooks. On the
 current machine with an already-current settings.json it is a no-op.
 
-Cross-repo note: this writes into each consumer's OWN repo working tree (it does not commit). The
-consumer's next session verifies the hook still fires and commits - the change-request round-trip
-(a behavior-changing edit to a live consumer). Run --dry-run first to preview.
+Cross-repo note: this writes into each consumer's OWN repo working tree AND commits and pushes
+there itself (report_consumer_commit -> commit_consumer_changes), since no live session in that repo
+would otherwise notice and checkpoint the change. If the push diverges, it resets and regenerates
+this host's own Tower-Crane-owned values rather than text-merging. The consumer's next session only
+needs to confirm the hook still fires. Run --dry-run first to preview (it writes and commits nothing).
 """
 
 import argparse

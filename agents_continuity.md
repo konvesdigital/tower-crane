@@ -167,7 +167,7 @@ judgment.
    decide now; for those, read the diff and write your own plain-language assessment — benign, or
    destructive/obfuscated/exfiltration-shaped/inconsistent with the file's stated purpose? **Show
    both the literal diff and your assessment together, always** (`trust_and_values_draft.md` Part 1
-   §4) — quoted verbatim in your own chat-visible response, never tool output alone.
+   §4) — quoted verbatim in your own chat-visible response (a fenced code block for anything non-trivial), never tool output alone.
 6. Ask whether to approve. Everything shown: `python toolkit/scripts/update_toolkit.py --approve` (also
    runs a post-merge `check_tower_crane.py`, auto-rolling back on failure before
    `last_reviewed_sha` advances). Only the leading items: `--approve --through <n>` (`<n>` = last

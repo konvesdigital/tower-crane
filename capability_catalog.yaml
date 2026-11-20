@@ -177,7 +177,7 @@ nodes:
     themes: []
 
   - id: relocate
-    trigger: "(auto, after config.local.json changes)"
+    trigger: "relocate (run after a hub move or rename)"
     context: hub
     description: >-
       Brings every consumer registered on this host back in line with where the hub now lives, via
@@ -189,7 +189,7 @@ nodes:
       consumer's own repo, so its next session needs only to confirm the hooks still fire.
       Consumers not connected on this host are skipped, and a run on an already-current consumer
       changes nothing. Other hosts need no run of their own: they pick the change up at their next
-      relocate or `resume` pass. `setup_machine` runs it, and a `[NOTICE]` from any script after a
+      relocate or `resume` pass. `setup_machine` and `update` run it, and a `[NOTICE]` from any script after a
       hub move points to it.
     themes: []
 
