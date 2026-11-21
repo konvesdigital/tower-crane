@@ -23,12 +23,29 @@ self-corrects automatically. python_launcher / host_id / identity / publish.* ar
 fields that genuinely differ per machine and need a human to fill them in.
 """
 
+import hashlib
 import json
 import os
 import platform
 import re
 import subprocess
 from pathlib import Path
+
+
+def normalize_crlf(data):
+    """bytes with every CRLF pair turned into LF. Git for Windows (core.autocrlf=true) checks files
+    out as CRLF on one host while a scaffolder-written copy on another is LF, so any byte-level
+    comparison of repo files must go through this (or through newline_variant_hashes) first."""
+    return data.replace(b'\r\n', b'\n')
+
+
+def newline_variant_hashes(data):
+    """The set of sha256 hex digests data could legitimately carry: as given, LF-normalized, and
+    CRLF-normalized. A hash stamped on a host that had the file as LF or as CRLF matches on a host
+    that has it the other way."""
+    lf = normalize_crlf(data)
+    crlf = lf.replace(b'\n', b'\r\n')
+    return {hashlib.sha256(v).hexdigest() for v in (data, lf, crlf)}
 
 
 def missing_template_message(path, needed_for):

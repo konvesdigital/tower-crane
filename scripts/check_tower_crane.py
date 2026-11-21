@@ -68,7 +68,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from config_lib import (
     get_shared_config, get_expanded_optin, get_dispatch_optin, materialize_skill_stub,
     HUB_POINTER_IMPORT_LINE, HUB_POINTER_RELPATH, HUB_DISPATCH_RELPATH, HUB_DISPATCH_TEMPLATE,
-    parse_hub_pointer, dead_hook_tools,
+    parse_hub_pointer, dead_hook_tools, normalize_crlf,
 )
 from guidance_lib import read_sections, write_section, SECTION_CHECKER
 from registry_lib import parse_registry, effective_scope, host_path, reconcile_scope_floor
@@ -389,6 +389,37 @@ def invoke_duplicate_hook_tests():
     case('unrelated hooks are never flagged', [other, other], [])
 
 
+def invoke_crlf_comparison_tests():
+    """Pass A: a byte-level comparison must not depend on whether git checked a file out with LF or
+    CRLF (Git for Windows' core.autocrlf=true converts on checkout). Each case writes the same text
+    both ways and asserts the comparison agrees; a case that fails names a site that would report
+    false drift or a false change on a host whose repos were checked out rather than scaffolded."""
+    import tempfile
+    print()
+    print("--- Pass A: CRLF-safe byte comparisons ---")
+    import hashlib
+    from check_shared_resource_drift import matches_stamped_hash
+    text = "line one\nline two\nline three\n"
+    lf_bytes = text.encode('utf-8')
+    crlf_bytes = text.replace('\n', '\r\n').encode('utf-8')
+    tmp = Path(tempfile.mkdtemp(prefix='tc_crlf_'))
+    try:
+        lf_path, crlf_path = tmp / 'lf.md', tmp / 'crlf.md'
+        lf_path.write_bytes(lf_bytes)
+        crlf_path.write_bytes(crlf_bytes)
+        lf_stamp = hashlib.sha256(lf_bytes).hexdigest()
+        crlf_stamp = hashlib.sha256(crlf_bytes).hexdigest()
+        report('PASS' if matches_stamped_hash(crlf_path, lf_stamp) else 'FAIL',
+               "CRLF comparisons / drift: hash stamped on an LF host matches the CRLF checkout")
+        report('PASS' if matches_stamped_hash(lf_path, crlf_stamp) else 'FAIL',
+               "CRLF comparisons / drift: hash stamped on a CRLF host matches the LF copy")
+        lf_path.write_bytes((text + "extra\n").encode('utf-8'))
+        report('PASS' if not matches_stamped_hash(lf_path, lf_stamp) else 'FAIL',
+               "CRLF comparisons / drift: a real content change is still reported")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def invoke_rescaffold_test(config, this_host):
     """Pass A: re-running new_consumer.py on an already-connected, pointer-form project must leave
     its settings.json (no repointed or duplicated hooks), CLAUDE.md and skill stubs byte-identical.
@@ -426,13 +457,13 @@ def invoke_rescaffold_test(config, this_host):
         watched = [p for p in (tmp / '.claude').rglob('*')
                    if p.is_file() and p.name in ('settings.json', 'SKILL.md', '_hub_dispatch.py')]
         watched.append(tmp / 'CLAUDE.md')
-        before = {p: p.read_bytes().replace(bytes([13, 10]), bytes([10])) for p in watched}
+        before = {p: normalize_crlf(p.read_bytes()) for p in watched}
 
         proc = subprocess.run(
             [config['python_launcher'], str(SHARED_ROOT / 'scripts' / 'new_consumer.py'),
              '--target-path', str(tmp), '--project-name', c['name'], '--dry-run'],
             capture_output=True, text=True, encoding='utf-8')
-        changed = [str(p.relative_to(tmp)) for p, data in before.items() if p.read_bytes().replace(bytes([13, 10]), bytes([10])) != data]
+        changed = [str(p.relative_to(tmp)) for p, data in before.items() if normalize_crlf(p.read_bytes()) != data]
         if proc.returncode == 0 and not changed:
             report('PASS', f"re-scaffold of '{c['name']}' left settings.json, CLAUDE.md and "
                            f"{len(before) - 2} other watched files unchanged.")
@@ -1156,6 +1187,7 @@ def main():
         invoke_block_patcher_tests()
         invoke_rescaffold_test(config, this_host)
         invoke_duplicate_hook_tests()
+        invoke_crlf_comparison_tests()
     if not args.skip_reference:
         invoke_reference_scan(config, this_host, args.consumer, args.write_guidance, head_sha, today)
         check_hub_self_use_skills(config)

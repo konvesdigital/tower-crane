@@ -26,10 +26,12 @@ overwriting the stub, then re-run this script so the marker's hash is refreshed.
 """
 
 import argparse
-import hashlib
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from config_lib import newline_variant_hashes  # noqa: E402  (path insert above)
 
 MARKER_RE = re.compile(
     r'<!--\s*shared_resources:\s*(?P<entry>.+?)\s+adopted\s+\d{4}-\d{2}-\d{2}'
@@ -50,8 +52,10 @@ def resolve_path(raw):
     return (Path.home() / normalized[2:]).resolve()
 
 
-def sha256_of(path):
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+def matches_stamped_hash(path, stamped):
+    """True if the file's content hashes to the stamped value as given, LF-normalized, or
+    CRLF-normalized, so a checkout's line endings never read as a content change."""
+    return stamped in newline_variant_hashes(path.read_bytes())
 
 
 def check_stub(skill_md):
@@ -75,8 +79,7 @@ def check_stub(skill_md):
                 "source path doesn't resolve - that's check_shared_resource_refs.py's concern, "
                 "not this script's.")
 
-    live_hash = sha256_of(resolved)
-    if live_hash == marker.group('hash'):
+    if matches_stamped_hash(resolved, marker.group('hash')):
         return ('OK', skill_md.parent.name, f"source content unchanged since '{marker.group('entry')}' was adopted.")
 
     return ('DRIFT', skill_md.parent.name,
